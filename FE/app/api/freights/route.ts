@@ -1,3 +1,4 @@
+import { badJson, readBody, validationError } from "@railhub/be/http";
 import { match } from "@railhub/be/matching";
 import { seed } from "@railhub/be/seed";
 import { listShipments, registerShipment, validateShipmentInput } from "@railhub/be/store";
@@ -14,20 +15,12 @@ export function GET() {
 
 /** POST /api/freights — 화물 등록 */
 export async function POST(req: Request) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "본문(JSON)을 파싱할 수 없습니다." }, { status: 400 });
-  }
+  const body = await readBody(req);
+  if (body.kind === "invalid") return badJson();
+  const raw = body.kind === "json" ? body.value : {};
 
-  const { ok, errors, value } = validateShipmentInput(body, seed);
-  if (!ok || !value) {
-    return Response.json(
-      { error: "입력값이 올바르지 않습니다.", fields: errors },
-      { status: 400 },
-    );
-  }
+  const { ok, errors, value } = validateShipmentInput(raw, seed);
+  if (!ok || !value) return validationError(errors);
 
   const shipment = registerShipment(value, seed);
 

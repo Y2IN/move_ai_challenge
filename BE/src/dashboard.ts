@@ -18,6 +18,8 @@ import type {
 /** #7 홈 대시보드 — persona별 KPI(큐레이션) + 편익 내역 */
 export function getDashboard(persona: Persona, data: SeedData = seed): DashboardResponse {
   const d = data.dashboard;
+  // 방어: 시드에 없는 persona 로 호출돼도 500 대신 corp 로 폴백한다.
+  const personaData = d.personas[persona] ?? d.personas.corp;
 
   // ── 편익 내역 seam ──────────────────────────────────────────
   // 편익 계산 모듈(#27)이 준비되면 아래 두 값을 그 함수 호출로 교체한다.
@@ -28,7 +30,7 @@ export function getDashboard(persona: Persona, data: SeedData = seed): Dashboard
   return {
     persona,
     period: d.period,
-    kpis: d.personas[persona].kpis,
+    kpis: personaData.kpis,
     subsidyEstimate: d.subsidyEstimate,
     equivalents: d.equivalents,
     breakdown,

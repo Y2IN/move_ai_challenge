@@ -1,3 +1,4 @@
+import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/http";
 import { seed } from "@railhub/be/seed";
 import { confirmMatch, validateShipmentInput } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
@@ -13,27 +14,23 @@ export const dynamic = "force-dynamic";
  *  - 편성이 성립(matched)하지 않으면 409 로 매칭 결과를 그대로 돌려준다.
  */
 export async function POST(req: Request) {
-  const body = await readJson(req);
-  const b = (body && typeof body === "object" ? body : {}) as {
-    input?: unknown;
-    acceptedShipmentIds?: unknown;
-  };
+  const body = await readBody(req);
+  if (body.kind === "invalid") return badJson();
+  const raw =
+    body.kind === "json" && body.value && typeof body.value === "object" && !Array.isArray(body.value)
+      ? (body.value as { input?: unknown; acceptedShipmentIds?: unknown })
+      : {};
 
   // 입력이 있으면 검증 후 사용, 없으면 시드 단독
   let input: ShipmentInput | null = null;
-  if (b.input != null && typeof b.input === "object" && Object.keys(b.input).length > 0) {
-    const v = validateShipmentInput(b.input, seed);
-    if (!v.ok || !v.value) {
-      return Response.json(
-        { error: "입력값이 올바르지 않습니다.", fields: v.errors },
-        { status: 400 },
-      );
-    }
+  if (!isEmptyObject(raw.input)) {
+    const v = validateShipmentInput(raw.input, seed);
+    if (!v.ok || !v.value) return validationError(v.errors);
     input = v.value;
   }
 
-  const acceptedShipmentIds = Array.isArray(b.acceptedShipmentIds)
-    ? b.acceptedShipmentIds.filter((x): x is string => typeof x === "string")
+  const acceptedShipmentIds = Array.isArray(raw.acceptedShipmentIds)
+    ? raw.acceptedShipmentIds.filter((x): x is string => typeof x === "string")
     : [];
 
   const result = confirmMatch(input, acceptedShipmentIds, seed);
@@ -44,12 +41,4 @@ export async function POST(req: Request) {
     );
   }
   return Response.json({ confirmation: result.confirmation }, { status: 201 });
-}
-
-async function readJson(req: Request): Promise<unknown> {
-  try {
-    return await req.json();
-  } catch {
-    return null;
-  }
 }

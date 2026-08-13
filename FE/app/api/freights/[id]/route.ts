@@ -1,3 +1,4 @@
+import { badJson, readBody, validationError } from "@railhub/be/http";
 import { seed } from "@railhub/be/seed";
 import { deleteShipment, updateShipment } from "@railhub/be/store";
 
@@ -10,22 +11,16 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function PATCH(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "본문(JSON)을 파싱할 수 없습니다." }, { status: 400 });
-  }
+  const body = await readBody(req);
+  if (body.kind === "invalid") return badJson();
+  const patch = body.kind === "json" ? body.value : {};
 
-  const result = updateShipment(id, body, seed);
+  const result = updateShipment(id, patch, seed);
   if (result.status === "notFound") {
     return Response.json({ error: `화물을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
   if (result.status === "invalid") {
-    return Response.json(
-      { error: "입력값이 올바르지 않습니다.", fields: result.errors },
-      { status: 400 },
-    );
+    return validationError(result.errors);
   }
   return Response.json({ shipment: result.shipment });
 }

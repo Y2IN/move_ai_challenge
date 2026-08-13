@@ -35,10 +35,11 @@ const ARRANGEMENTS: readonly TransportArrangement[] = ["consignment", "own"];
 
 // ── 스토어 상태 ────────────────────────────────────────────────
 
-/** 등록 화물은 원본 입력과 정규화된 Shipment 를 함께 보관한다 (부분 수정 시 merge 재검증용). */
+/** 등록 화물은 원본 입력·정규화된 Shipment·발급 seq 를 함께 보관한다 (부분 수정 시 merge 재검증·id 재발급용). */
 interface StoredShipment {
   input: ShipmentInput;
   shipment: Shipment;
+  seq: number;
 }
 const registered: StoredShipment[] = [];
 let seq = 0;
@@ -47,17 +48,21 @@ let seq = 0;
 const confirmations: Confirmation[] = [];
 let confirmSeq = 0;
 
+/** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
+function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipment {
+  return {
+    ...normalizeInput(input, data),
+    id: `SHM-USER-${String(n).padStart(3, "0")}`,
+    // 상호를 준 경우에만 화주도 별도로 구분해 둔다 (목록에서 구별 가능하도록).
+    shipperId: input.shipperName ? `SHP-USER-${n}` : "SHP-USER",
+  };
+}
+
 /** 등록: 입력을 Shipment 로 정규화해 스토어에 넣고, 만들어진 레코드를 돌려줍니다. */
 export function registerShipment(input: ShipmentInput, data: SeedData = seed): Shipment {
-  const normalized = normalizeInput(input, data);
   seq += 1;
-  const shipment: Shipment = {
-    ...normalized,
-    id: `SHM-USER-${String(seq).padStart(3, "0")}`,
-    // 상호를 준 경우에만 화주도 별도로 구분해 둔다 (목록에서 구별 가능하도록).
-    shipperId: input.shipperName ? `SHP-USER-${seq}` : "SHP-USER",
-  };
-  registered.push({ input, shipment });
+  const shipment = buildShipment(input, seq, data);
+  registered.push({ input, shipment, seq });
   return shipment;
 }
 
@@ -92,12 +97,9 @@ export function updateShipment(
   const v = validateShipmentInput(merged, data);
   if (!v.ok || !v.value) return { status: "invalid", errors: v.errors };
 
-  const normalized = normalizeInput(v.value, data);
-  const shipment: Shipment = {
-    ...normalized,
-    id: record.shipment.id,
-    shipperId: record.shipment.shipperId,
-  };
+  // 등록과 같은 규칙(buildShipment)으로 재발급 — id 는 seq 로 동일하게 유지되고,
+  // shipperName 을 새로 넣으면 shipperId 도 등록 경로와 일관되게 바뀐다.
+  const shipment = buildShipment(v.value, record.seq, data);
   record.input = v.value;
   record.shipment = shipment;
   return { status: "updated", shipment };
@@ -202,7 +204,7 @@ export function validateShipmentInput(
   else if (!stationIds.has(destStationId))
     errors.destStationId = `등록되지 않은 역 코드입니다: ${destStationId}`;
 
-  if (originStationId && originStationId === destStationId)
+  if (originStationId && originStationId === destStationId && !errors.destStationId)
     errors.destStationId = "출발역과 도착역이 같습니다.";
 
   const category = b.category as ItemCategory;

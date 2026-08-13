@@ -120,6 +120,7 @@
         "requiredArrivalBy": "2026-08-25"
       },
       "currentMode": "road",
+      "transportArrangement": "consignment",
       "roadDirectDistanceKm": 385.0,
       "currentRoadFareKrw": 580000,
       "constraintText": "월말 정산 때문에 25일 전에는 무조건 도착해야 합니다. 파렛트 적재라 지게차 하역 되는 역이어야 하고, 부품에 녹 슬면 안 되니 비 맞는 건 안 됩니다. 출발일은 20일로 잡아뒀는데 도착만 맞으면 앞뒤로 조정은 가능해요.",
@@ -163,6 +164,7 @@
         "requiredArrivalBy": "2026-08-22"
       },
       "currentMode": "road",
+      "transportArrangement": "consignment",
       "roadDirectDistanceKm": 370.0,
       "currentRoadFareKrw": 495000,
       "constraintText": "19일 출고로 잡혀 있긴 한데 도착이 22일까지면 하루 이틀은 조정 가능합니다. 냉장은 아니어도 되지만 필름이라 비 맞으면 전량 폐기라 유개차 아니면 못 보냅니다. 야간 출발은 상관없어요.",
@@ -206,6 +208,7 @@
         "requiredArrivalBy": "2026-08-26"
       },
       "currentMode": "road",
+      "transportArrangement": "consignment",
       "roadDirectDistanceKm": 372.0,
       "currentRoadFareKrw": 360000,
       "constraintText": "물량이 적어서 단독으로는 철도를 못 씁니다. 다음 주 나갈 물량도 있는데 같이 실을 수 있으면 좋겠어요. 다만 출고 인력이 주말에는 없어서 토·일 출발은 불가능합니다.",
@@ -250,6 +253,7 @@
         "requiredArrivalBy": "2026-08-31"
       },
       "currentMode": "road",
+      "transportArrangement": "consignment",
       "roadDirectDistanceKm": 372.0,
       "currentRoadFareKrw": 420000,
       "constraintText": "24일 출고 예정 물량입니다. 창고에 이미 다 나와 있어서 당겨서 보내는 건 문제 없습니다.",
