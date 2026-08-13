@@ -181,8 +181,18 @@ export interface EsgSection {
   /** 이 문단이 대응하는 공시 기준 */
   standard: string;
   text: string;
-  /** ai = Claude 생성, fallback = 템플릿 대체 */
-  source: "ai" | "fallback";
+  /**
+   * 이 문장이 어디서 왔는지.
+   *
+   *   ai        Claude 가 생성하고 숫자 검증을 통과한 문장
+   *   fallback  템플릿 문장 (인증 없음·호출 실패·검증 실패)
+   *   user      **서버가 생성을 보증할 수 없는 문장** — 클라이언트가 보낸 것
+   *
+   * `user` 를 별도로 두는 이유: 재생성 시 클라이언트가 기존 문단을 그대로 돌려주는데,
+   * 서버는 그게 정말 우리가 만든 것인지 알 방법이 없습니다. 이걸 `ai` 로 실어주면
+   * 호출자가 임의 문장을 "AI 가 작성한 공시 문단"으로 둔갑시킬 수 있습니다.
+   */
+  source: "ai" | "fallback" | "user";
   /** 숫자 환각 검출 등 생성 과정에서 붙은 경고 */
   warnings: string[];
 }

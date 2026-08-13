@@ -1,7 +1,11 @@
-import { generateReport } from "@railhub/be/esg/narrative";
+import {
+  EsgSectionInputError,
+  generateReport,
+  parsePreviousSections,
+} from "@railhub/be/esg/narrative";
 import { isSectionKey, SECTION_KEYS } from "@railhub/be/esg/paragraphs";
 import { EsgQueryError, resolveAggregate } from "@railhub/be/esg/query";
-import type { EsgSection, EsgSectionKey } from "@railhub/be/esg/types";
+import type { EsgSectionKey } from "@railhub/be/esg/types";
 
 /**
  * #41 POST /api/esg/report
@@ -20,13 +24,14 @@ import type { EsgSection, EsgSectionKey } from "@railhub/be/esg/types";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+/** 본문은 신뢰할 수 없는 입력입니다. 타입 단언이 아니라 검증으로 좁힙니다. */
 interface ReportBody {
   period?: string;
   from?: string;
   to?: string;
   shipperId?: string;
-  sections?: string[];
-  previous?: EsgSection[];
+  sections?: unknown;
+  previous?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -42,14 +47,26 @@ export async function POST(request: Request) {
     if (!Array.isArray(body.sections)) {
       return Response.json({ error: "sections 는 문자열 배열이어야 합니다." }, { status: 400 });
     }
-    const unknown = body.sections.filter((key) => !isSectionKey(key));
+    const unknown = body.sections.filter((key) => typeof key !== "string" || !isSectionKey(key));
     if (unknown.length > 0) {
       return Response.json(
         { error: `알 수 없는 문단입니다: ${unknown.join(", ")} (가능한 값: ${SECTION_KEYS.join(", ")})` },
         { status: 400 },
       );
     }
-    sections = body.sections.filter(isSectionKey);
+    sections = body.sections.filter((k): k is EsgSectionKey => typeof k === "string" && isSectionKey(k));
+  }
+
+  // previous 도 sections 와 같은 수준으로 검증합니다. 여기를 비워두면
+  // 배열이 아닌 값이 generateReport 안에서 TypeError 를 내 400 이어야 할 요청이 500 이 됩니다.
+  let previous;
+  try {
+    previous = parsePreviousSections(body.previous);
+  } catch (error) {
+    if (error instanceof EsgSectionInputError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
   }
 
   try {
@@ -60,7 +77,7 @@ export async function POST(request: Request) {
       shipperId: body.shipperId,
     });
 
-    const report = await generateReport(agg, { sections, previous: body.previous });
+    const report = await generateReport(agg, { sections, previous });
     return Response.json(report);
   } catch (error) {
     if (error instanceof EsgQueryError) {
