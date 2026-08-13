@@ -349,6 +349,8 @@ export interface DashboardSeed {
   period: string;
   subsidyEstimate: SubsidyEstimate;
   equivalents: DashboardEquivalents;
+  /** 분기 누적 (랜딩 히어로·코레일 KPI 공용) */
+  cumulative: { shippers: number; filledWagons: number };
   /** 편익 내역 — 편익 계산 모듈(#27)이 준비되기 전까지 쓰는 큐레이션 값 */
   benefit: { totalBenefitKrw: number; breakdown: BenefitItem[] };
   personas: Record<Persona, { kpis: KpiCard[] }>;
@@ -364,4 +366,21 @@ export interface DashboardResponse {
   equivalents: DashboardEquivalents;
   breakdown: BenefitItem[];
   totalBenefitKrw: number;
+}
+
+// ── 랜딩 (STEP 01, 로그인 전) ──────────────────────────────────
+
+export interface PublicStatsBreakdownItem {
+  key: string;
+  label: string;
+  /** 표시 문자열 (예: "1억 5,800만") */
+  value: string;
+}
+
+/** #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요) */
+export interface PublicStats {
+  quarterSubsidy: SubsidyEstimate;
+  breakdown: PublicStatsBreakdownItem[];
+  cumulative: { shippers: number; filledWagons: number };
+  equivalents: DashboardEquivalents;
 }

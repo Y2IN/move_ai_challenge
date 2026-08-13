@@ -366,6 +366,7 @@
     "period": "2026Q2",
     "subsidyEstimate": { "amount": 342000000, "label": "3억 4,200만", "deltaPct": 38 },
     "equivalents": { "pineTrees": 40000, "trucksBlocked": 45 },
+    "cumulative": { "shippers": 128, "filledWagons": 1043 },
     "benefit": {
       "totalBenefitKrw": 1140000000,
       "breakdown": [
