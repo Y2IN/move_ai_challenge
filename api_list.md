@@ -25,16 +25,17 @@
 화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
 각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
 
-- **✅ 완료 (27):**
+- **✅ 완료 (28):**
   - 랜딩·대시보드: #6 #7 #8 #9
-  - 화물등록: #11 #12 #13 #14 #15
+  - 화물등록: #10 파싱(데모) · #11 #12 #13 #14 #15
   - 매칭: #16 #18 #19
   - 조율: #22 run · #25 조회 · #26 취소
   - 편익: #28 summary
   - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
   - ESG: #40 #41 #42
 - **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits/calculate(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
-- **❌ 미구현 (8):** #10 파싱 · #21 classify · #23 조율SSE · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+- **❌ 미구현 (7):** #21 classify · #23 조율SSE · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+- **🔶 데모(LLM 후속):** #10 파싱 — 케이스 반환, Claude 붙이면 교체
 - **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
 - **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
 
@@ -101,12 +102,14 @@
 
 | # | 상태 | Method | Path | 용도 | LLM |
 |---|---|---|---|---|---|
-| 10 | ❌ | POST | `/api/freights/parse` | **자연어 문장 → 구조화 폼.** "울산에서 경기까지 8톤" → 6개 필드 | ✅ |
+| 10 | ✅ | POST | `/api/freights/parse` | **자연어 문장 → 구조화 폼.** GET=케이스 목록, POST={text\|caseId} | 🔶 데모(LLM 미연결, 케이스 반환) |
 | 11 | ✅ | POST | `/api/freights` | 화물 등록 (위탁/자차 상태 포함) | |
 | 12 | ✅ | POST | `/api/freights/bulk` | 엑셀 다건 등록 (multipart) | CSV 파싱 → 미리보기/확정 2단계. xlsx 바이너리 리더는 후속 |
 | 13 | ✅ | GET | `/api/freights` | 화물 목록 (사이드바 "화물") | |
 | 14 | ✅ | PATCH | `/api/freights/{id}` | 수정 (부분 수정 재검증) | |
 | 15 | ✅ | DELETE | `/api/freights/{id}` | 삭제 | |
+
+> **현재 데모 버전(LLM 미연결):** Claude 대신 `BE/src/parse.ts`의 미리 준비한 케이스에서 결과를 반환합니다. `GET`으로 케이스를 고르고 `POST {caseId}` 또는 `POST {text}`(키워드 매칭)로 실행하며, 응답 `notice`에 데모 안내가 담깁니다. LLM 붙일 땐 `parseFreightText` 내부만 교체(스키마 유지).
 
 ### #10이 이 서비스의 첫 번째 LLM 지점
 
