@@ -76,7 +76,8 @@ export function AppLayout({
   return (
     <div className="grid min-h-screen grid-cols-[240px_1fr] bg-[#F9FAFB]">
       {/* 랜딩('/') 상단바와 같은 다크 팔레트 */}
-      <aside className="flex flex-col gap-[22px] bg-[#0B1220] px-4 py-[22px]">
+      {/* h-screen으로 stretch를 끊어야 sticky가 먹고, 프로필이 문서 끝이 아닌 화면 하단에 고정된다 */}
+      <aside className="sticky top-0 flex h-screen flex-col gap-[22px] overflow-y-auto bg-[#0B1220] px-4 py-[22px]">
         <div className="flex items-center gap-2 px-2">
           <img src="/train.png" alt="" width={28} height={28} className="rounded-lg" />
           <span className="text-base font-extrabold tracking-[-0.03em] text-white">알뜰철도 X</span>
