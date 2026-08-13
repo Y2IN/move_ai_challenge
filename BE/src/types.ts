@@ -14,6 +14,9 @@ export type ItemCategory = "석유화학제품" | "화학원료" | "철강재" |
 /** 화물 등록 폼(디자인 04a)의 "기업 구분" — 전환교통 고시상 우대 등급 */
 export type CompanyGrade = "sme" | "excellentLogistics" | "general";
 
+/** 화물 등록 폼(디자인 04a)의 "운송 형태" — 위탁(제3자 물류 위탁) / 자차(자기 차량 운송) */
+export type TransportArrangement = "consignment" | "own";
+
 export interface Station {
   id: string;
   name: string;
@@ -98,6 +101,8 @@ export interface Shipment {
   };
   schedule: { requestedDepartureDate: string; requiredArrivalBy: string };
   currentMode: "road" | "rail";
+  /** 위탁 / 자차 운송 형태 (화물 등록 시 입력) */
+  transportArrangement: TransportArrangement;
   roadDirectDistanceKm: number;
   /** 화주가 지금 실제로 내고 있는 도로 운임 (baseline). 소량일수록 톤당 단가가 높습니다. */
   currentRoadFareKrw: number;
@@ -144,6 +149,7 @@ export interface SeedData {
   shippers: Shipper[];
   shipments: Shipment[];
   emptyWagons: EmptyWagon[];
+  dashboard: DashboardSeed;
 }
 
 // ── 사용자 입력 (디자인 04a 화물 등록 폼) ──────────────────────
@@ -159,6 +165,8 @@ export interface ShipmentInput {
   weightTon: number;
   desiredDepartureDate: string; // YYYY-MM-DD
   companyGrade: CompanyGrade;
+  /** 위탁 / 자차 운송 형태 */
+  transportArrangement: TransportArrangement;
   /** 선택 — 비우면 lane 거리와 원단위로 추정합니다. */
   shipperName?: string;
   originShuttleKm?: number;
@@ -280,4 +288,99 @@ export interface CalcResult {
   subsidy: SubsidyResult;
   /** 화주별 분담. CalcInput.members 를 넘겼을 때만 채워진다 */
   shares: MemberShare[];
+}
+
+// ── 대시보드 (STEP 03) ─────────────────────────────────────────
+
+export type Persona = "corp" | "korail";
+
+/** 상단 KPI 카드 — persona별로 라벨·값이 완전히 다르다. 서버가 라벨까지 담아 보낸다. */
+export interface KpiCard {
+  key: string;
+  label: string;
+  /** 화면 표시용 문자열 (예: "1억 2,400만", "41%", "182 tCO₂eq") */
+  value: string;
+  amountKrw?: number;
+  count?: number;
+  /** 전분기 대비 증감(%) */
+  deltaPct?: number;
+}
+
+export interface SubsidyEstimate {
+  amount: number;
+  label: string;
+  deltaPct?: number;
+}
+
+export interface DashboardEquivalents {
+  pineTrees: number;
+  trucksBlocked: number;
+}
+
+export type MatchRowStatus = "done" | "group" | "wait";
+
+/** 행 펼침 상세 (#9 GET /api/matches/{id}) */
+export interface MatchRowDetail {
+  partners: string[];
+  departAt: string;
+  co2ReducedTon: number;
+  equivalentKrw: number;
+}
+
+/** 매칭 한 건 전체 (상세 포함) — #9 응답 */
+export interface MatchRow {
+  id: string;
+  route: string;
+  wagon: string;
+  sub: string;
+  tons: number;
+  loadRate: number;
+  status: MatchRowStatus;
+  savingPct: number;
+  savingKrw: number;
+  detail: MatchRowDetail;
+}
+
+/** #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다. */
+export type MatchSummary = Omit<MatchRow, "detail">;
+
+/** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
+export interface DashboardSeed {
+  period: string;
+  subsidyEstimate: SubsidyEstimate;
+  equivalents: DashboardEquivalents;
+  /** 분기 누적 (랜딩 히어로·코레일 KPI 공용) */
+  cumulative: { shippers: number; filledWagons: number };
+  /** 편익 내역 — 편익 계산 모듈(#27)이 준비되기 전까지 쓰는 큐레이션 값 */
+  benefit: { totalBenefitKrw: number; breakdown: BenefitItem[] };
+  personas: Record<Persona, { kpis: KpiCard[] }>;
+  matches: MatchRow[];
+}
+
+/** #7 응답 — 대시보드는 데이터 조립만. 편익 계산은 계산 모듈이 담당한다. */
+export interface DashboardResponse {
+  persona: Persona;
+  period: string;
+  kpis: KpiCard[];
+  subsidyEstimate: SubsidyEstimate;
+  equivalents: DashboardEquivalents;
+  breakdown: BenefitItem[];
+  totalBenefitKrw: number;
+}
+
+// ── 랜딩 (STEP 01, 로그인 전) ──────────────────────────────────
+
+export interface PublicStatsBreakdownItem {
+  key: string;
+  label: string;
+  /** 표시 문자열 (예: "1억 5,800만") */
+  value: string;
+}
+
+/** #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요) */
+export interface PublicStats {
+  quarterSubsidy: SubsidyEstimate;
+  breakdown: PublicStatsBreakdownItem[];
+  cumulative: { shippers: number; filledWagons: number };
+  equivalents: DashboardEquivalents;
 }

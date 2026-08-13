@@ -20,6 +20,19 @@
 
 ---
 
+## 구현 현황 (2026-08-13 · `feat/cargo-matching`)
+
+화물 등록·매칭·**대시보드** 영역 구현. **LLM 없이도 시연 동선(등록 → 매칭 실패 → 조율 수락 → 편성 확정)이 API로 완결**됩니다. 세부 상태는 아래 §3·§4·§5 표의 **상태** 열 참고.
+
+- **✅ 완료 (11):** #6 랜딩stats · #7 대시보드 · #8 매칭목록 · #9 매칭상세 · #11 등록 · #13 목록 · #14 수정 · #15 삭제 · #16 매칭요청 · #18 공차현황 · #19 편성확정
+- **❌ 미구현 (2):** #10 자연어 파싱(LLM) · #12 엑셀 bulk(규칙기반, 시연 동선 밖)
+- **🟡 부분 (1):** #20 reconcilable — 조율 후보(`negotiationCandidates`)만 반환, `conflict`/`lever` 미보강 (조율 에이전트와 세트)
+- **⛔ 보류 (1):** #17 job — 현재 매칭이 sync라 불필요
+
+> 대시보드 편익 breakdown은 계산 모듈(#27)이 들어올 seam으로 큐레이션 값 사용 중. 그 외 섹션(인증·조율·편익·보조금·ESG·코레일)은 착수 전. 다음 우선순위는 조율 에이전트(#21·#22, LLM 핵심).
+
+---
+
 ## 1. 인증 · 계정 (5개)
 
 역할이 `corp`(기업 물류 담당자) / `korail`(코레일 담당자) 2종으로 분기하고, 같은 대시보드에서 **응답 스키마는 같고 값만 다른** 구조입니다. 역할별 엔드포인트를 나누지 말고 하나로 두는 게 낫습니다.
@@ -36,9 +49,9 @@
 
 ## 2. 랜딩 (로그인 전) (1개)
 
-| # | Method | Path | 용도 | 비고 |
-|---|---|---|---|---|
-| 6 | GET | `/api/public/stats` | 랜딩 히어로 수치 | 인증 불필요. 캐시 60초 |
+| # | 상태 | Method | Path | 용도 | 비고 |
+|---|---|---|---|---|---|
+| 6 | ✅ | GET | `/api/public/stats` | 랜딩 히어로 수치 | 인증 불필요. 60초 캐시. 대시보드 집계 재사용, breakdown 표시값은 금액에서 포맷 |
 
 ```jsonc
 // 6. GET /api/public/stats
@@ -59,26 +72,26 @@
 
 ## 3. 홈 대시보드 (STEP 03) (3개)
 
-| # | Method | Path | 용도 | 비고 |
-|---|---|---|---|---|
-| 7 | GET | `/api/dashboard?persona=corp\|korail&period=2026Q2` | 상단 KPI 4장 + 보조금 예상액 + 편익 breakdown | persona별 KPI 라벨/값이 완전히 다름(공차율·채운화차·추가수익·신규화주 vs 감축·절감·편익·전환율). **응답에 label을 서버가 담아 보내야 함** |
-| 8 | GET | `/api/matches?persona=&status=&page=` | AI 합적 매칭 현황 목록 | `route, wagon, sub, tons, loadRate, status(done\|group\|wait), saving` |
-| 9 | GET | `/api/matches/{id}` | 행 펼침 상세 | 합적 파트너 / 출발 / 탄소 감축 / 환산 가치 |
+| # | 상태 | Method | Path | 용도 | 비고 |
+|---|---|---|---|---|---|
+| 7 | ✅ | GET | `/api/dashboard?persona=corp\|korail&period=2026Q2` | 상단 KPI 4장 + 보조금 예상액 + 편익 breakdown | persona별 KPI 라벨/값이 완전히 다름(공차율·채운화차·추가수익·신규화주 vs 감축·절감·편익·전환율). label 서버가 담아 보냄. 편익 계산은 계산 모듈(#27) seam |
+| 8 | ✅ | GET | `/api/matches?persona=&status=&page=` | AI 합적 매칭 현황 목록 | `route, wagon, sub, tons, loadRate, status(done\|group\|wait), saving`. 요약만(상세 제외) |
+| 9 | ✅ | GET | `/api/matches/{id}` | 행 펼침 상세 | 합적 파트너 / 출발 / 탄소 감축 / 환산 가치. 목록이 커질 수 있어 상세는 별도 lazy 로딩 |
 
-> **최적화 제안:** 목록이 5행 고정이고 detail이 4쌍뿐이라 #9를 별도 호출로 두면 왕복만 늘어납니다. #8 응답에 `detail[]`을 인라인으로 포함시키고 #9는 만들지 않는 쪽을 권합니다. (행 수가 수십 건으로 늘면 그때 분리)
+> **구조 결정:** 목록은 고정 크기가 아니라 계속 늘어나므로, #8은 요약만 싣고 상세는 #9로 분리(lazy 로딩)합니다. 무거운 detail을 목록 매 행에 인라인하지 않습니다.
 
 ---
 
 ## 4. 화물 등록 (STEP 04a) (6개)
 
-| # | Method | Path | 용도 | LLM |
-|---|---|---|---|---|
-| 10 | POST | `/api/freights/parse` | **자연어 문장 → 구조화 폼.** "울산에서 경기까지 8톤" → 6개 필드 | ✅ |
-| 11 | POST | `/api/freights` | 화물 등록 | |
-| 12 | POST | `/api/freights/bulk` | 엑셀 다건 등록 (multipart) | 파싱 결과 미리보기 후 확정하는 2단계 권장 |
-| 13 | GET | `/api/freights` | 화물 목록 (사이드바 "화물") | |
-| 14 | PATCH | `/api/freights/{id}` | 수정 | |
-| 15 | DELETE | `/api/freights/{id}` | 삭제 | |
+| # | 상태 | Method | Path | 용도 | LLM |
+|---|---|---|---|---|---|
+| 10 | ❌ | POST | `/api/freights/parse` | **자연어 문장 → 구조화 폼.** "울산에서 경기까지 8톤" → 6개 필드 | ✅ |
+| 11 | ✅ | POST | `/api/freights` | 화물 등록 (위탁/자차 상태 포함) | |
+| 12 | ❌ | POST | `/api/freights/bulk` | 엑셀 다건 등록 (multipart) | 파싱 결과 미리보기 후 확정하는 2단계 권장 |
+| 13 | ✅ | GET | `/api/freights` | 화물 목록 (사이드바 "화물") | |
+| 14 | ✅ | PATCH | `/api/freights/{id}` | 수정 (부분 수정 재검증) | |
+| 15 | ✅ | DELETE | `/api/freights/{id}` | 삭제 | |
 
 ### #10이 이 서비스의 첫 번째 LLM 지점
 
@@ -107,13 +120,13 @@
 
 ## 5. 매칭 (STEP 04b · 04c) (5개)
 
-| # | Method | Path | 용도 | 비고 |
-|---|---|---|---|---|
-| 16 | POST | `/api/matching/request` | AI 합적 매칭 요청 | 성립/미성립 분기 |
-| 17 | GET | `/api/matching/{jobId}` | 매칭 결과 조회 | 계산이 3초 넘으면 job 분리, 아니면 #16 동기 응답으로 통합 |
-| 18 | GET | `/api/wagons/vacancies` | 코레일 공차 현황 | 구간·출발·화차종류·정원·잔여. **외부 연동 or 시드 데이터** |
-| 19 | POST | `/api/matching/{groupId}/confirm` | "코레일 공차 수송 확정" | |
-| 20 | GET | `/api/matching/{id}/reconcilable` | 04c "조율 여지" 후보 | 어긋난 조건 3건(발송일/물량당김/인도역) |
+| # | 상태 | Method | Path | 용도 | 비고 |
+|---|---|---|---|---|---|
+| 16 | ✅ | POST | `/api/matching/request` | AI 합적 매칭 요청 | 성립/미성립 분기. MatchResult 그대로 반환 |
+| 17 | ⛔ | GET | `/api/matching/{jobId}` | 매칭 결과 조회 | 현재 sync — 불필요, 보류. 계산이 3초 넘으면 그때 job 분리 |
+| 18 | ✅ | GET | `/api/wagons/vacancies` | 코레일 공차 현황 | 구간·출발·화차종류·정원·잔여. 시드 3량(단일 노선) |
+| 19 | ✅ | POST | `/api/matching/confirm` | "코레일 공차 수송 확정" | 무상태라 확정 시 GRP-NNN 발급(플랫 경로). `acceptedShipmentIds`로 조율 수락 재매칭 |
+| 20 | 🟡 | GET | `/api/matching/{id}/reconcilable` | 04c "조율 여지" 후보 | `negotiationCandidates`만 반환. conflict/lever 미보강 → 조율 브랜치 |
 
 ```jsonc
 // POST /api/matching/request  → 미성립 케이스 (04c)
