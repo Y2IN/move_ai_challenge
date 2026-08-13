@@ -1,4 +1,4 @@
-import type { TransportArrangement } from '@railhub/be/types';
+import type { CompanyGrade, TransportArrangement } from '@railhub/be/types';
 
 export type FreightItem = '석유화학제품' | '화학원료' | '철강재' | '기타';
 export type CorpType = '중소기업' | '우수물류기업' | '일반';
@@ -18,6 +18,23 @@ export type FreightField = keyof FreightForm;
 
 export const FREIGHT_ITEMS: FreightItem[] = ['석유화학제품', '화학원료', '철강재', '기타'];
 export const CORP_TYPES: CorpType[] = ['중소기업', '우수물류기업', '일반'];
+
+/**
+ * 기업 구분 화면 표시값(한글) ↔ 서버 enum(CompanyGrade) 매핑.
+ * 운송방식과 동일하게 화면은 한글 유지, 등록 API 호출 시에만 변환한다.
+ *   body.companyGrade = CORP_TYPE_TO_API[form.corpType]
+ */
+export const CORP_TYPE_TO_API: Record<CorpType, CompanyGrade> = {
+  중소기업: 'sme',
+  우수물류기업: 'excellentLogistics',
+  일반: 'general',
+};
+
+export const CORP_TYPE_FROM_API: Record<CompanyGrade, CorpType> = {
+  sme: '중소기업',
+  excellentLogistics: '우수물류기업',
+  general: '일반',
+};
 export const TRANSPORT_MODES: TransportMode[] = ['자차', '위탁'];
 
 /**
