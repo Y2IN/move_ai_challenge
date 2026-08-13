@@ -1,0 +1,64 @@
+import type { ReactNode } from 'react';
+import { brand, landingStats } from '../mocks/marketing';
+
+/** 02 로그인 · 회원가입 좌측 브랜드 패널 */
+export function AuthBrandPanel() {
+  return (
+    <div className="flex flex-col justify-between bg-[#F9FAFB] px-10 py-11">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-[#3182F6] text-sm font-extrabold text-white">
+          X
+        </span>
+        <span className="text-[17px] font-extrabold tracking-[-0.03em] text-[#191F28]">{brand.name}</span>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h2 className="text-3xl font-extrabold leading-[1.35] tracking-[-0.035em] text-[#191F28]">
+          철도를 채우는 순간,
+          <br />
+          ESG가 완성됩니다
+        </h2>
+        <p className="text-base leading-[1.62] text-[#6B7684]">{brand.subheadline}</p>
+      </div>
+
+      <div className="flex flex-col gap-2.5 text-[15px] text-[#8B95A1]">
+        {landingStats.map((s) => (
+          <span key={s.label}>
+            {s.label} <b className="text-[#333D4B]">{s.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 인증 화면 카드 셸. 1040 × 720 */
+export function AuthCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid h-[720px] w-[1040px] grid-cols-[420px_1fr] overflow-hidden rounded-[20px] bg-white shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+      <AuthBrandPanel />
+      {children}
+    </div>
+  );
+}
+
+export function AuthInput({
+  label,
+  type = 'text',
+  placeholder,
+}: {
+  label: string;
+  type?: 'text' | 'email' | 'password';
+  placeholder?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-sm font-semibold text-[#6B7684]">{label}</span>
+      <input
+        type={type}
+        placeholder={placeholder}
+        className="h-14 rounded-xl border border-[#E5E8EB] bg-[#F9FAFB] px-4 text-base text-[#191F28] outline-none transition-colors focus:border-[#3182F6] focus:bg-white"
+      />
+    </label>
+  );
+}
