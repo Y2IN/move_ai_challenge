@@ -20,30 +20,44 @@
 
 ---
 
-## 구현 현황 (2026-08-13 · `feat/cargo-matching`)
+## 구현 현황 (2026-08-13 · main 병합 후 · 전 43개 기준)
 
-화물 등록·매칭·**대시보드** 영역 구현. **LLM 없이도 시연 동선(등록 → 매칭 실패 → 조율 수락 → 편성 확정)이 API로 완결**됩니다. 세부 상태는 아래 §3·§4·§5 표의 **상태** 열 참고.
+화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
+각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
 
-- **✅ 완료 (11):** #6 랜딩stats · #7 대시보드 · #8 매칭목록 · #9 매칭상세 · #11 등록 · #13 목록 · #14 수정 · #15 삭제 · #16 매칭요청 · #18 공차현황 · #19 편성확정
-- **❌ 미구현 (2):** #10 자연어 파싱(LLM) · #12 엑셀 bulk(규칙기반, 시연 동선 밖)
-- **🟡 부분 (1):** #20 reconcilable — 조율 후보(`negotiationCandidates`)만 반환, `conflict`/`lever` 미보강 (조율 에이전트와 세트)
-- **⛔ 보류 (1):** #17 job — 현재 매칭이 sync라 불필요
+- **✅ 완료 (23):**
+  - 랜딩·대시보드: #6 #7 #8 #9
+  - 화물등록: #11 #13 #14 #15
+  - 매칭: #16 #18 #19
+  - 조율: #22 run
+  - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
+  - ESG: #40 #41 #42
+- **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
+- **❌ 미구현 (12):** #10 파싱 · #12 엑셀 · #21 classify · #23 조율SSE · #25 · #26 · #28 summary · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+- **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
+- **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
 
-> 대시보드 편익 breakdown은 계산 모듈(#27)이 들어올 seam으로 큐레이션 값 사용 중. 그 외 섹션(인증·조율·편익·보조금·ESG·코레일)은 착수 전. 다음 우선순위는 조율 에이전트(#21·#22, LLM 핵심).
+> **주의 2가지:**
+> ① **FE는 아직 API 미연동** — 화면은 전부 목 데이터. API는 seed 기반으로 실제 동작하지만 UI와 안 이어짐.
+> ② **LLM 라우트**(#22 조율 · #41 ESG · #32/#35/#37 보조금 서술)는 `ANTHROPIC_API_KEY` 있으면 실제 Claude, 없으면 규칙 폴백.
+> 남은 우선순위: 인증 #3 데모(P0) · #27 benefits 라우트(대시보드 라이브 연결) · #10 파싱 · FE↔API 연동.
 
 ---
 
-## 1. 인증 · 계정 (5개)
+## 1. 인증 · 계정 (5개) — ➖ MVP 제외
+
+> **이번 MVP는 인증 없이 진행합니다.** 데모 로그인(#3)은 백엔드 없이 화면에서 역할만 고르고
+> `/home`으로 이동하는 클라이언트 처리로 갈음합니다. 아래는 나중에 붙일 때를 위한 스펙 보존용.
 
 역할이 `corp`(기업 물류 담당자) / `korail`(코레일 담당자) 2종으로 분기하고, 같은 대시보드에서 **응답 스키마는 같고 값만 다른** 구조입니다. 역할별 엔드포인트를 나누지 말고 하나로 두는 게 낫습니다.
 
-| # | Method | Path | 용도 | 비고 |
-|---|---|---|---|---|
-| 1 | POST | `/api/auth/signup` | 회원가입 | `role`, `email`, `password`, `orgName`, `termsAgreed`. role이 korail이면 orgName은 "소속 본부·지사" |
-| 2 | POST | `/api/auth/login` | 로그인 | → `{ accessToken, user, role, org }` |
-| 3 | POST | `/api/auth/demo` | 데모 계정 입장 | **해커톤 시연 필수.** role만 받아 즉시 세션 발급. 02b 화면 "역할만 고르면 바로 입장" |
-| 4 | GET | `/api/me` | 세션 확인 | 사이드바 "대성물산 · 김철도" 렌더 |
-| 5 | POST | `/api/auth/logout` | 로그아웃 | |
+| # | 상태 | Method | Path | 용도 | 비고 |
+|---|---|---|---|---|---|
+| 1 | ➖ | POST | `/api/auth/signup` | 회원가입 | `role`, `email`, `password`, `orgName`, `termsAgreed`. role이 korail이면 orgName은 "소속 본부·지사" |
+| 2 | ➖ | POST | `/api/auth/login` | 로그인 | → `{ accessToken, user, role, org }` |
+| 3 | ➖ | POST | `/api/auth/demo` | 데모 계정 입장 | 클라이언트에서 역할만 고르고 `/home` 이동으로 갈음 (API 불필요) |
+| 4 | ➖ | GET | `/api/me` | 세션 확인 | 사이드바 "대성물산 · 김철도" 렌더 |
+| 5 | ➖ | POST | `/api/auth/logout` | 로그아웃 | |
 
 ---
 
@@ -160,14 +174,14 @@
 
 이 부분이 제품의 차별점이자 LLM 비중이 가장 큰 영역입니다. 화면에 **제약 분류 → 제안 생성 → 화주 회신 → 재제안 → 최종 편성**의 4단계 타임라인이 그려져 있습니다.
 
-| # | Method | Path | 용도 | LLM |
-|---|---|---|---|---|
-| 21 | POST | `/api/negotiation/classify` | 화주 자연어 제약 → **절대조건 / 조정가능** 분류 | ✅ |
-| 22 | POST | `/api/negotiation/run` | 조율 에이전트 실행 (타임라인 생성 시작) | ✅ |
-| 23 | GET | `/api/negotiation/{id}/stream` | **SSE.** 적재율 41→75→94% 진행 | ✅ |
-| 24 | POST | `/api/negotiation/{id}/proposals/{pid}/reply` | 화주 회신 입력 → 재제안 트리거 | ✅ |
-| 25 | GET | `/api/negotiation/{id}` | 최종 편성 결과 | |
-| 26 | POST | `/api/negotiation/{id}/cancel` | "다음 공차 일정 대기" | |
+| # | 상태 | Method | Path | 용도 | LLM |
+|---|---|---|---|---|---|
+| 21 | ❌ | POST | `/api/negotiation/classify` | 화주 자연어 제약 → **절대조건 / 조정가능** 분류 | ✅ |
+| 22 | ✅ | POST | `/api/negotiation/run` | 조율 에이전트 실행 (`negotiate.ts` — 양보 조합 탐색 + 제안 생성) | ✅ |
+| 23 | ❌ | GET | `/api/negotiation/{id}/stream` | **SSE.** 적재율 41→75→94% 진행 | ✅ |
+| 24 | 🟡 | POST | `/api/negotiation/{id}/proposals/{pid}/reply` | 화주 회신 입력 → 재제안 | ✅ · `negotiation/accept`(수락 재매칭)는 있음, reply 형태는 미구현 |
+| 25 | ❌ | GET | `/api/negotiation/{id}` | 최종 편성 결과 | |
+| 26 | ❌ | POST | `/api/negotiation/{id}/cancel` | "다음 공차 일정 대기" | |
 
 ### #21 제약 분류 — 프롬프트 설계가 곧 제품 품질
 
@@ -210,11 +224,11 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 
 ## 7. 편익 계산 (STEP 05) — 순수 계산, LLM 금지 (3개)
 
-| # | Method | Path | 용도 | LLM |
-|---|---|---|---|---|
-| 27 | POST | `/api/benefits/calculate` | 도로 단독 vs 철도 합적 → 4대 편익 | ❌ 결정적 계산 |
-| 28 | GET | `/api/benefits/summary?period=2026Q2` | 대시보드용 집계 | ❌ |
-| 29 | GET | `/api/coefficients?year=2026` | 환경부 배출계수 · 사회적비용 단가 · KOTI 산식 파라미터 | ❌ |
+| # | 상태 | Method | Path | 용도 | LLM |
+|---|---|---|---|---|---|
+| 27 | 🟡 | POST | `/api/benefits/calculate` | 도로 단독 vs 철도 합적 → 4대 편익 | ❌ 결정적 계산. `calc.ts` 엔진 완성, 라우트만 없음 |
+| 28 | ❌ | GET | `/api/benefits/summary?period=2026Q2` | 대시보드용 집계 | ❌ |
+| 29 | 🟡 | GET | `/api/coefficients?year=2026` | 환경부 배출계수 · 사회적비용 단가 · KOTI 산식 파라미터 | ❌ `constants.ts`에 계수 있음, 라우트만 없음 |
 
 ```jsonc
 // POST /api/benefits/calculate
@@ -244,18 +258,18 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 
 ## 8. 보조금 사업계획서 (STEP 06) (10개)
 
-| # | Method | Path | 용도 | LLM |
-|---|---|---|---|---|
-| 30 | GET | `/api/subsidy/preflight?period=` | 06a "무엇이 만들어지나요" 5개 항목 준비 상태 | ❌ |
-| 31 | POST | `/api/subsidy/applications` | 생성 시작 → `{ applicationId }` | |
-| 32 | GET | `/api/subsidy/applications/{id}/stream` | **SSE.** 5단계 진행률 + 문단 6개 중 n번째 | ✅ |
-| 33 | GET | `/api/subsidy/applications/{id}` | 완성 문서 조회 (1~6장) | |
-| 34 | GET | `/api/subsidy/applications/latest` | 사이드바 재진입 시 초안 존재하면 06c로 직행 | |
-| 35 | POST | `/api/subsidy/applications/{id}/regenerate` | 전체 재생성 | ✅ |
-| 36 | POST | `/api/subsidy/applications/{id}/paragraphs/{key}/regenerate` | **문단 단위 재생성 (↻)** | ✅ |
-| 37 | PATCH | `/api/subsidy/applications/{id}/paragraphs/{key}` | 문단 편집 저장 ("AI 서술 · 편집 가능") | |
-| 38 | GET | `/api/subsidy/applications/{id}/revisions` | 변경 이력 | |
-| 39 | GET | `/api/subsidy/applications/{id}/export?format=hwp\|pdf` | 다운로드 | |
+| # | 상태 | Method | Path | 용도 | LLM |
+|---|---|---|---|---|---|
+| 30 | ❌ | GET | `/api/subsidy/preflight?period=` | 06a "무엇이 만들어지나요" 5개 항목 준비 상태 | ❌ |
+| 31 | ✅ | POST | `/api/subsidy/applications` | 생성 시작 → `{ applicationId }` | |
+| 32 | ✅ | GET | `/api/subsidy/applications/{id}/stream` | **SSE.** 5단계 진행률 + 문단 6개 중 n번째 | ✅ |
+| 33 | ✅ | GET | `/api/subsidy/applications/{id}` | 완성 문서 조회 (1~6장) | |
+| 34 | ✅ | GET | `/api/subsidy/applications/latest` | 사이드바 재진입 시 초안 존재하면 06c로 직행 | |
+| 35 | ✅ | POST | `/api/subsidy/applications/{id}/regenerate` | 전체 재생성 | ✅ |
+| 36 | ❌ | POST | `/api/subsidy/applications/{id}/paragraphs/{key}/regenerate` | **문단 단위 재생성 (↻)** | ✅ |
+| 37 | ✅ | PATCH | `/api/subsidy/applications/{id}/paragraphs/{key}` | 문단 편집 저장 ("AI 서술 · 편집 가능") | |
+| 38 | ✅ | GET | `/api/subsidy/applications/{id}/revisions` | 변경 이력 | |
+| 39 | ✅ | GET | `/api/subsidy/applications/{id}/export?format=hwp\|pdf` | 다운로드 | |
 
 ### 문서 구조 = 응답 스키마
 
@@ -298,21 +312,21 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 
 ## 9. K-ESG 리포트 (3개)
 
-| # | Method | Path | 용도 | LLM |
-|---|---|---|---|---|
-| 40 | GET | `/api/esg/indicators?period=` | K-ESG 지표표 (E-3-2, E-7-1, E-3-3) | ❌ |
-| 41 | POST | `/api/esg/report` | 공시 리포트 초안 문구 생성 · "다시 생성" | ✅ |
-| 42 | GET | `/api/esg/scope3/export?format=csv\|xlsx` | Scope 3 데이터 내보내기 | ❌ |
+| # | 상태 | Method | Path | 용도 | LLM |
+|---|---|---|---|---|---|
+| 40 | ✅ | GET | `/api/esg/indicators?period=` | K-ESG 지표표 (E-3-2, E-7-1, E-3-3) | ❌ |
+| 41 | ✅ | POST | `/api/esg/report` | 공시 리포트 초안 문구 생성 · "다시 생성" | ✅ |
+| 42 | ✅ | GET | `/api/esg/scope3/export?format=csv\|xlsx` | Scope 3 데이터 내보내기 | ❌ |
 
 ---
 
 ## 10. 코레일 페르소나 · 마스터 (3개)
 
-| # | Method | Path | 용도 |
-|---|---|---|---|
-| 43 | POST | `/api/korail/assignments/{id}/approve` | 화차 배정 승인 (코레일 담당자) |
-| — | GET | `/api/master/stations` | 역 마스터 — 자연어 파싱 결과 정규화용 |
-| — | GET | `/api/master/wagon-types` | 화차 종류 (컨테이너/유개/무개/탱크) |
+| # | 상태 | Method | Path | 용도 |
+|---|---|---|---|---|
+| 43 | ❌ | POST | `/api/korail/assignments/{id}/approve` | 화차 배정 승인 (코레일 담당자) |
+| — | ❌ | GET | `/api/master/stations` | 역 마스터 — 자연어 파싱 결과 정규화용 |
+| — | ❌ | GET | `/api/master/wagon-types` | 화차 종류 (컨테이너/유개/무개/탱크) |
 
 > 코레일 페르소나의 KPI·매칭 목록은 #7·#8에서 `persona=korail`로 이미 커버됩니다. 별도 엔드포인트를 만들지 마세요.
 
