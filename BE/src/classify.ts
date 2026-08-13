@@ -1,11 +1,11 @@
 /**
  * 화주 자연어 제약 → 절대조건/조정가능 분류 (#21) — **데모 버전 (LLM 미연결)**.
  *
- * Claude 대신 규칙기반으로 발화를 분류한다. 날짜·키워드 패턴으로
+ * 생성 AI 대신 규칙기반으로 발화를 분류한다. 날짜·키워드 패턴으로
  * arrivalDeadline(도착기한)·departDate(출발 조정)·요건(유개/주말/지게차)을 뽑고,
  * 가격/리드타임 민감도를 추정한다. 응답 `notice`에 데모 안내가 담긴다.
  *
- * LLM 붙일 땐 classifyConstraints 내부만 Claude 호출로 교체(스키마 유지).
+ * LLM 붙일 땐 classifyConstraints 내부만 generateText() 호출로 교체(스키마 유지).
  */
 
 import { seed } from "./seed";

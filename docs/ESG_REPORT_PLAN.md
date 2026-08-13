@@ -112,7 +112,7 @@ BE/src/report/
   contract.ts     // ReportInput — 계산팀과의 유일한 접점
   fixture.ts      // 계산 없이 개발·시연하기 위한 고정 입력
   paragraphs.ts   // 문단 6개 정의 + 프롬프트
-  generate.ts     // Claude 호출 · 병렬 · 폴백
+  generate.ts     // Gemini 호출 · 병렬 · 폴백
   verify.ts       // 숫자 환각 검출기 (§4)
   kesg.ts         // K-ESG 지표표 매핑 (E-3-2 / E-7-1 / E-3-3)
   document.ts     // ReportInput + 문단 → 별지 제3호 서식 구조체
@@ -137,7 +137,7 @@ FE/app/api/esg/...                    // #40~#42
 
 > Phase A가 끝나면 계산이 늦어져도 내 작업은 안 막힌다.
 
-### Phase B — 문단 생성 (Claude)
+### Phase B — 문단 생성 (Gemini)
 
 6. `paragraphs.ts` — 문단 6개 정의
 7. `generate.ts` — 병렬 호출 + 폴백
@@ -222,7 +222,7 @@ export function findHallucinatedNumbers(
 
 ### 4.4 폴백 — 해커톤 와이파이는 못 믿는다
 
-Claude 호출 실패 시 **템플릿 문장**으로 자동 대체하고 `source: "fallback"` 을 붙인다. 화면은 그대로 뜨고 배지만 달라진다. 문서 생성이 통째로 죽는 것보다 훨씬 낫다.
+Gemini 호출 실패 시 **템플릿 문장**으로 자동 대체하고 `source: "fallback"` 을 붙인다. 화면은 그대로 뜨고 배지만 달라진다. 문서 생성이 통째로 죽는 것보다 훨씬 낫다.
 
 ### 4.5 HWP는 버리고 PDF만
 

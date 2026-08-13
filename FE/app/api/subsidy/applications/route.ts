@@ -3,7 +3,7 @@ import { resolveReportInput } from "@railhub/be/report/source";
 import {
   generateFallbackOnly,
   generateParagraphs,
-  isClaudeConfigured,
+  isLlmConfigured,
 } from "@railhub/be/report/generate";
 import { nextApplicationId, save } from "@railhub/be/report/store";
 import type { ShipmentInput } from "@railhub/be/types";
@@ -11,7 +11,7 @@ import type { ShipmentInput } from "@railhub/be/types";
 /**
  * api_list #31 — 사업계획서 생성 시작 (06a "보고서 초안 생성" 버튼).
  *
- * 문단 6개를 병렬로 생성한다. Claude 호출이 실패하거나 인증이 없으면
+ * 문단 6개를 병렬로 생성한다. 생성 AI 호출이 실패하거나 인증이 없으면
  * 규칙기반 폴백 문장으로 채우고 문서는 정상적으로 나간다.
  *
  * 수치는 실제 매칭·계산에서 가져온다(`resolveReportInput`). 편성이 확정되지 않았거나
@@ -32,13 +32,13 @@ export async function POST(req: Request) {
     now: body?.now ? new Date(body.now) : undefined,
   });
   const input = source.input;
-  const { paragraphs, diagnostics } = isClaudeConfigured()
+  const { paragraphs, diagnostics } = isLlmConfigured()
     ? await generateParagraphs(input)
     : generateFallbackOnly(input);
 
   const now = new Date().toISOString();
-  const app = save({
-    id: nextApplicationId(),
+  const app = await save({
+    id: await nextApplicationId(),
     input,
     document: buildDocument(input, now, paragraphs),
     diagnostics,

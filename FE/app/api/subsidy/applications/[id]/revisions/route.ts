@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const app = find(id);
+  const app = await find(id);
   if (!app) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }

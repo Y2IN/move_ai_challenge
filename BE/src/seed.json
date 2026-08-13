@@ -9,7 +9,7 @@
       "거리·좌표·시각표는 근사치입니다. 발표 전 코레일 화물열차 시각표 / 도로공사 거리로 교체하세요.",
       "배출계수·사회적비용 원단위·공차할인율 등 '계수'는 이 파일에 없습니다. BE/src/constants.ts 한 곳에만 둡니다.",
       "shipments[].parsedConstraints 는 /api/parse 가 채우는 자리입니다. 시드에서는 null 로 비워둡니다.",
-      "shipments[].fallbackHints 는 Claude 호출이 실패했을 때 쓰는 규칙기반 폴백 전용 값입니다.",
+      "shipments[].fallbackHints 는 생성 AI 호출이 실패했을 때 쓰는 규칙기반 폴백 전용 값입니다.",
       "lanes[].roadDistanceKm 는 도로 직행 baseline 거리입니다. 철도 거리와 다릅니다.",
       "emptyWagons[].cutoffAt 은 모집 마감시한(출발 D-2)입니다. 이 시점에 정원 판정을 하고, minLoadRate 미만이면 편성을 취소합니다. minLoadRate 는 코레일 정책이 아니라 우리가 상한 보장 손실을 어디까지 감수할지의 선입니다."
     ]

@@ -11,7 +11,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /** GET /api/negotiation/{id}/stream */
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-  const record = getNegotiation(id);
+  const record = await getNegotiation(id);
   if (!record) {
     return Response.json({ error: `조율 세션을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }

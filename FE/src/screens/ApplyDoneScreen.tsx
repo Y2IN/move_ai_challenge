@@ -58,6 +58,7 @@ interface ApplyDoneScreenProps {
   onExportDoc: (format: SubsidyExportFormat) => void;
   esg: EsgTabState;
   onRegenerateSection: (key: EsgSectionKey) => void;
+  onEditSection: (key: EsgSectionKey, text: string) => void;
   onRegenerateAllEsg: () => void;
   onRetryIndicators: () => void;
   onExportScope3: (format: Scope3Format) => void;
@@ -134,9 +135,13 @@ function DocTab({
 function EsgTab({
   esg,
   onRegenerateSection,
+  onEditSection,
   onRegenerateAllEsg,
   onRetryIndicators,
-}: Pick<ApplyDoneScreenProps, 'esg' | 'onRegenerateSection' | 'onRegenerateAllEsg' | 'onRetryIndicators'>) {
+}: Pick<
+  ApplyDoneScreenProps,
+  'esg' | 'onRegenerateSection' | 'onEditSection' | 'onRegenerateAllEsg' | 'onRetryIndicators'
+>) {
   if (esg.indicatorsError) {
     return (
       <DocSheet minHeight={720}>
@@ -182,6 +187,7 @@ function EsgTab({
       reportError={esg.reportError}
       busyKeys={esg.busyKeys}
       onRegenerateSection={onRegenerateSection}
+      onEditSection={onEditSection}
       onRetryReport={onRegenerateAllEsg}
     />
   );
@@ -227,6 +233,7 @@ export function ApplyDoneScreen({
   onExportDoc,
   esg,
   onRegenerateSection,
+  onEditSection,
   onRegenerateAllEsg,
   onRetryIndicators,
   onExportScope3,
@@ -312,6 +319,7 @@ export function ApplyDoneScreen({
             <EsgTab
               esg={esg}
               onRegenerateSection={onRegenerateSection}
+              onEditSection={onEditSection}
               onRegenerateAllEsg={onRegenerateAllEsg}
               onRetryIndicators={onRetryIndicators}
             />

@@ -15,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const app = find(id);
+  const app = await find(id);
 
   if (app) {
     return Response.json({

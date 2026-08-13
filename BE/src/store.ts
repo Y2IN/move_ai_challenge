@@ -1,15 +1,39 @@
 /**
- * 인메모리 화물 스토어 — 시연·개발 전용.
+ * 화물 스토어 — Supabase 우선, 인메모리 폴백.
  *
- * 사용자가 화면(디자인 04a)에서 등록한 화물을 프로세스 메모리에 담습니다.
- * 서버를 재시작하면 비워집니다. DB 로 교체할 땐 이 모듈만 바꾸면 됩니다.
- * (Next dev 서버는 HMR 시 모듈이 다시 평가되며 초기화될 수 있습니다.)
+ * ── 왜 DB 를 붙였나 ──────────────────────────────────────────────
+ *
+ * Vercel 서버리스는 요청마다 **다른 람다 인스턴스**로 갈 수 있다.
+ * `globalThis` 트릭은 한 인스턴스 안에서 번들이 여러 벌 생기는 문제만 막지,
+ * 인스턴스가 갈리는 건 못 막는다. 심사위원이 화물을 등록하고 다음 날 다시 왔을 때
+ * 목록이 비어 있으면 그걸로 끝이다. 그래서 영속 저장소가 필요해졌다.
+ *
+ * ── 이중화 ──────────────────────────────────────────────────────
+ *
+ * 쓰기는 **DB 와 메모리에 둘 다** 넣고, 읽기는 DB 를 먼저 본다.
+ * DB 가 잠들거나(무료 플랜 7일 무활동 정지) 네트워크가 끊기면 읽기도
+ * 메모리로 되돌아간다 — 그 인스턴스가 처리한 만큼은 계속 보인다.
+ * 환경변수가 아예 없으면 예전과 100% 같은 동작이다.
  *
  * ⚠️ 매칭 풀과의 관계: `match()` 는 여전히 "시드 풀 + 방금 등록한 1건" 으로
- *    편성을 계산합니다. 시연 시나리오(14/18톤 → 반드시 미달)를 보존하기 위해
- *    이 스토어의 누적 화물은 매칭 풀에 섞지 않고, 목록(#13) 표시용으로만 씁니다.
+ *    편성을 계산한다. 시연 시나리오(14/18톤 → 반드시 미달)를 보존하기 위해
+ *    이 스토어의 누적 화물은 매칭 풀에 섞지 않고, 목록(#13) 표시용으로만 쓴다.
+ *    심사위원이 2주간 화물을 아무리 쌓아도 시나리오가 흔들리지 않는 이유다.
  */
 
+import { nextSeq } from "./db/client";
+import {
+  cancelNegotiationRow,
+  clearAll as clearDb,
+  deleteShipmentRecord,
+  findNegotiation,
+  findShipmentRecord,
+  insertConfirmation,
+  insertNegotiation,
+  insertShipment,
+  listShipmentRecords,
+  updateShipmentRecord,
+} from "./db/shipments";
 import { match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
 import { accept } from "./negotiate";
@@ -35,32 +59,30 @@ const CATEGORIES: readonly ItemCategory[] = [
 const GRADES: readonly CompanyGrade[] = ["sme", "excellentLogistics", "general"];
 const ARRANGEMENTS: readonly TransportArrangement[] = ["consignment", "own"];
 
-// ── 스토어 상태 ────────────────────────────────────────────────
+// ── 인메모리 미러 ──────────────────────────────────────────────
 
-/** 등록 화물은 원본 입력·정규화된 Shipment·발급 seq 를 함께 보관한다 (부분 수정 시 merge 재검증·id 재발급용). */
+/** 등록 화물은 원본 입력·정규화된 Shipment·발급 seq 를 함께 보관한다 (부분 수정 시 merge 재검증용). */
 interface StoredShipment {
   input: ShipmentInput;
   shipment: Shipment;
   seq: number;
 }
+
 /**
  * ⚠️ 모듈 최상위에 배열을 그냥 두면 안 된다.
  *
  * Next 는 라우트 핸들러마다 서버 번들을 따로 만든다. 그러면 이 모듈도 번들마다
  * 한 벌씩 생겨서 `POST /api/freights` 가 채운 배열과 `PATCH·DELETE /api/freights/{id}`
- * 가 읽는 배열이 **서로 다른 객체**가 된다. 방금 등록한 화물이 수정·삭제(#14/#15)에서
- * 곧바로 404 로 나온다. (report/store.ts 에서 이미 한 번 밟은 사고다)
+ * 가 읽는 배열이 **서로 다른 객체**가 된다.
  *
  * globalThis 에 한 번만 매달아 번들이 몇 벌이든 같은 저장소를 보게 한다.
- * (콜드 스타트마다 비워지는 건 그대로다 — 영속이 필요하면 이 파일만 교체한다)
+ * (DB 가 붙으면 이 배열은 폴백용 미러로만 쓰인다)
  */
 interface ShipmentStoreState {
   registered: StoredShipment[];
   seq: number;
-  /** 확정된 편성(코레일 공차 수송 확정) 기록 */
   confirmations: Confirmation[];
   confirmSeq: number;
-  /** 조율(negotiation) 세션 기록 (#25 조회 · #26 취소) */
   negotiations: StoredNegotiation[];
   negSeq: number;
 }
@@ -84,6 +106,20 @@ const registered = state.registered;
 const confirmations = state.confirmations;
 const negotiations = state.negotiations;
 
+/**
+ * 일련번호 발급 — DB 시퀀스가 우선, 안 되면 인메모리 카운터.
+ *
+ * DB 가 살아 있으면 인스턴스가 갈려도 번호가 이어진다. 폴백 카운터는 인스턴스마다
+ * 0 부터 시작하므로 id 가 겹칠 수 있는데, 폴백은 애초에 그 인스턴스 안에서만
+ * 보이는 임시 상태라 충돌하지 않는다.
+ */
+async function issueSeq(
+  kind: "shipment" | "confirm" | "negotiation",
+  bump: () => number,
+): Promise<number> {
+  return (await nextSeq(kind)) ?? bump();
+}
+
 /** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
 function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipment {
   return {
@@ -94,20 +130,32 @@ function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipmen
   };
 }
 
-/** 등록: 입력을 Shipment 로 정규화해 스토어에 넣고, 만들어진 레코드를 돌려줍니다. */
-export function registerShipment(input: ShipmentInput, data: SeedData = seed): Shipment {
-  state.seq += 1;
-  const shipment = buildShipment(input, state.seq, data);
-  registered.push({ input, shipment, seq: state.seq });
+// ── 화물 CRUD ──────────────────────────────────────────────────
+
+/** 등록: 입력을 Shipment 로 정규화해 저장하고, 만들어진 레코드를 돌려준다. */
+export async function registerShipment(
+  input: ShipmentInput,
+  data: SeedData = seed,
+): Promise<Shipment> {
+  const n = await issueSeq("shipment", () => (state.seq += 1));
+  const shipment = buildShipment(input, n, data);
+  const record: StoredShipment = { input, shipment, seq: n };
+
+  await insertShipment(record);
+  registered.push(record); // 미러 — DB 가 죽어도 이 인스턴스에서는 계속 보인다
   return shipment;
 }
 
-/** 등록된 화물 목록 — 최근 등록이 앞으로 오도록 뒤집어 반환합니다. */
-export function listShipments(): Shipment[] {
+/** 등록된 화물 목록 — 최근 등록이 앞으로 온다. */
+export async function listShipments(): Promise<Shipment[]> {
+  const rows = await listShipmentRecords();
+  if (rows) return rows.map((r) => r.shipment);
   return registered.map((r) => r.shipment).reverse();
 }
 
-export function getShipment(id: string): Shipment | null {
+export async function getShipment(id: string): Promise<Shipment | null> {
+  const row = await findShipmentRecord(id);
+  if (row) return row.shipment;
   return registered.find((r) => r.shipment.id === id)?.shipment ?? null;
 }
 
@@ -120,37 +168,49 @@ export type UpdateResult =
  * 부분 수정 (#14). patch 는 ShipmentInput 의 일부. 저장된 원본 입력에 덮어써
  * 전체를 다시 검증·정규화한 뒤 같은 id 로 교체한다.
  */
-export function updateShipment(
+export async function updateShipment(
   id: string,
   patch: unknown,
   data: SeedData = seed,
-): UpdateResult {
-  const record = registered.find((r) => r.shipment.id === id);
-  if (!record) return { status: "notFound" };
+): Promise<UpdateResult> {
+  const stored =
+    (await findShipmentRecord(id)) ?? registered.find((r) => r.shipment.id === id);
+  if (!stored) return { status: "notFound" };
 
   const p = patch && typeof patch === "object" ? (patch as Record<string, unknown>) : {};
-  const merged = { ...record.input, ...p };
+  const merged = { ...stored.input, ...p };
   const v = validateShipmentInput(merged, data);
   if (!v.ok || !v.value) return { status: "invalid", errors: v.errors };
 
   // 등록과 같은 규칙(buildShipment)으로 재발급 — id 는 seq 로 동일하게 유지되고,
   // shipperName 을 새로 넣으면 shipperId 도 등록 경로와 일관되게 바뀐다.
-  const shipment = buildShipment(v.value, record.seq, data);
-  record.input = v.value;
-  record.shipment = shipment;
+  const shipment = buildShipment(v.value, stored.seq, data);
+  const next: StoredShipment = { input: v.value, shipment, seq: stored.seq };
+
+  const saved = await updateShipmentRecord(next);
+  if (saved === "notFound") return { status: "notFound" };
+
+  // 미러도 맞춰 둔다 (DB 가 나중에 끊겨도 최신 값이 남아 있도록)
+  const mirror = registered.find((r) => r.shipment.id === id);
+  if (mirror) Object.assign(mirror, next);
+
   return { status: "updated", shipment };
 }
 
 /** 삭제 (#15). 있으면 지우고 true, 없으면 false. */
-export function deleteShipment(id: string): boolean {
+export async function deleteShipment(id: string): Promise<boolean> {
+  const inDb = await deleteShipmentRecord(id);
+
   const i = registered.findIndex((r) => r.shipment.id === id);
-  if (i === -1) return false;
-  registered.splice(i, 1);
-  return true;
+  if (i !== -1) registered.splice(i, 1);
+
+  // DB 가 붙어 있으면 DB 의 판정이 우선. 폴백일 땐 미러에 있었는지로 판단한다.
+  return inDb ?? i !== -1;
 }
 
 /** 테스트·시연 리셋용 */
-export function clearShipments(): void {
+export async function clearShipments(): Promise<void> {
+  await clearDb();
   registered.length = 0;
   state.seq = 0;
   confirmations.length = 0;
@@ -181,11 +241,11 @@ export type ConfirmResult =
  * 코레일 공차 수송 확정 (#19). 입력/조율수락으로 매칭을 다시 돌려 `matched` 일 때만
  * 편성을 확정 기록한다. 미성립(shortfall/noWagon)이면 매칭 결과를 그대로 돌려준다.
  */
-export function confirmMatch(
+export async function confirmMatch(
   input: ShipmentInput | null,
   acceptedShipmentIds: string[] = [],
   data: SeedData = seed,
-): ConfirmResult {
+): Promise<ConfirmResult> {
   // 조율 수락분이 있으면 negotiate.accept() 로 재매칭 (예정 물량 당김), 없으면 그대로 매칭.
   const result = acceptedShipmentIds.length
     ? accept(data, input, acceptedShipmentIds).result
@@ -195,9 +255,9 @@ export function confirmMatch(
     return { status: "notMatched", match: result };
   }
 
-  state.confirmSeq += 1;
+  const n = await issueSeq("confirm", () => (state.confirmSeq += 1));
   const confirmation: Confirmation = {
-    groupId: `GRP-${String(state.confirmSeq).padStart(3, "0")}`,
+    groupId: `GRP-${String(n).padStart(3, "0")}`,
     status: "confirmed",
     wagon: result.wagon,
     members: result.members,
@@ -207,6 +267,8 @@ export function confirmMatch(
     confirmedAt: new Date().toISOString(),
     calc: result.calc,
   };
+
+  await insertConfirmation(confirmation, n);
   confirmations.push(confirmation);
   return { status: "confirmed", confirmation };
 }
@@ -221,32 +283,38 @@ export interface StoredNegotiation {
 }
 
 /** 조율 실행 결과를 저장하고 NEG-NNN id 를 발급한다 (#22 run 이 호출). */
-export function saveNegotiation(result: NegotiationResult): StoredNegotiation {
-  state.negSeq += 1;
+export async function saveNegotiation(
+  result: NegotiationResult,
+): Promise<StoredNegotiation> {
+  const n = await issueSeq("negotiation", () => (state.negSeq += 1));
   const record: StoredNegotiation = {
-    id: `NEG-${String(state.negSeq).padStart(3, "0")}`,
+    id: `NEG-${String(n).padStart(3, "0")}`,
     status: "open",
     result,
     createdAt: new Date().toISOString(),
   };
+
+  await insertNegotiation(record, n);
   negotiations.push(record);
   return record;
 }
 
 /** #25 — 조율 세션(최종 편성 결과) 조회. 없으면 null. */
-export function getNegotiation(id: string): StoredNegotiation | null {
-  return negotiations.find((n) => n.id === id) ?? null;
+export async function getNegotiation(id: string): Promise<StoredNegotiation | null> {
+  return (await findNegotiation(id)) ?? negotiations.find((n) => n.id === id) ?? null;
 }
 
 /** #26 — 조율 취소("다음 공차 일정 대기"). 상태만 cancelled 로. 없으면 null. */
-export function cancelNegotiation(id: string): StoredNegotiation | null {
-  const record = negotiations.find((n) => n.id === id);
-  if (!record) return null;
-  record.status = "cancelled";
-  return record;
+export async function cancelNegotiation(id: string): Promise<StoredNegotiation | null> {
+  const updated = await cancelNegotiationRow(id);
+
+  const mirror = negotiations.find((n) => n.id === id);
+  if (mirror) mirror.status = "cancelled";
+
+  return updated ?? mirror ?? null;
 }
 
-// ── 입력 검증 ──────────────────────────────────────────────────
+// ── 입력 검증 (순수 함수 — DB 와 무관) ─────────────────────────
 
 export interface ValidationResult {
   ok: boolean;
@@ -257,8 +325,8 @@ export interface ValidationResult {
 }
 
 /**
- * 화물 등록 폼(04a)의 원시 요청 본문을 검증하고 `ShipmentInput` 으로 정규화합니다.
- * 실패하면 필드별 오류를 모아 돌려주므로 화면에서 각 입력 아래에 바로 표시할 수 있습니다.
+ * 화물 등록 폼(04a)의 원시 요청 본문을 검증하고 `ShipmentInput` 으로 정규화한다.
+ * 실패하면 필드별 오류를 모아 돌려주므로 화면에서 각 입력 아래에 바로 표시할 수 있다.
  */
 export function validateShipmentInput(
   body: unknown,

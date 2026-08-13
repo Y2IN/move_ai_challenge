@@ -133,14 +133,28 @@ export default function SubsidyDone() {
       .catch((error: Error) => setIndicatorsError(error.message));
   }, []);
 
+  /**
+   * 폴백 초안 회전 인덱스. 재생성할 때마다 1씩 올려 서버로 보냅니다.
+   *
+   * 서버가 이 카운터를 들고 있으면 안 됩니다 — 서버리스에서는 콜드 스타트마다 리셋되어
+   * 재생성을 눌러도 같은 문장이 다시 나옵니다. DB(Supabase)에 넣는 것도 과합니다.
+   * 데모 문장 하나 고르자고 재생성마다 쓰기가 한 번씩 발생하니까요.
+   *
+   * "지금 몇 번째 초안을 보고 있는가"는 화면의 상태이므로 화면이 셉니다. 단조 증가라
+   * 인스턴스가 몇 개든, 같은 문단을 연속으로 눌러도 매번 다음 초안이 나옵니다.
+   * (렌더에 영향을 주지 않는 값이라 state 가 아니라 ref 입니다)
+   */
+  const draftSeed = useRef(0);
+  const nextDraftSeed = useCallback(() => (draftSeed.current += 1), []);
+
   /** 전체 생성 = 최초 로드이자 "전체 재생성". 문단 5개가 병렬로 생성됩니다. */
   const generateAll = useCallback(() => {
     setReport(null);
     setReportError(null);
-    generateEsgReport({})
+    generateEsgReport({ draftSeed: nextDraftSeed() })
       .then(setReport)
       .catch((error: Error) => setReportError(error.message));
-  }, []);
+  }, [nextDraftSeed]);
 
   const started = useRef(false);
   useEffect(() => {
@@ -165,7 +179,11 @@ export default function SubsidyDone() {
       if (!report) return;
       setBusyKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
 
-      generateEsgReport({ ...periodToQuery(report.period), sections: [key] })
+      generateEsgReport({
+        ...periodToQuery(report.period),
+        sections: [key],
+        draftSeed: nextDraftSeed(),
+      })
         .then((partial) => {
           const next = partial.sections.find((s) => s.key === key);
           if (!next) throw new Error("응답에 요청한 문단이 없습니다.");
@@ -209,8 +227,44 @@ export default function SubsidyDone() {
         })
         .finally(() => setBusyKeys((prev) => prev.filter((k) => k !== key)));
     },
-    [report],
+    [report, nextDraftSeed],
   );
+
+  /**
+   * 문단 직접 편집(✎). 담당자가 사내 문체로 손보는 자리입니다.
+   *
+   * **출처를 `user` 로 내립니다.** 사람이 고쳐 쓴 문장이 "AI 서술 · 숫자 검증 통과"
+   * 파란 배지를 달고 있으면 안 됩니다 — 그 배지는 서버 검출기를 통과했다는 뜻인데,
+   * 편집분은 통과한 적이 없습니다. 서버가 `previous` 로 받은 문단을 `user` 로 내리는
+   * 것과 같은 이유이고, 같은 배지("검증 필요")로 표시됩니다.
+   *
+   * 편집분은 서버로 보내지 않습니다. 이 시점에 필요한 건 저장이 아니라 화면 반영이고,
+   * 왕복시키면 문단이 다시 생성 경로를 타 방금 쓴 문장이 날아갑니다.
+   */
+  const editSection = useCallback((key: EsgSectionKey, text: string) => {
+    setReport((prev) => {
+      if (!prev) return prev;
+      const sections = prev.sections.map((s) =>
+        s.key === key
+          ? {
+              ...s,
+              text,
+              source: "user" as const,
+              warnings: ["직접 편집한 문단입니다. 숫자 검증을 다시 받지 않았습니다."],
+            }
+          : s,
+      );
+      return {
+        ...prev,
+        sections,
+        generation: {
+          ...prev.generation,
+          aiCount: sections.filter((s) => s.source === "ai").length,
+          fallbackCount: sections.filter((s) => s.source === "fallback").length,
+        },
+      };
+    });
+  }, []);
 
   const exportScope3 = useCallback(
     (format: Scope3Format) => {
@@ -244,6 +298,7 @@ export default function SubsidyDone() {
       onExportDoc={exportDoc}
       esg={{ indicators, indicatorsError, report, reportError, busyKeys }}
       onRegenerateSection={regenerateSection}
+      onEditSection={editSection}
       onRegenerateAllEsg={generateAll}
       onRetryIndicators={loadIndicators}
       onExportScope3={exportScope3}

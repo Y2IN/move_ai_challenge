@@ -1,0 +1,47 @@
+name: Keepalive
+
+# Supabase 무료 플랜은 **7일간 요청이 0건이면** 프로젝트를 재운다.
+# 심사위원이 2주에 걸쳐 테스트하는 동안 중간에 일주일 공백이 생기면 그대로 잠들고,
+# 그때 열어 본 사람은 "화물 목록이 안 뜨는 서비스"를 보게 된다.
+#
+# 매일 한 번 /api/health 를 치면 그 라우트가 DB 에 쿼리를 하나 날리므로
+# 정지 타이머가 리셋된다. (Vercel 만 깨워서는 소용없다 — health 라우트 주석 참고)
+#
+# 잠들어도 앱이 죽지는 않는다 (인메모리 폴백). 이건 "등록한 화물이 남아 있게" 하려는 것이다.
+
+on:
+  schedule:
+    # 매일 00:10 UTC (한국시간 09:10). 정각은 GitHub Actions 큐가 붐빈다.
+    - cron: "10 0 * * *"
+  workflow_dispatch: # 발표 직전 수동으로 깨울 때
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: /api/health 호출
+        run: |
+          URL="https://railhub-x.vercel.app/api/health"
+
+          # 콜드 스타트 + Supabase 복귀에 시간이 걸릴 수 있어 3번까지 재시도한다.
+          for attempt in 1 2 3; do
+            echo "── 시도 $attempt ──"
+            if BODY=$(curl -fsS --max-time 30 "$URL"); then
+              echo "$BODY"
+
+              # ok:true 라도 DB 가 안 붙었으면 조용히 폴백으로 도는 것이므로 실패로 본다.
+              if echo "$BODY" | grep -q '"reachable":true'; then
+                echo "✔ DB 응답 정상"
+                exit 0
+              fi
+              echo "⚠ 앱은 떴지만 DB 가 응답하지 않습니다 (인메모리 폴백 상태)"
+            else
+              echo "⚠ 호출 실패"
+            fi
+            sleep 20
+          done
+
+          echo "✖ DB 가 계속 응답하지 않습니다."
+          echo "  Supabase 대시보드에서 프로젝트가 paused 인지 확인하고 Restore 하세요."
+          exit 1

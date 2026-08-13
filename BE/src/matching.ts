@@ -197,7 +197,7 @@ export function wagonViolation(wagon: EmptyWagon, shipments: Shipment[]): string
   return null;
 }
 
-/** 출발일이 화차 시각표와 맞는지 (fallbackHints 기준 — Claude 파싱 실패 시 경로) */
+/** 출발일이 화차 시각표와 맞는지 (fallbackHints 기준 — AI 파싱 실패 시 경로) */
 export function scheduleFits(s: Shipment, wagon: EmptyWagon): boolean {
   const want = new Date(s.schedule.requestedDepartureDate).getTime();
   const dep = new Date(wagon.departure.date).getTime();

@@ -74,7 +74,7 @@ export interface ParsedConstraints {
   noWeekendDispatch: boolean;
 }
 
-/** Claude 호출이 실패했을 때 쓰는 규칙기반 폴백 값 (시드에 미리 넣어 둠) */
+/** 생성 AI 호출이 실패했을 때 쓰는 규칙기반 폴백 값 (시드에 미리 넣어 둠) */
 export type FallbackHints = Omit<ParsedConstraints, "hard" | "soft"> & {
   requiresForklift: boolean;
 };

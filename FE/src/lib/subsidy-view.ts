@@ -83,7 +83,7 @@ export interface ApplyDocView {
 
 /** BE 문단 출처 → 화면 톤. `pending` 은 아직 생성 전이라 템플릿과 같은 회색입니다. */
 const TONE_BY_SOURCE: Record<Paragraph['source'], ParagraphTone> = {
-  claude: 'ai',
+  ai: 'ai',
   fallback: 'fallback',
   user: 'user',
   pending: 'fallback',

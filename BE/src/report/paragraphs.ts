@@ -33,7 +33,7 @@ export interface ParagraphSpec {
   facts: (input: ReportInput) => string[];
   /** 무엇을 쓸지 */
   instruction: (input: ReportInput) => string;
-  /** Claude 호출 실패 시 쓰는 규칙기반 문장 */
+  /** 생성 AI 호출 실패 시 쓰는 규칙기반 문장 */
   fallback: (input: ReportInput) => string;
 }
 

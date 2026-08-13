@@ -1,11 +1,11 @@
 /**
  * 자연어 → 구조화 폼 (#10) — **데모 버전 (LLM 미연결)**.
  *
- * 지금은 Claude 대신 미리 추가한 케이스에서 파싱 결과를 돌려준다.
+ * 지금은 생성 AI 대신 미리 추가한 케이스에서 파싱 결과를 돌려준다.
  * 화면은 케이스를 골라(GET) 파싱을 실행(POST)하면 되고, 응답의 `notice` 에
  * "데모 버전이라 케이스를 추가해뒀다"는 안내가 담긴다.
  *
- * LLM 을 붙일 땐 parseFreightText 내부만 Claude 호출로 교체하면 된다
+ * LLM 을 붙일 땐 parseFreightText 내부만 generateText() 호출로 교체하면 된다
  * (응답 스키마 ParseResponse 는 그대로 유지).
  */
 

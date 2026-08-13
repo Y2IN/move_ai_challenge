@@ -1,5 +1,5 @@
 import { PARAGRAPH_KEYS, type ParagraphKey } from "@railhub/be/report/contract";
-import { generateParagraph, isClaudeConfigured } from "@railhub/be/report/generate";
+import { generateParagraph, isLlmConfigured } from "@railhub/be/report/generate";
 import { PARAGRAPH_SPECS } from "@railhub/be/report/paragraphs";
 import { find, replaceParagraph } from "@railhub/be/report/store";
 import { verifyParagraph } from "@railhub/be/report/verify";
@@ -31,7 +31,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  const existing = find(id);
+  const existing = await find(id);
   if (!existing) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
@@ -39,7 +39,7 @@ export async function POST(
   // 초안을 만들 때 쓴 입력을 그대로 재사용한다. 다시 resolve 하면 그 사이 편성이
   // 바뀌어 문단이 문서의 표와 다른 수치를 인용하게 된다.
   const input = existing.input;
-  const { paragraph, diagnostic } = isClaudeConfigured()
+  const { paragraph, diagnostic } = isLlmConfigured()
     ? await generateParagraph(key, input)
     : {
         paragraph: {
@@ -55,12 +55,12 @@ export async function POST(
           source: "fallback" as const,
           attempts: 0,
           hallucinations: [],
-          error: "Claude 인증 없음",
+          error: "생성 AI 인증 없음",
           elapsedMs: 0,
         },
       };
 
-  const updated = replaceParagraph(id, key, paragraph, "regenerate", new Date().toISOString());
+  const updated = await replaceParagraph(id, key, paragraph, "regenerate", new Date().toISOString());
   return Response.json({
     applicationId: id,
     paragraph,
@@ -79,7 +79,7 @@ export async function PATCH(
   if (!key) {
     return Response.json({ error: `알 수 없는 문단: ${rawKey}` }, { status: 400 });
   }
-  const stored = find(id);
+  const stored = await find(id);
   if (!stored) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
@@ -93,7 +93,7 @@ export async function PATCH(
   // 사람이 고친 문장도 검사한다. 막지는 않고 경고만 붙인다.
   const check = verifyParagraph(text, stored.input);
 
-  const app = replaceParagraph(
+  const app = await replaceParagraph(
     id,
     key,
     { type: "ai", key, text, source: "user", editable: true, editedByUser: true },

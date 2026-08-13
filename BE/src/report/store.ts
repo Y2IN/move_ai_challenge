@@ -1,13 +1,23 @@
 /**
- * 사업계획서 초안 저장소 — 인메모리.
+ * 사업계획서 초안 저장소 — Supabase 우선, 인메모리 폴백.
  *
- * 시연에 DB는 필요 없다. 나중에 붙일 수 있게 접근부만 분리해 둔다.
+ * 예전엔 인메모리뿐이라 서버리스 콜드 스타트마다 비워졌다. 초안 생성(POST) →
+ * 스트리밍 → 조회(GET)가 서로 다른 람다 인스턴스로 갈리면 방금 만든 초안이
+ * 곧바로 404 로 나왔다. 심사위원이 2주간 테스트하는 환경에서는 치명적이라
+ * DB 를 붙였다.
  *
- * ⚠️ 서버리스에서는 콜드 스타트마다 비워진다. 시연 중 인스턴스가 갈리면
- *    초안이 사라질 수 있으므로, 데모는 한 번에 이어서 진행할 것.
- *    영속이 필요해지면 이 파일의 구현만 교체하면 된다.
+ * 쓰기는 DB·메모리 양쪽에, 읽기는 DB 우선. DB 가 없거나 잠들면 예전과 같이 동작한다.
  */
 
+import {
+  appendRevision,
+  clearApplications,
+  findApplication,
+  findLatestApplication,
+  updateDocument,
+  upsertApplication,
+} from "../db/reports";
+import { nextSeq } from "../db/client";
 import type {
   Paragraph,
   ParagraphKey,
@@ -48,10 +58,10 @@ export interface Revision {
  *
  * Next 는 라우트 핸들러마다 서버 번들을 따로 만든다. 그러면 이 모듈도 번들마다
  * 한 벌씩 생겨서 `POST /applications` 가 저장한 Map 과 `GET /applications/{id}` 가
- * 읽는 Map 이 **서로 다른 객체**가 된다. 방금 만든 초안이 곧바로 404 로 나온다.
+ * 읽는 Map 이 **서로 다른 객체**가 된다.
  *
  * globalThis 에 한 번만 매달아 번들이 몇 벌이든 같은 저장소를 보게 한다.
- * (콜드 스타트마다 비워지는 건 그대로다 — 영속이 필요하면 이 파일만 교체한다)
+ * (DB 가 붙으면 이 Map 은 폴백용 미러다)
  */
 interface ReportStoreState {
   apps: Map<string, StoredApplication>;
@@ -69,22 +79,35 @@ const state: ReportStoreState = (globalRef.__railhubReportStore ??= {
 
 const store = state.apps;
 
-export function nextApplicationId(): string {
-  state.seq += 1;
-  return `APP-${String(state.seq).padStart(4, "0")}`;
+/** 이번 초안에 쓸 번호. DB 시퀀스가 우선, 안 되면 인메모리 카운터. */
+let lastSeq = 0;
+
+/**
+ * APP-NNNN 발급. id 문자열 규칙은 여기 한 곳에만 둔다 (SQL 은 번호만 준다).
+ *
+ * 발급한 번호를 `lastSeq` 에 남겨 뒤이은 `save()` 가 같은 값을 쓰게 한다.
+ * 라우트는 항상 발급 직후에 저장하므로 이 정도로 충분하다.
+ */
+export async function nextApplicationId(): Promise<string> {
+  lastSeq = (await nextSeq("application")) ?? (state.seq += 1);
+  return `APP-${String(lastSeq).padStart(4, "0")}`;
 }
 
-export function save(app: StoredApplication): StoredApplication {
+export async function save(app: StoredApplication): Promise<StoredApplication> {
+  await upsertApplication(app, lastSeq || state.seq || 1);
   store.set(app.id, app);
   return app;
 }
 
-export function find(id: string): StoredApplication | undefined {
-  return store.get(id);
+export async function find(id: string): Promise<StoredApplication | undefined> {
+  return (await findApplication(id)) ?? store.get(id);
 }
 
 /** 사이드바 재진입 시 초안이 있으면 06c로 직행 (api_list #34) */
-export function findLatest(): StoredApplication | undefined {
+export async function findLatest(): Promise<StoredApplication | undefined> {
+  const fromDb = await findLatestApplication();
+  if (fromDb) return fromDb;
+
   let latest: StoredApplication | undefined;
   for (const app of store.values()) {
     if (!latest || app.updatedAt > latest.updatedAt) latest = app;
@@ -93,32 +116,41 @@ export function findLatest(): StoredApplication | undefined {
 }
 
 /** 문단 하나를 갈아끼우고 이력을 남긴다. */
-export function replaceParagraph(
+export async function replaceParagraph(
   id: string,
   key: ParagraphKey,
   next: Paragraph,
   action: Revision["action"],
   at: string,
-): StoredApplication | undefined {
-  const app = store.get(id);
+): Promise<StoredApplication | undefined> {
+  const app = await find(id);
   if (!app) return undefined;
 
   const before = app.document.paragraphs[key];
   app.document.paragraphs[key] = next;
-  app.revisions.push({
+  const revision: Revision = {
     at,
     key,
     action,
     before: before?.text ?? "",
     after: next.text,
     source: next.source,
-  });
+  };
+  app.revisions.push(revision);
   app.updatedAt = at;
+
+  await updateDocument(id, app.document, at);
+  await appendRevision(id, revision);
+
+  // 미러도 최신으로 (DB 가 나중에 끊겨도 이 인스턴스는 최신 문서를 들고 있게)
+  store.set(id, app);
   return app;
 }
 
 /** 테스트·시연 리셋용 */
-export function clear(): void {
+export async function clear(): Promise<void> {
+  await clearApplications();
   store.clear();
   state.seq = 0;
+  lastSeq = 0;
 }

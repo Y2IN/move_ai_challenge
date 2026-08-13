@@ -1,11 +1,11 @@
 /**
- * 문단 생성 — Claude 호출 · 병렬 · 환각 검증 · 폴백.
+ * 문단 생성 — 생성 AI 호출 · 병렬 · 환각 검증 · 폴백.
  *
  * 06b 화면이 "약 10초"라고 명시한다. 문단 6개를 순차로 호출하면 서버리스
  * 실행 제한을 넘길 위험이 있어 **전부 병렬로 호출**한다.
  *
  * 각 문단은 다음 순서를 거친다.
- *   1. Claude 호출
+ *   1. 생성 AI 호출
  *   2. 숫자 환각 검증 (verify.ts)
  *   3. 환각이 있으면 **한 번만** 재시도 (무엇이 문제였는지 알려주고)
  *   4. 그래도 실패하거나 호출 자체가 실패하면 규칙기반 폴백 문장
@@ -13,7 +13,7 @@
  * 폴백이 있어야 현장 네트워크가 끊겨도 문서 생성이 통째로 죽지 않는다.
  */
 
-import { CLAUDE_MODEL, isClaudeConfigured, tryGetClaude } from "../claude";
+import { generateText, isLlmConfigured } from "../llm";
 import {
   PARAGRAPH_KEYS,
   type Paragraph,
@@ -27,7 +27,7 @@ const MAX_TOKENS = 1024;
 /** 환각이 나오면 한 번만 다시 시킨다. 두 번 이상은 시간만 쓴다. */
 const MAX_RETRY = 1;
 
-export { isClaudeConfigured };
+export { isLlmConfigured };
 
 export interface GenerateResult {
   paragraphs: Record<ParagraphKey, Paragraph>;
@@ -84,21 +84,20 @@ export async function generateParagraph(
     let text: string;
 
     try {
-      const claude = tryGetClaude();
-      if (!claude) {
-        lastError = "Claude 인증 없음";
+      if (!isLlmConfigured()) {
+        lastError = "생성 AI 인증 없음";
         break;
       }
-      const res = await claude.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: MAX_TOKENS,
+      text = await generateText({
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: prompt }],
+        prompt,
+        maxTokens: MAX_TOKENS,
+        // 짧은 서식 문단이라 깊은 추론이 필요 없다. 이걸 빼면 문단 6개 병렬에도
+        // 40초까지 늘어나 vercel.json 의 maxDuration(60s) 에 위험하게 붙는다.
+        thinking: "low",
+        // 문단 하나가 늦어져 전체가 타임아웃되느니, 그 문단만 폴백으로 떨어뜨린다.
+        timeoutMs: 25_000,
       });
-      text = res.content
-        .flatMap((b) => (b.type === "text" ? [b.text] : []))
-        .join("")
-        .trim();
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       break; // 호출 자체가 실패하면 재시도해도 대개 같다 — 바로 폴백
@@ -110,7 +109,7 @@ export async function generateParagraph(
     }
 
     const report = findHallucinatedNumbers(text, allowed);
-    if (report.clean) return done(toParagraph(key, text, "claude"));
+    if (report.clean) return done(toParagraph(key, text, "ai"));
 
     hallucinations.push(report.offenders);
     lastError = report.message;
@@ -169,7 +168,7 @@ export function generateFallbackOnly(input: ReportInput): GenerateResult {
       source: "fallback",
       attempts: 0,
       hallucinations: [],
-      error: "Claude 인증 없음 — 폴백 문장 사용",
+      error: "생성 AI 인증 없음 — 폴백 문장 사용",
       elapsedMs: 0,
     });
   }
