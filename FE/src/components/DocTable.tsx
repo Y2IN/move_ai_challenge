@@ -111,8 +111,17 @@ export function AiParagraphBlock({
   className?: string;
 }) {
   return (
-    <div className={`group relative rounded-[10px] border border-[#D6E7FF] bg-[#F5F9FF] px-[18px] py-4 ${className}`}>
-      <p className="text-sm leading-[1.85] text-[#333D4B]">{body}</p>
+    <div
+      className={`group relative rounded-r-[10px] border-l-[3px] border-[#3182F6] bg-[#F5F9FF] px-[18px] pb-4 pt-3.5 ${className}`}
+    >
+      <div className="flex items-center gap-[7px]">
+        <span className="inline-flex h-4 items-center justify-center rounded bg-[#D6E7FF] px-1.5 text-[10px] font-extrabold tracking-wide text-[#1B64DA]">
+          AI
+        </span>
+        <span className="text-[11px] font-bold text-[#1B64DA]">AI 서술 · 편집 가능</span>
+      </div>
+
+      <p className="mt-2 text-sm leading-[1.85] text-[#333D4B]">{body}</p>
 
       <button
         type="button"
@@ -121,10 +130,6 @@ export function AiParagraphBlock({
       >
         ↻ 문단 재생성
       </button>
-
-      <span className="absolute -bottom-[9px] left-4 rounded-md bg-[#D6E7FF] px-2 py-0.5 text-[11px] font-bold text-[#1B64DA]">
-        AI 서술 · 편집 가능
-      </span>
     </div>
   );
 }
