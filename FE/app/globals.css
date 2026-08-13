@@ -24,6 +24,40 @@ body {
     "Malgun Gothic", sans-serif;
 }
 
+/* 생성 중 표시 점 3개 물결 (delay를 자식 선택자로 줘야 animation 단축속성에 안 먹힘) */
+@keyframes dot-wave {
+  0%,
+  70%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.dot-wave > span {
+  display: inline-block;
+  animation: dot-wave 1.1s ease-in-out infinite;
+}
+
+.dot-wave > span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.dot-wave > span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-wave > span {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* 랜딩 히어로 칩 회전초밥 벨트 (트랙에 목록 2벌 → -50%가 이음매) */
 @keyframes chip-marquee {
   to {

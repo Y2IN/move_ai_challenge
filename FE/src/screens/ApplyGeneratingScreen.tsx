@@ -1,42 +1,80 @@
 import { AppLayout } from '../components/AppLayout';
-import { applyMeta, generateProgress, generateSteps } from '../mocks/apply';
+import { applyMeta, type GenerateStep } from '../mocks/apply';
+
+export interface GenerateProgress {
+  current: number;
+  total: number;
+  percent: number;
+}
 
 interface ApplyGeneratingScreenProps {
-  onNavigate?: (to: string) => void;
+  /** 서버가 보내온 단계. 계산 4단계 + AI 서술 1단계 */
+  steps: GenerateStep[];
+  progress: GenerateProgress;
+  /** 생성이 실패했을 때의 안내. null 이면 정상 진행 중 */
+  error?: string | null;
+  /** 완료됐거나 실패해서 결과 화면으로 넘어갈 수 있는 상태인가 */
+  finished?: boolean;
+  onViewResult?: () => void;
   onCancel?: () => void;
 }
 
-/** 06b — 생성 중. 스피너 대신 실제 작업 단계를 순차로 보여준다 */
-export function ApplyGeneratingScreen({ onNavigate, onCancel }: ApplyGeneratingScreenProps) {
+/**
+ * 06b — 생성 중. 스피너 대신 실제 작업 단계를 순차로 보여준다.
+ *
+ * ⚠️ 이 화면은 **표시만** 한다. 진행률은 컨테이너(`app/subsidy/generating/page.tsx`)가
+ *    SSE 로 받아 props 로 내려준다. 예전에는 여기서 목업 상수를 그대로 그렸는데,
+ *    그러면 "6개 문단 중 4번째" 가 영원히 4번째에 멈춰 있는 가짜 진행률이 된다.
+ */
+export function ApplyGeneratingScreen({
+  steps,
+  progress,
+  error = null,
+  finished = false,
+  onViewResult,
+  onCancel,
+}: ApplyGeneratingScreenProps) {
   return (
     <AppLayout active="subsidy">
       <header className="flex flex-col gap-2">
         <span className="text-sm font-bold text-[#3182F6]">{applyMeta.periodLabel}</span>
         <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">
-          사업계획서를 작성하고 있습니다
+          {error
+            ? '사업계획서 작성을 마치지 못했습니다'
+            : finished
+              ? '사업계획서 작성이 끝났습니다'
+              : '사업계획서를 작성하고 있습니다'}
         </h1>
         <p className="text-base text-[#6B7684]">
-          법정 산식 계산이 먼저 끝나고, 마지막에 AI가 서술 문장을 씁니다.
+          {error ?? '법정 산식 계산이 먼저 끝나고, 마지막에 AI가 서술 문장을 씁니다.'}
         </p>
       </header>
 
       <section className="rounded-[20px] bg-white p-7">
         <div className="flex items-center justify-between">
           <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">
-            진행 단계 {generateProgress.current} / {generateProgress.total}
+            진행 단계 {progress.current} / {progress.total}
           </span>
-          <span className="text-[15px] font-bold tabular-nums text-[#3182F6]">{generateProgress.percent}%</span>
+          <span
+            className={`text-[15px] font-bold tabular-nums ${
+              error ? 'text-[#8B95A1]' : 'text-[#3182F6]'
+            }`}
+          >
+            {progress.percent}%
+          </span>
         </div>
 
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#F2F4F6]">
           <span
-            className="block h-1.5 rounded-full bg-[#3182F6] transition-[width] duration-500"
-            style={{ width: `${generateProgress.percent}%` }}
+            className={`block h-1.5 rounded-full transition-[width] duration-500 ${
+              error ? 'bg-[#D1D6DB]' : 'bg-[#3182F6]'
+            }`}
+            style={{ width: `${progress.percent}%` }}
           />
         </div>
 
         <div className="mt-2 flex flex-col">
-          {generateSteps.map((s) => (
+          {steps.map((s) => (
             <div
               key={s.label}
               className={[
@@ -54,11 +92,11 @@ export function ApplyGeneratingScreen({ onNavigate, onCancel }: ApplyGeneratingS
 
               <span className={`text-base ${s.done ? 'font-semibold text-[#4E5968]' : 'font-bold text-[#191F28]'}`}>
                 {s.label}
-                {!s.done && (
-                  <span className="ml-0.5 text-[#3182F6]">
-                    <span className="animate-pulse">·</span>
-                    <span className="animate-pulse [animation-delay:200ms]">·</span>
-                    <span className="animate-pulse [animation-delay:400ms]">·</span>
+                {!s.done && !error && (
+                  <span className="dot-wave ml-0.5 text-[#3182F6]" aria-hidden="true">
+                    <span>·</span>
+                    <span>·</span>
+                    <span>·</span>
                   </span>
                 )}
               </span>
@@ -82,13 +120,14 @@ export function ApplyGeneratingScreen({ onNavigate, onCancel }: ApplyGeneratingS
         <span className="flex gap-4">
           <button
             type="button"
-            onClick={() => onNavigate?.('/subsidy/done')}
-            className="text-[15px] font-bold text-[#3182F6]"
+            onClick={onViewResult}
+            disabled={!finished && !error}
+            className="text-[15px] font-bold text-[#3182F6] disabled:cursor-not-allowed disabled:text-[#C4CBD4]"
           >
             완료 화면 보기 →
           </button>
           <button type="button" onClick={onCancel} className="text-[15px] font-bold text-[#8B95A1]">
-            생성 취소
+            {finished || error ? '닫기' : '생성 취소'}
           </button>
         </span>
       </section>
