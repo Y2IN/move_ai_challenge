@@ -18,7 +18,8 @@ export default function Home() {
         <p className="mb-3 font-semibold text-slate-100">다음 작업</p>
         <ul className="space-y-1.5 text-slate-400">
           <li>· 기획 문서 확인 — docs/PROJECT.md</li>
-          <li>· .env.local 생성 후 ANTHROPIC_API_KEY 입력</li>
+          <li>· FE/.env.local 생성 후 ANTHROPIC_API_KEY 입력</li>
+          <li>· 배선 확인 — /api/health</li>
           <li>· 화물 입력 / 공차 매칭 / 편익 대시보드 / ESG 리포트 화면 구현</li>
         </ul>
       </div>

@@ -186,10 +186,10 @@ CO2 감축량(kg)    = (도로tonKm × 도로배출계수 − 철도tonKm × 철
 | 영역      | 선택                                         | 근거                                                                                                                                                                |
 | --------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 프론트    | **React (Next.js 15 App Router)**            | 대시보드 UI                                                                                                                                                         |
-| 백엔드    | **Next.js Route Handlers (Node/TypeScript)** | 별도 서버 없이 `app/api/*`로 처리. Java Spring·FastAPI는 이번 MVP(CRUD 거의 없음, 계산+LLM 호출 위주)에서 계층 구성 비용만 큼. 서버 2개 → CORS·배포 2번 문제도 회피 |
-| 타입 공유 | `lib/types.ts`                               | 프론트·백엔드가 동일 타입 사용. 시연 중 스펙 변경 시 수정 지점 절반                                                                                                 |
+| 백엔드    | **Next.js Route Handlers (Node/TypeScript)** | 별도 서버 없이 `FE/app/api/*`로 처리 (도메인 로직은 `BE/` 워크스페이스, 라우트는 얇게). Java Spring·FastAPI는 이번 MVP(CRUD 거의 없음, 계산+LLM 호출 위주)에서 계층 구성 비용만 큼. 서버 2개 → CORS·배포 2번 문제도 회피 |
+| 타입 공유 | `BE/src/types.ts`                            | 프론트·백엔드가 동일 타입 사용. 시연 중 스펙 변경 시 수정 지점 절반                                                                                                 |
 | 생성형 AI | **Claude API** (`@anthropic-ai/sdk`)         | 제약 조건 해석, **조율안·화주별 설득 메시지 생성**, 리포트 문장 생성. 구조화 출력이 필요하므로 응답은 JSON 스키마로 고정                                            |
-| 데이터    | **인메모리 시드 (`lib/seed.ts`)**            | 시연에 DB 불필요. 나중에 붙일 수 있게 데이터 접근부만 분리                                                                                                          |
+| 데이터    | **인메모리 시드 (`BE/src/seed.ts`)**         | 시연에 DB 불필요. 나중에 붙일 수 있게 데이터 접근부만 분리                                                                                                          |
 | 스타일    | Tailwind CSS v4                              | 대시보드 속도                                                                                                                                                       |
 | 배포      | Vercel                                       | `git push` 한 번                                                                                                                                                    |
 
@@ -198,26 +198,31 @@ CO2 감축량(kg)    = (도로tonKm × 도로배출계수 − 철도tonKm × 철
 ## 8. 폴더 구조 (예정)
 
 ```
-app/
-  page.tsx              // 랜딩
-  api/
-    parse/route.ts      // 자연어 → 구조화 화물 데이터 + 제약 조건 (Claude)
-    match/route.ts      // 합적 매칭 + 편익 산출
-    negotiate/route.ts  // 조율안 + 화주별 제안 메시지 생성 (Claude)
-    report/route.ts     // K-ESG 리포트 초안 생성 (Claude)
-lib/
-  types.ts              // 공용 도메인 타입 (Shipment.constraintText 포함)
-  constants.ts          // ⚠️ 모든 계수는 여기에만
-  network.ts            // 역/노선 거리
-  seed.ts               // 시연용 화물·공차 데이터 (정원 미달로 세팅)
-  matching.ts           // 합적 + 공차 매칭 알고리즘
-  negotiate.ts          // 조건 조율 — 양보 조합 탐색 + 프롬프트
-  benefit.ts            // 4대 편익 계산
-  claude.ts             // Claude 클라이언트 (세팅 완료)
+FE/                     // Next.js 워크스페이스 (Vercel Root Directory)
+  app/
+    page.tsx            // 랜딩
+    api/                // 라우트는 얇게 — 입력 검증 + BE 호출 + 응답만
+      health/route.ts   // 배선 확인 (세팅 완료)
+      parse/route.ts    // 자연어 → 구조화 화물 데이터 + 제약 조건 (Claude)
+      match/route.ts    // 합적 매칭 + 편익 산출
+      negotiate/route.ts// 조율안 + 화주별 제안 메시지 생성 (Claude)
+      report/route.ts   // K-ESG 리포트 초안 생성 (Claude)
+BE/                     // 도메인 로직 워크스페이스 — import { x } from "@railhub/be/파일명"
+  src/
+    types.ts            // 공용 도메인 타입 (Shipment.constraintText 포함)
+    constants.ts        // ⚠️ 모든 계수는 여기에만
+    network.ts          // 역/노선 거리
+    seed.ts             // 시연용 화물·공차 데이터 (정원 미달로 세팅)
+    matching.ts         // 합적 + 공차 매칭 알고리즘
+    negotiate.ts        // 조건 조율 — 양보 조합 탐색 + 프롬프트
+    benefit.ts          // 4대 편익 계산
+    claude.ts           // Claude 클라이언트 (세팅 완료)
 docs/
   PROJECT.md            // 이 문서
   DEPLOY.md             // 배포 가이드
 ```
+
+BE 는 빌드 산출물이 없다. FE 가 TS 소스를 그대로 transpile 하므로(`FE/next.config.ts` 의 `transpilePackages`) 파일만 추가하면 바로 import 된다.
 
 ## 9. 구현 순서 (권장)
 
