@@ -25,15 +25,16 @@
 화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
 각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
 
-- **✅ 완료 (23):**
+- **✅ 완료 (26):**
   - 랜딩·대시보드: #6 #7 #8 #9
   - 화물등록: #11 #13 #14 #15
   - 매칭: #16 #18 #19
-  - 조율: #22 run
+  - 조율: #22 run · #25 조회 · #26 취소
+  - 편익: #28 summary
   - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
   - ESG: #40 #41 #42
-- **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
-- **❌ 미구현 (12):** #10 파싱 · #12 엑셀 · #21 classify · #23 조율SSE · #25 · #26 · #28 summary · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+- **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits/calculate(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
+- **❌ 미구현 (9):** #10 파싱 · #12 엑셀 · #21 classify · #23 조율SSE · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
 - **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
 - **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
 
@@ -177,11 +178,11 @@
 | # | 상태 | Method | Path | 용도 | LLM |
 |---|---|---|---|---|---|
 | 21 | ❌ | POST | `/api/negotiation/classify` | 화주 자연어 제약 → **절대조건 / 조정가능** 분류 | ✅ |
-| 22 | ✅ | POST | `/api/negotiation/run` | 조율 에이전트 실행 (`negotiate.ts` — 양보 조합 탐색 + 제안 생성) | ✅ |
+| 22 | ✅ | POST | `/api/negotiation/run` | 조율 에이전트 실행 (`negotiate.ts` — 양보 조합 탐색 + 제안 생성). NEG-NNN id 발급 | ✅ |
 | 23 | ❌ | GET | `/api/negotiation/{id}/stream` | **SSE.** 적재율 41→75→94% 진행 | ✅ |
 | 24 | 🟡 | POST | `/api/negotiation/{id}/proposals/{pid}/reply` | 화주 회신 입력 → 재제안 | ✅ · `negotiation/accept`(수락 재매칭)는 있음, reply 형태는 미구현 |
-| 25 | ❌ | GET | `/api/negotiation/{id}` | 최종 편성 결과 | |
-| 26 | ❌ | POST | `/api/negotiation/{id}/cancel` | "다음 공차 일정 대기" | |
+| 25 | ✅ | GET | `/api/negotiation/{id}` | 최종 편성 결과 | run(#22)이 발급한 NEG-NNN 세션 조회 (인메모리) |
+| 26 | ✅ | POST | `/api/negotiation/{id}/cancel` | "다음 공차 일정 대기" | 세션 cancelled + 다음 공차 안내 |
 
 ### #21 제약 분류 — 프롬프트 설계가 곧 제품 품질
 
@@ -227,7 +228,7 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 | # | 상태 | Method | Path | 용도 | LLM |
 |---|---|---|---|---|---|
 | 27 | 🟡 | POST | `/api/benefits/calculate` | 도로 단독 vs 철도 합적 → 4대 편익 | ❌ 결정적 계산. `calc.ts` 엔진 완성, 라우트만 없음 |
-| 28 | ❌ | GET | `/api/benefits/summary?period=2026Q2` | 대시보드용 집계 | ❌ |
+| 28 | ✅ | GET | `/api/benefits/summary?period=2026Q2` | 대시보드용 집계 | ❌ 큐레이션 분기 편익 + 보조금 상한(고시 근거) |
 | 29 | 🟡 | GET | `/api/coefficients?year=2026` | 환경부 배출계수 · 사회적비용 단가 · KOTI 산식 파라미터 | ❌ `constants.ts`에 계수 있음, 라우트만 없음 |
 
 ```jsonc

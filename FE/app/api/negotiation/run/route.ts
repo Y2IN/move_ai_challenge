@@ -1,5 +1,6 @@
 import { negotiate } from "@railhub/be/negotiate";
 import { seed } from "@railhub/be/seed";
+import { saveNegotiation } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 /**
@@ -22,5 +23,8 @@ export async function POST(req: Request) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
-  return Response.json(await negotiate(seed, body?.shipment ?? null, now));
+  // 결과를 세션으로 저장하고 id 를 함께 반환 — #25 조회·#26 취소가 이 id 를 쓴다.
+  const result = await negotiate(seed, body?.shipment ?? null, now);
+  const { id } = saveNegotiation(result);
+  return Response.json({ id, ...result });
 }

@@ -13,6 +13,7 @@
 import { match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
 import { accept } from "./negotiate";
+import type { NegotiationResult } from "./negotiate";
 import { seed } from "./seed";
 import type {
   CalcResult,
@@ -48,6 +49,10 @@ let seq = 0;
 /** 확정된 편성(코레일 공차 수송 확정) 기록 */
 const confirmations: Confirmation[] = [];
 let confirmSeq = 0;
+
+/** 조율(negotiation) 세션 기록 (#25 조회 · #26 취소) */
+const negotiations: StoredNegotiation[] = [];
+let negSeq = 0;
 
 /** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
 function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipment {
@@ -120,6 +125,8 @@ export function clearShipments(): void {
   seq = 0;
   confirmations.length = 0;
   confirmSeq = 0;
+  negotiations.length = 0;
+  negSeq = 0;
 }
 
 // ── 편성 확정 (#19) ────────────────────────────────────────────
@@ -172,6 +179,41 @@ export function confirmMatch(
   };
   confirmations.push(confirmation);
   return { status: "confirmed", confirmation };
+}
+
+// ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────
+
+export interface StoredNegotiation {
+  id: string;
+  status: "open" | "cancelled";
+  result: NegotiationResult;
+  createdAt: string;
+}
+
+/** 조율 실행 결과를 저장하고 NEG-NNN id 를 발급한다 (#22 run 이 호출). */
+export function saveNegotiation(result: NegotiationResult): StoredNegotiation {
+  negSeq += 1;
+  const record: StoredNegotiation = {
+    id: `NEG-${String(negSeq).padStart(3, "0")}`,
+    status: "open",
+    result,
+    createdAt: new Date().toISOString(),
+  };
+  negotiations.push(record);
+  return record;
+}
+
+/** #25 — 조율 세션(최종 편성 결과) 조회. 없으면 null. */
+export function getNegotiation(id: string): StoredNegotiation | null {
+  return negotiations.find((n) => n.id === id) ?? null;
+}
+
+/** #26 — 조율 취소("다음 공차 일정 대기"). 상태만 cancelled 로. 없으면 null. */
+export function cancelNegotiation(id: string): StoredNegotiation | null {
+  const record = negotiations.find((n) => n.id === id);
+  if (!record) return null;
+  record.status = "cancelled";
+  return record;
 }
 
 // ── 입력 검증 ──────────────────────────────────────────────────
