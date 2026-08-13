@@ -12,7 +12,16 @@ export const brand = {
  * 여기 상수로 두면 홈 대시보드(#7)와 같은 집계를 쓰는데도 값이 갈라집니다.
  * 화면은 `lib/landing.ts` 의 `usePublicStats()` 를 쓰세요.
  */
-export const heroCaption = '이번 분기 전환교통 보조금 예상액';
+/**
+ * 히어로 금액은 **보조금이 아니라 사회환경적 편익 환산액**입니다.
+ *
+ * 시드 기준으로 전환 추가비용(A)이 음수라 — 철도 합적이 도로 직행보다 싸게 나옵니다 —
+ * 보조금 산정 결과가 "대상 아님 · 0원"입니다. 여기서 보조금 예상액을 크게 띄우면
+ * 클릭 한 번에 정반대 숫자를 보게 됩니다. 편익은 실제로 양수이고 계산 근거도 있습니다.
+ *
+ * 기간 표기는 `/api/public/stats` 의 `periodLabel` 을 앞에 붙여 화면에서 조립합니다.
+ */
+export const heroCaption = '사회환경적 편익 환산액';
 
 export const marketingNav = [
   { label: '서비스 소개', href: '#how' },

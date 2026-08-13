@@ -83,7 +83,8 @@ export function AppLayout({
   return (
     <div className="grid min-h-screen grid-cols-[240px_1fr] bg-[#F9FAFB]">
       {/* 랜딩('/') 상단바와 같은 다크 팔레트 */}
-      <aside className="flex flex-col gap-[22px] bg-[#0B1220] px-4 py-[22px]">
+      {/* h-screen으로 stretch를 끊어야 sticky가 먹고, 프로필이 문서 끝이 아닌 화면 하단에 고정된다 */}
+      <aside className="sticky top-0 flex h-screen flex-col gap-[22px] overflow-y-auto bg-[#0B1220] px-4 py-[22px]">
         <div className="flex items-center gap-2 px-2">
           <img src="/train.png" alt="" width={28} height={28} className="rounded-lg" />
           <span className="text-base font-extrabold tracking-[-0.03em] text-white">알뜰철도 X</span>
@@ -132,8 +133,18 @@ export function AppLayout({
               {account?.initial ?? ''}
             </span>
             {/* 계정이 오기 전엔 자리만 지킨다 — 임시 이름을 띄우면 잠깐 다른 사람이 찍힌다 */}
-            <span className="text-sm font-semibold text-[#D1D6DB]">
-              {account ? `${account.org} · ${account.name}` : <span className="inline-block h-4 w-28 animate-pulse rounded bg-white/10" />}
+            <span className="flex min-w-0 flex-col leading-tight">
+              {account ? (
+                <>
+                  <span className="truncate text-[13px] text-[#8B95A1]">{account.org}</span>
+                  <span className="truncate text-sm font-semibold text-[#D1D6DB]">{account.name}</span>
+                </>
+              ) : (
+                <>
+                  <span className="h-[15px] w-20 animate-pulse rounded bg-white/10" />
+                  <span className="mt-0.5 h-4 w-14 animate-pulse rounded bg-white/10" />
+                </>
+              )}
             </span>
           </div>
         </div>

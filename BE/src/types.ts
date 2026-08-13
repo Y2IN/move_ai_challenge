@@ -438,9 +438,26 @@ export interface PublicStatsBreakdownItem {
   quantity: string;
 }
 
-/** #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요) */
+/** 랜딩 히어로에 띄우는 이번 분기 사회환경적 편익 환산액 */
+export interface PublicBenefitTotal {
+  amount: number;
+  /** 서버가 만든 표시 문자열 (예: "206만"). 화면에서 다시 축약하지 마십시오 */
+  label: string;
+  /** 전 분기 대비 증감률. **비교할 실적이 없으면 생략됩니다** — 0을 넣지 않습니다 */
+  deltaPct?: number;
+}
+
+/**
+ * #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요)
+ *
+ * 히어로 금액은 **보조금이 아니라 편익 환산액**입니다. 시드 기준으로 전환 추가비용이
+ * 음수라 보조금 산정 결과가 "대상 아님 · 0원"인데, 랜딩에서 보조금을 띄우면
+ * 로그인 후 사업계획서와 정반대 숫자가 됩니다. 자세한 배경은 `public.ts` 주석 참고.
+ */
 export interface PublicStats {
-  quarterSubsidy: SubsidyEstimate;
+  /** 집계 기간 표기 (예: "2026년 2분기") — 어느 기간의 수치인지 화면에 밝힙니다 */
+  periodLabel: string;
+  quarterBenefit: PublicBenefitTotal;
   breakdown: PublicStatsBreakdownItem[];
   cumulative: { shippers: number; filledWagons: number };
   equivalents: DashboardEquivalents;

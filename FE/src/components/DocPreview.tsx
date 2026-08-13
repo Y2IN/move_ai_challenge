@@ -144,7 +144,7 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
                 <MiniFormula>{stats ? `${formatNumber(total)} × 0.3` : '편익 계 × 0.3'}</MiniFormula>
               </Cell>
               <Cell right last>
-                {stats ? formatKrwExact(stats.quarterSubsidy.amount) : '—'}
+                {stats ? formatKrwExact(Math.round(total * 0.3)) : '—'}
               </Cell>
             </Row>
 
@@ -155,7 +155,7 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
               </Cell>
               <Cell right last>
                 <span className="text-xs">
-                  {stats ? formatKrwExact(stats.quarterSubsidy.amount) : '—'}
+                  {stats ? formatKrwExact(Math.round(total * 0.3)) : '—'}
                 </span>
               </Cell>
             </Row>
