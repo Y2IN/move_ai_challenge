@@ -120,6 +120,7 @@ export interface SeedData {
   shippers: Shipper[];
   shipments: Shipment[];
   emptyWagons: EmptyWagon[];
+  dashboard: DashboardSeed;
 }
 
 // ── 사용자 입력 (디자인 04a 화물 등록 폼) ──────────────────────
@@ -218,4 +219,77 @@ export interface CalcResult {
   benefit: BenefitResult;
   cost: CostResult;
   subsidy: SubsidyResult;
+}
+
+// ── 대시보드 (STEP 03) ─────────────────────────────────────────
+
+export type Persona = "corp" | "korail";
+
+/** 상단 KPI 카드 — persona별로 라벨·값이 완전히 다르다. 서버가 라벨까지 담아 보낸다. */
+export interface KpiCard {
+  key: string;
+  label: string;
+  /** 화면 표시용 문자열 (예: "1억 2,400만", "41%", "182 tCO₂eq") */
+  value: string;
+  amountKrw?: number;
+  count?: number;
+  /** 전분기 대비 증감(%) */
+  deltaPct?: number;
+}
+
+export interface SubsidyEstimate {
+  amount: number;
+  label: string;
+  deltaPct?: number;
+}
+
+export interface DashboardEquivalents {
+  pineTrees: number;
+  trucksBlocked: number;
+}
+
+export type MatchRowStatus = "done" | "group" | "wait";
+
+/** 행 펼침 상세 (#9 대신 #8 응답에 인라인) */
+export interface MatchRowDetail {
+  partners: string[];
+  departAt: string;
+  co2ReducedTon: number;
+  equivalentKrw: number;
+}
+
+/** 매칭 현황 목록 한 행 (#8) */
+export interface MatchRow {
+  id: string;
+  route: string;
+  wagon: string;
+  sub: string;
+  tons: number;
+  loadRate: number;
+  status: MatchRowStatus;
+  savingPct: number;
+  savingKrw: number;
+  detail: MatchRowDetail;
+}
+
+/** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
+export interface DashboardSeed {
+  period: string;
+  subsidyEstimate: SubsidyEstimate;
+  equivalents: DashboardEquivalents;
+  /** 편익 내역 — 편익 계산 모듈(#27)이 준비되기 전까지 쓰는 큐레이션 값 */
+  benefit: { totalBenefitKrw: number; breakdown: BenefitItem[] };
+  personas: Record<Persona, { kpis: KpiCard[] }>;
+  matches: MatchRow[];
+}
+
+/** #7 응답 — 대시보드는 데이터 조립만. 편익 계산은 계산 모듈이 담당한다. */
+export interface DashboardResponse {
+  persona: Persona;
+  period: string;
+  kpis: KpiCard[];
+  subsidyEstimate: SubsidyEstimate;
+  equivalents: DashboardEquivalents;
+  breakdown: BenefitItem[];
+  totalBenefitKrw: number;
 }

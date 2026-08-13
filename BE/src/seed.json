@@ -347,5 +347,107 @@
         "forklift"
       ]
     }
-  ]
+  ],
+  "dashboard": {
+    "period": "2026Q2",
+    "subsidyEstimate": { "amount": 342000000, "label": "3억 4,200만", "deltaPct": 38 },
+    "equivalents": { "pineTrees": 40000, "trucksBlocked": 45 },
+    "benefit": {
+      "totalBenefitKrw": 1140000000,
+      "breakdown": [
+        { "key": "ghg", "label": "온실가스 감축", "quantity": "182 tCO₂eq", "amountKrw": 158000000, "source": "환경부 배출계수" },
+        { "key": "airPollution", "label": "대기오염 저감", "quantity": "NOx·SOx·PM2.5", "amountKrw": 64000000, "source": "KOTI 사회적비용" },
+        { "key": "accident", "label": "교통사고 예방", "quantity": "대형화물차 45대 감소", "amountKrw": 53000000, "source": "KOTI 산식" },
+        { "key": "congestion", "label": "도로혼잡 완화", "quantity": "차량·km 감소분", "amountKrw": 865000000, "source": "KOTI 산식" }
+      ]
+    },
+    "personas": {
+      "corp": {
+        "kpis": [
+          { "key": "co2Reduction", "label": "탄소 감축", "value": "182 tCO₂eq", "deltaPct": 74 },
+          { "key": "costSaving", "label": "운송비 절감", "value": "1억 2,400만", "amountKrw": 124000000, "deltaPct": 18 },
+          { "key": "benefit", "label": "사회·환경 편익", "value": "11억 4,000만", "amountKrw": 1140000000, "deltaPct": 38 },
+          { "key": "conversionRate", "label": "철도 전환율", "value": "41%", "deltaPct": 12 }
+        ]
+      },
+      "korail": {
+        "kpis": [
+          { "key": "emptyWagonRate", "label": "공차율", "value": "31%", "deltaPct": -9 },
+          { "key": "filledWagons", "label": "채운 화차", "value": "1,043량", "count": 1043, "deltaPct": 22 },
+          { "key": "extraRevenue", "label": "추가 수익", "value": "8억 6,500만", "amountKrw": 865000000, "deltaPct": 27 },
+          { "key": "newShippers", "label": "신규 화주", "value": "128개사", "count": 128, "deltaPct": 15 }
+        ]
+      }
+    },
+    "matches": [
+      {
+        "id": "MATCH-2026Q2-014",
+        "route": "울산화물역 → 오봉역",
+        "wagon": "유개화차 1량",
+        "sub": "석유화학·화학원료 외 3사",
+        "tons": 14,
+        "loadRate": 0.78,
+        "status": "group",
+        "savingPct": 21,
+        "savingKrw": 21800000,
+        "detail": {
+          "partners": ["누리정공", "한결소재", "가온밸브"],
+          "departAt": "2026-08-20T22:40:00+09:00",
+          "co2ReducedTon": 12.4,
+          "equivalentKrw": 21800000
+        }
+      },
+      {
+        "id": "MATCH-2026Q2-013",
+        "route": "부산신항 → 오봉역",
+        "wagon": "컨테이너화차 2량",
+        "sub": "전자부품·기계류 5사",
+        "tons": 39,
+        "loadRate": 0.94,
+        "status": "done",
+        "savingPct": 27,
+        "savingKrw": 41200000,
+        "detail": {
+          "partners": ["세아전자", "동성기계", "한빛정밀", "우진산업", "대륙로지스"],
+          "departAt": "2026-07-28T21:10:00+09:00",
+          "co2ReducedTon": 33.6,
+          "equivalentKrw": 41200000
+        }
+      },
+      {
+        "id": "MATCH-2026Q2-012",
+        "route": "광양항 → 의왕ICD",
+        "wagon": "유개화차 1량",
+        "sub": "철강재 2사",
+        "tons": 16,
+        "loadRate": 0.89,
+        "status": "done",
+        "savingPct": 19,
+        "savingKrw": 18600000,
+        "detail": {
+          "partners": ["남광철강", "가온밸브"],
+          "departAt": "2026-07-15T20:40:00+09:00",
+          "co2ReducedTon": 15.1,
+          "equivalentKrw": 18600000
+        }
+      },
+      {
+        "id": "MATCH-2026Q2-015",
+        "route": "울산화물역 → 오봉역",
+        "wagon": "미배정",
+        "sub": "산업용 밸브 1사",
+        "tons": 4,
+        "loadRate": 0.22,
+        "status": "wait",
+        "savingPct": 0,
+        "savingKrw": 0,
+        "detail": {
+          "partners": ["가온밸브"],
+          "departAt": "2026-08-24T00:00:00+09:00",
+          "co2ReducedTon": 0,
+          "equivalentKrw": 0
+        }
+      }
+    ]
+  }
 }
