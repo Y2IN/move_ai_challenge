@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b1120;
+  --panel: #111c33;
+  --line: #1f2f4d;
+  --accent: #34d399;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: #e6edf7;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+}
