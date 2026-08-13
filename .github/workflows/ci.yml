@@ -35,3 +35,116 @@ jobs:
           # 빌드 시점에 실제 키가 필요하면 안 된다.
           # Claude 클라이언트는 요청 시점에만 초기화되므로 여기서는 더미로 충분.
           ANTHROPIC_API_KEY: dummy-key-for-build
+
+  # ── 배포 ────────────────────────────────────────────────────────
+  #
+  # Vercel Git 연동을 쓰지 않고 여기서 배포한다. 연동을 쓰면 CI 가 빨간불이어도
+  # Vercel 이 독립적으로 배포해버려서, 타입이 깨진 커밋이 발표용 URL 에 올라간다.
+  # `needs: build` 로 묶어두면 typecheck·build 를 통과한 커밋만 배포된다.
+  #
+  #   main push  → 프로덕션 (발표용 고정 URL)
+  #   PR         → 프리뷰 URL (PR 코멘트로 자동 게시)
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # 포크에서 온 PR 은 시크릿을 못 읽으므로 시도하지 않는다.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    permissions:
+      contents: read
+      pull-requests: write # 프리뷰 URL 을 PR 에 코멘트로 남긴다
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      # 시크릿이 아직 등록되지 않았어도 파이프라인을 빨간불로 만들지 않는다.
+      # 배포만 건너뛰고 경고를 남긴다 (최초 세팅 전 PR 들이 전부 실패하는 걸 막는다).
+      - name: 배포 시크릿 확인
+        id: guard
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "ready=false" >>"$GITHUB_OUTPUT"
+            echo "::warning::VERCEL_TOKEN·VERCEL_ORG_ID·VERCEL_PROJECT_ID 중 누락된 값이 있어 배포를 건너뜁니다."
+          else
+            echo "ready=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.guard.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - name: Vercel CLI 설치
+        if: steps.guard.outputs.ready == 'true'
+        run: npm i -g vercel@latest
+
+      # 대상 환경을 한 번만 정하고 이후 단계가 공유한다.
+      # main 이면 production, 그 외에는 preview.
+      - name: 대상 환경 결정
+        if: steps.guard.outputs.ready == 'true'
+        id: target
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "env=production" >>"$GITHUB_OUTPUT"
+            echo "flag=--prod" >>"$GITHUB_OUTPUT"
+          else
+            echo "env=preview" >>"$GITHUB_OUTPUT"
+            echo "flag=" >>"$GITHUB_OUTPUT"
+          fi
+
+      # 프로젝트 설정(Root Directory=FE 포함)과 환경변수를 내려받는다.
+      - name: Vercel 프로젝트 설정 내려받기
+        if: steps.guard.outputs.ready == 'true'
+        run: vercel pull --yes --environment=${{ steps.target.outputs.env }} --token="$VERCEL_TOKEN"
+
+      - name: Vercel 빌드
+        if: steps.guard.outputs.ready == 'true'
+        run: vercel build ${{ steps.target.outputs.flag }} --token="$VERCEL_TOKEN"
+
+      - name: 배포
+        if: steps.guard.outputs.ready == 'true'
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt ${{ steps.target.outputs.flag }} --token="$VERCEL_TOKEN")
+          echo "url=$url" >>"$GITHUB_OUTPUT"
+          echo "### 배포 완료 → $url" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: 프리뷰 URL 을 PR 에 남기기
+        if: steps.guard.outputs.ready == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.url }}';
+            const marker = '<!-- vercel-preview -->';
+            const body = `${marker}\n🚀 **프리뷰 배포**: ${url}\n\n커밋 \`${context.sha.slice(0, 7)}\` 기준입니다.`;
+
+            // 같은 PR 에 코멘트가 쌓이지 않도록 기존 것을 갱신한다.
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
