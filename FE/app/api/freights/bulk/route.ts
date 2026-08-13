@@ -36,6 +36,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = commit ? commitBulk(csv, seed) : previewBulk(csv, seed);
+  const result = commit ? await commitBulk(csv, seed) : previewBulk(csv, seed);
   return Response.json(result, { status: commit ? 201 : 200 });
 }

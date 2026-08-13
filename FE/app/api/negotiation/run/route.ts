@@ -25,6 +25,6 @@ export async function POST(req: Request) {
 
   // 결과를 세션으로 저장하고 id 를 함께 반환 — #25 조회·#26 취소가 이 id 를 쓴다.
   const result = await negotiate(seed, body?.shipment ?? null, now);
-  const { id } = saveNegotiation(result);
+  const { id } = await saveNegotiation(result);
   return Response.json({ id, ...result });
 }

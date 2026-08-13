@@ -2,7 +2,7 @@
  * `ReportInput` → 별지 제3호 서식 구조체.
  *
  * **이 파일은 수치를 계산하지 않는다.** 입력을 서식 배치에 맞게 옮겨 담기만 한다.
- * 문단(`paragraphs`)은 비워 둔 채로 나가고, Phase B에서 Claude가 채운다.
+ * 문단(`paragraphs`)은 비워 둔 채로 나가고, Phase B에서 생성 AI가 채운다.
  */
 
 import {

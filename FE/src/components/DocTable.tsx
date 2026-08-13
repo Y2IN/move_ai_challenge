@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /** 관공서 서식 표. 실선 테두리 + 회색 헤더 */
 export function DocTable({ children }: { children: ReactNode }) {
@@ -103,9 +105,9 @@ export function DocLegend({ note }: { note: string }) {
 /**
  * 문단 출처별 톤. BE EsgSection.source 와 1:1 입니다.
  *
- *   ai        Claude 생성 + 숫자 검증 통과 (파랑)
+ *   ai        생성 AI 작성 + 숫자 검증 통과 (파랑)
  *   fallback  사전 작성 서술 초안 — 인증 없음·호출 실패·검증 실패 (회색)
- *   user      서버가 생성을 보증하지 않는 문단 — 재생성 시 유지분 등 (호박색)
+ *   user      숫자 검증을 거치지 않은 문단 — 직접 편집분·클라이언트 제공분 (호박색)
  */
 export type ParagraphTone = 'ai' | 'fallback' | 'user';
 
@@ -142,14 +144,27 @@ const TONE_STYLE: Record<
     chip: 'bg-[#FCEBC5]',
     text: 'text-[#A96A00]',
     badge: '검증 필요',
-    label: '서버가 생성을 보증하지 않는 문단',
+    label: '숫자 검증을 거치지 않은 문단 · 직접 편집분',
   },
 };
 
-/** AI가 쓴 서술 문단. hover 시 재생성 칩이 뜬다 */
+const CHIP_BUTTON =
+  'rounded-lg border bg-white px-2.5 py-[5px] text-xs font-bold transition-opacity disabled:cursor-default disabled:text-[#B0B8C1]';
+
+/**
+ * AI가 쓴 서술 문단. hover 시 재생성·편집 칩이 뜬다.
+ *
+ * **편집이 필요한 이유:** 공시 문단은 결국 담당자가 사내 표현으로 손봅니다. 문체를
+ * 바꾸고 싶을 때마다 재생성을 돌리는 건 답이 아닙니다 — 재생성은 문장을 통째로
+ * 갈아치우므로 마음에 들던 부분까지 사라집니다.
+ *
+ * 편집한 문단은 호출자가 출처를 `user` 로 내립니다. AI가 쓴 것도, 우리가 준비한
+ * 초안도 아닌 문장이 파란 "AI 서술 · 숫자 검증 통과" 배지를 달고 있으면 안 됩니다.
+ */
 export function AiParagraphBlock({
   body,
   onRegenerate,
+  onEdit,
   className = '',
   tone = 'ai',
   label,
@@ -158,6 +173,8 @@ export function AiParagraphBlock({
 }: {
   body: string;
   onRegenerate?: () => void;
+  /** 본문 직접 편집. 생략하면 편집 버튼이 뜨지 않습니다 */
+  onEdit?: (next: string) => void;
   className?: string;
   /** 문단 출처. 생략하면 기존과 동일한 AI(파랑) 스타일 */
   tone?: ParagraphTone;
@@ -169,6 +186,39 @@ export function AiParagraphBlock({
   footer?: ReactNode;
 }) {
   const t = TONE_STYLE[tone];
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(body);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 편집 중에 재생성이 끝나 본문이 바뀌면 편집을 접습니다. 그대로 두면 사용자가
+  // 저장하는 순간 방금 생성된 문장을 낡은 초안으로 덮어씁니다.
+  useEffect(() => {
+    setEditing(false);
+    setDraft(body);
+  }, [body]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const area = areaRef.current;
+    if (!area) return;
+    area.focus();
+    area.setSelectionRange(area.value.length, area.value.length);
+  }, [editing]);
+
+  const commit = () => {
+    const next = draft.trim();
+    // 빈 문단을 저장하면 공시 서식에 구멍이 뚫립니다. 안 바뀐 경우도 굳이 출처를
+    // 내릴 이유가 없습니다.
+    if (next && next !== body) onEdit?.(next);
+    setEditing(false);
+    setDraft(next || body);
+  };
+
+  const cancel = () => {
+    setDraft(body);
+    setEditing(false);
+  };
+
   return (
     <div
       className={`group relative rounded-r-[10px] border-l-[3px] ${t.border} ${t.bg} px-[18px] pb-4 pt-3.5 ${className}`}
@@ -179,22 +229,71 @@ export function AiParagraphBlock({
         >
           {t.badge}
         </span>
-        <span className={`text-[11px] font-bold ${t.text}`}>{busy ? '문단 재생성 중…' : (label ?? t.label)}</span>
+        <span className={`text-[11px] font-bold ${t.text}`}>
+          {busy ? '문단 재생성 중…' : editing ? '편집 중 · 저장하면 「검증 필요」로 표시됩니다' : (label ?? t.label)}
+        </span>
       </div>
 
-      <p className={`mt-2 text-sm leading-[1.85] text-[#333D4B] ${busy ? 'animate-pulse opacity-50' : ''}`}>{body}</p>
+      {editing ? (
+        <textarea
+          ref={areaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          // Esc 로 취소, ⌘/Ctrl+Enter 로 저장. Enter 는 줄바꿈이어야 하므로 잡지 않습니다.
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancel();
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit();
+          }}
+          rows={Math.max(4, Math.ceil(draft.length / 60))}
+          className="mt-2 w-full resize-y rounded-lg border border-[#D1D6DB] bg-white px-3 py-2.5 text-sm leading-[1.85] text-[#333D4B] outline-none focus:border-[#3182F6]"
+        />
+      ) : (
+        <p className={`mt-2 text-sm leading-[1.85] text-[#333D4B] ${busy ? 'animate-pulse opacity-50' : ''}`}>
+          {body}
+        </p>
+      )}
 
-      {footer}
+      {editing ? (
+        <div className="mt-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={commit}
+            className={`${CHIP_BUTTON} border-[#3182F6] bg-[#3182F6] text-white`}
+          >
+            저장
+          </button>
+          <button type="button" onClick={cancel} className={`${CHIP_BUTTON} border-[#D1D6DB] text-[#4E5968]`}>
+            취소
+          </button>
+          <span className="text-[11px] text-[#8B95A1]">⌘+Enter 저장 · Esc 취소</span>
+        </div>
+      ) : (
+        footer
+      )}
 
-      {onRegenerate && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onRegenerate}
-          className="absolute right-3.5 top-3 rounded-lg border border-[#D6E7FF] bg-white px-2.5 py-[5px] text-xs font-bold text-[#3182F6] opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-default disabled:text-[#B0B8C1]"
-        >
-          {busy ? '생성 중…' : '↻ 문단 재생성'}
-        </button>
+      {!editing && (onRegenerate || onEdit) && (
+        <div className="absolute right-3.5 top-3 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+          {onEdit && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(true)}
+              className={`${CHIP_BUTTON} border-[#D1D6DB] text-[#4E5968]`}
+            >
+              ✎ 편집
+            </button>
+          )}
+          {onRegenerate && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRegenerate}
+              className={`${CHIP_BUTTON} border-[#D6E7FF] text-[#3182F6]`}
+            >
+              {busy ? '생성 중…' : '↻ 문단 재생성'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

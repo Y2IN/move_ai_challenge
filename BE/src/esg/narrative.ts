@@ -9,8 +9,13 @@
  *  3. **폴백은 필수 경로다.** 키가 없든 네트워크가 끊기든 문서는 나온다. 배지만 달라진다.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { claudeAuthMode, CLAUDE_MODEL, tryGetClaude } from "../claude";
+import {
+  generateText,
+  isLlmConfigured,
+  llmAuthMode,
+  llmErrorStatus,
+  LLM_MODEL,
+} from "../llm";
 import { collectAllowedNumbers, findHallucinatedNumbers } from "../report/verify";
 import { buildIndicators, SCOPE3_CATEGORY } from "./indicators";
 import {
@@ -44,21 +49,22 @@ const STAGGER_MS = 150;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * 폴백 초안 회전 인덱스.
+ * 폴백 초안 회전 인덱스의 기본값.
  *
  * 재생성을 눌렀는데 같은 문장이 다시 나오면, 보는 사람에게는 "생성"이 아니라
- * 멈춘 화면으로 읽힙니다. 폴백을 쓸 때마다 다음 초안으로 넘깁니다.
+ * 멈춘 화면으로 읽힙니다. 그래서 호출마다 다른 초안이 나와야 합니다.
  *
- * 프로세스가 살아 있는 동안은 호출마다 1씩 오르고, 콜드 스타트에서는 초 단위 시각으로
- * 출발점을 흩어 두 번째 실행이 항상 1번 초안으로 되돌아가지 않게 합니다.
- * (문단 상태를 서버에 저장할 만한 값은 아니라 프로세스 메모리로 충분합니다)
+ * **회전 상태는 서버가 들고 있지 않습니다.** 프로세스 메모리에 카운터를 두면 서버리스
+ * 콜드 스타트마다 리셋되고, DB 에 넣으면 데모 문장 하나 고르자고 매 재생성마다 쓰기가
+ * 한 번씩 발생합니다. 둘 다 이 값에 비해 과합니다.
+ *
+ * 대신 **호출자가 `draftSeed` 로 넘깁니다** — 화면은 자기가 지금 몇 번째 초안을 띄우고
+ * 있는지 알고 있으므로, 단조 증가 카운터만 보내면 인스턴스가 몇 개든 항상 다음 초안이
+ * 나옵니다. `draftSeed` 가 없을 때만 초 단위 시각으로 갈음합니다 (curl 로 두 번
+ * 호출해도 다른 문장이 나오도록).
  */
-const variantCursor = new Map<EsgSectionKey, number>();
-
-function nextVariant(key: EsgSectionKey): number {
-  const current = variantCursor.get(key) ?? Math.floor(Date.now() / 1000);
-  variantCursor.set(key, current + 1);
-  return current;
+function defaultDraftSeed(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
 /**
@@ -72,19 +78,16 @@ function nextVariant(key: EsgSectionKey): number {
  * 반환값은 "~하여/~해" 로 끝나는 사유구입니다. 뒤 문장과 이어 붙습니다.
  */
 function describeReason(error: unknown): string {
-  if (error instanceof Anthropic.RateLimitError) {
-    return "서술 에이전트 호출이 한도(429)에 걸려";
-  }
-  if (error instanceof Anthropic.AuthenticationError) {
-    return "서술 에이전트 인증이 만료되어";
-  }
-  if (error instanceof Anthropic.APIConnectionError) {
-    return "서술 에이전트에 연결하지 못해";
-  }
-  if (error instanceof Anthropic.APIError) {
-    return `서술 에이전트 호출이 실패하여(${error.status})`;
-  }
-  return "서술 에이전트 호출이 실패하여";
+  const status = llmErrorStatus(error);
+
+  // 무료 티어에서 제일 자주 보게 될 경로입니다. 분당·일일 한도에 걸린 것이지
+  // 고장이 아니므로, 사유를 정확히 적어 두면 대응(잠시 후 재생성)이 명확해집니다.
+  if (status === 429) return "서술 에이전트 호출이 한도(429)에 걸려";
+  if (status === 401 || status === 403) return "서술 에이전트 인증이 만료되어";
+  if (status !== null) return `서술 에이전트 호출이 실패하여(${status})`;
+
+  // 상태코드가 없으면 응답 자체가 없었던 것입니다 (연결 실패·타임아웃).
+  return "서술 에이전트에 연결하지 못해";
 }
 
 /**
@@ -139,32 +142,19 @@ function userPrompt(spec: ParagraphSpec, facts: unknown, retry: boolean): string
     .join("\n");
 }
 
-function extractText(message: Anthropic.Message): string {
-  return message.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-}
-
-async function callClaude(
-  client: Anthropic,
+async function callLlm(
   spec: ParagraphSpec,
   facts: unknown,
   retry: boolean,
 ): Promise<string> {
-  const message = await client.messages.create(
-    {
-      model: CLAUDE_MODEL,
-      max_tokens: MAX_TOKENS,
-      // 짧은 서술 문단이라 깊은 추론이 필요 없습니다. effort 를 낮춰 지연을 줄입니다.
-      output_config: { effort: "low" },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt(spec, facts, retry) }],
-    },
-    { timeout: REQUEST_TIMEOUT_MS, maxRetries: 2 },
-  );
-  return extractText(message);
+  return generateText({
+    system: SYSTEM_PROMPT,
+    prompt: userPrompt(spec, facts, retry),
+    maxTokens: MAX_TOKENS,
+    // 짧은 서술 문단이라 깊은 추론이 필요 없습니다. 추론 깊이를 낮춰 지연을 줄입니다.
+    thinking: "low",
+    timeoutMs: REQUEST_TIMEOUT_MS,
+  });
 }
 
 /**
@@ -173,29 +163,28 @@ async function callClaude(
  * 흐름: 생성 → 숫자 검증 → (환각이면) 1회 재생성 → 그래도 환각이면 폴백.
  */
 async function generateSection(
-  client: Anthropic | null,
+  configured: boolean,
   spec: ParagraphSpec,
   agg: EsgAggregate,
   facts: unknown,
   allowed: Set<string>,
+  draftSeed: number,
 ): Promise<EsgSection> {
   const base = { key: spec.key, title: spec.title, standard: spec.standard };
-  // 초안 선택은 폴백이 실제로 쓰이는 순간에만 합니다. AI 문장이 나온 호출까지
-  // 인덱스를 올리면, 폴백으로 떨어졌을 때 초안이 건너뛰어집니다.
   const fallback = (warnings: string[]): EsgSection => ({
     ...base,
-    text: fallbackText(spec, agg, nextVariant(spec.key)),
+    text: fallbackText(spec, agg, draftSeed),
     source: "fallback",
     warnings,
   });
 
-  if (!client) {
+  if (!configured) {
     return fallback(demoWarning("서술 에이전트 인증 정보가 없어"));
   }
 
   for (const retry of [false, true]) {
     try {
-      const text = await callClaude(client, spec, facts, retry);
+      const text = await callLlm(spec, facts, retry);
       if (!text) continue;
 
       const check = findHallucinatedNumbers(text, allowed);
@@ -298,6 +287,13 @@ export interface GenerateOptions {
   sections?: EsgSectionKey[];
   /** 이미 만들어 둔 문단 — `sections` 로 일부만 재생성할 때 나머지를 채웁니다 */
   previous?: EsgSection[];
+  /**
+   * 폴백 초안 회전 인덱스. **호출자가 재생성할 때마다 1씩 올려 보냅니다.**
+   *
+   * 서버는 회전 상태를 저장하지 않습니다 (`defaultDraftSeed` 주석 참고).
+   * 생략하면 초 단위 시각을 씁니다.
+   */
+  draftSeed?: number;
 }
 
 /** 문단 전체(또는 지정한 일부)를 생성해 리포트를 조립합니다. */
@@ -333,15 +329,19 @@ export async function generateReport(
     ? PARAGRAPHS.filter((p) => options.sections!.includes(p.key))
     : PARAGRAPHS;
 
-  // 인증이 없으면 null 이 오고 전 문단이 폴백으로 갑니다. throw 하지 않습니다.
-  const client = tryGetClaude();
+  // 인증이 없으면 false 가 되고 전 문단이 폴백으로 갑니다. throw 하지 않습니다.
+  const configured = isLlmConfigured();
+
+  const draftSeed = Number.isFinite(options.draftSeed)
+    ? Math.trunc(options.draftSeed!)
+    : defaultDraftSeed();
 
   // 문단끼리 의존이 없으므로 병렬로 던집니다. 순차 5회는 실행 시간 제한에 걸립니다.
   // 다만 완전히 동시에 쏘면 스스로 429 를 유발하므로 조금씩 어긋나게 출발시킵니다.
   const generated = await Promise.all(
     targets.map(async (spec, i) => {
       if (i > 0) await sleep(i * STAGGER_MS);
-      return generateSection(client, spec, agg, facts, allowed);
+      return generateSection(configured, spec, agg, facts, allowed, draftSeed);
     }),
   );
 
@@ -364,8 +364,8 @@ export async function generateReport(
     generatedAt: new Date().toISOString(),
     sections,
     generation: {
-      authMode: claudeAuthMode(),
-      model: CLAUDE_MODEL,
+      authMode: llmAuthMode(),
+      model: LLM_MODEL,
       aiCount: sections.filter((s) => s.source === "ai").length,
       fallbackCount: sections.filter((s) => s.source === "fallback").length,
     },

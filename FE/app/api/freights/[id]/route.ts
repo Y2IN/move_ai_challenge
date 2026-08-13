@@ -15,7 +15,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (body.kind === "invalid") return badJson();
   const patch = body.kind === "json" ? body.value : {};
 
-  const result = updateShipment(id, patch, seed);
+  const result = await updateShipment(id, patch, seed);
   if (result.status === "notFound") {
     return Response.json({ error: `화물을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 /** DELETE /api/freights/{id} — 삭제 */
 export async function DELETE(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-  if (!deleteShipment(id)) {
+  if (!(await deleteShipment(id))) {
     return Response.json({ error: `화물을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
   return Response.json({ deleted: id });

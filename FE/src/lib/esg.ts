@@ -127,6 +127,15 @@ export interface GenerateReportBody extends EsgQuery {
   sections?: EsgSectionKey[];
   /** 재생성 시 유지할 기존 문단 — 서버가 출처를 `user` 로 내려 되돌려줍니다 */
   previous?: EsgSection[];
+  /**
+   * 폴백 초안 회전 인덱스. **재생성할 때마다 1씩 올려 보냅니다.**
+   *
+   * 서버는 "몇 번째 초안까지 보여줬는지"를 저장하지 않습니다 — 서버리스라 프로세스
+   * 메모리는 콜드 스타트에 날아가고, DB 에 넣기엔 값이 하찮습니다. 지금 화면이 몇 번째를
+   * 띄우고 있는지는 화면이 알고 있으므로, 그 숫자를 보내는 쪽이 인스턴스 수와 무관하게
+   * 정확합니다.
+   */
+  draftSeed?: number;
 }
 
 /**

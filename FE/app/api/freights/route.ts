@@ -8,8 +8,8 @@ import { listShipments, registerShipment, validateShipmentInput } from "@railhub
 export const dynamic = "force-dynamic";
 
 /** GET /api/freights — 등록된 화물 목록 (사이드바 "화물") */
-export function GET() {
-  const items = listShipments();
+export async function GET() {
+  const items = await listShipments();
   return Response.json({ items, count: items.length });
 }
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const { ok, errors, value } = validateShipmentInput(raw, seed);
   if (!ok || !value) return validationError(errors);
 
-  const shipment = registerShipment(value, seed);
+  const shipment = await registerShipment(value, seed);
 
   // 편성 전체가 아니라 요약만 — 상세 편성/조율은 별도 매칭 API(#16)의 몫이다.
   const m = match(seed, value);

@@ -7,7 +7,7 @@
  * ## 역할 분담 — 이 경계가 제품 품질을 가른다
  *
  *   결정론적 계산 (이 파일)   누가 뭘 양보하면 성립하는지 · 그 양보가 이득인지
- *   LLM (Claude)             화주별 설득 문장
+ *   LLM (Gemini)             화주별 설득 문장
  *
  * 화면에 **"양보 대가가 절감액보다 큰 화주에게는 제안하지 않습니다"** 가 명시돼 있다.
  * 이건 **LLM에게 맡기면 안 되는 판단**이다. 보관비 62만원 vs 절감 218만원 같은 비교는
@@ -15,7 +15,7 @@
  * 이 순서가 뒤집히면 화주에게 손해 보는 제안을 보내게 된다.
  */
 
-import { tryGetClaude, CLAUDE_MODEL } from "./claude";
+import { generateText, isLlmConfigured } from "./llm";
 import { STORAGE_COST_KRW_PER_TON_DAY } from "./constants";
 import {
   buildCalc,
@@ -58,7 +58,7 @@ export interface ConcessionOption {
 export interface Proposal extends ConcessionOption {
   /** 화주에게 보낼 설득 메시지 */
   message: string;
-  source: "claude" | "fallback";
+  source: "ai" | "fallback";
 }
 
 export interface NegotiationResult {
@@ -234,25 +234,21 @@ export async function generateProposals(
   options: ConcessionOption[],
 ): Promise<Proposal[]> {
   const worthwhile = options.filter((o) => o.worthwhile);
-  const claude = tryGetClaude();
+  const configured = isLlmConfigured();
 
   return Promise.all(
     worthwhile.map(async (o): Promise<Proposal> => {
-      if (!claude) return { ...o, message: fallbackMessage(o), source: "fallback" };
+      if (!configured) return { ...o, message: fallbackMessage(o), source: "fallback" };
       try {
-        const res = await claude.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 512,
+        const text = await generateText({
           system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: buildPrompt(o) }],
+          prompt: buildPrompt(o),
+          maxTokens: 512,
+          // 짧은 설득 문장이라 깊은 추론이 필요 없다. 화주 수만큼 병렬로 나가므로
+          // 여기서 지연을 줄이는 게 전체 응답 시간에 그대로 반영된다.
+          thinking: "low",
         });
-        const text = res.content
-          .flatMap((b) => (b.type === "text" ? [b.text] : []))
-          .join("")
-          .trim();
-        return text
-          ? { ...o, message: text, source: "claude" }
-          : { ...o, message: fallbackMessage(o), source: "fallback" };
+        return { ...o, message: text, source: "ai" };
       } catch {
         return { ...o, message: fallbackMessage(o), source: "fallback" };
       }

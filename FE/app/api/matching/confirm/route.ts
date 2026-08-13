@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     ? raw.acceptedShipmentIds.filter((x): x is string => typeof x === "string")
     : [];
 
-  const result = confirmMatch(input, acceptedShipmentIds, seed);
+  const result = await confirmMatch(input, acceptedShipmentIds, seed);
   if (result.status === "notMatched") {
     return Response.json(
       { error: "편성이 성립하지 않아 확정할 수 없습니다.", match: result.match },

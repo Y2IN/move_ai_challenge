@@ -8,8 +8,8 @@ import { findLatest } from "@railhub/be/report/store";
  */
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const app = findLatest();
+export async function GET() {
+  const app = await findLatest();
   if (!app) return Response.json({ exists: false, applicationId: null });
 
   return Response.json({

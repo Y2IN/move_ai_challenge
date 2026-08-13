@@ -79,8 +79,11 @@ export interface ApplicationPayload {
   inputOrigin?: InputOrigin;
   inputNote?: string | null;
   revisionCount?: number;
-  /** `draft` = 저장된 초안 없이 수치만 채운 빈 서식 (문단이 비어 있습니다) */
-  stage?: 'generated' | 'draft';
+  /**
+   * `draft`   저장된 초안 없이 수치만 채운 빈 서식 (조회 전용, 저장 안 됨)
+   * `pending` 저장은 됐지만 문단은 아직 비어 있음 — 06b 스트림이 채웁니다
+   */
+  stage?: 'generated' | 'draft' | 'pending';
 }
 
 /**
@@ -95,6 +98,91 @@ export function createApplication(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * 문단을 만들지 않고 **빈 서식만** 발급합니다 (LLM 미사용, 즉시 반환).
+ *
+ * 06a 의 "보고서 초안 생성" 이 이걸 부르고, 실제 문단 작성은 06b 가 여는
+ * SSE 스트림(`streamApplication`)이 맡습니다. 여기서 문단까지 만들면
+ * 스트림이 같은 문단을 다시 생성해 LLM 호출이 두 배가 됩니다.
+ */
+export function createDraftApplication(
+  body: { trips?: number; now?: string } = {},
+): Promise<ApplicationPayload> {
+  return json<ApplicationPayload>(BASE, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...body, defer: true }),
+  });
+}
+
+// ── #32 진행률 스트림 (06b) ────────────────────────────────────
+
+/** 계산 4단계 + AI 서술 1단계. 서버가 보내는 그대로입니다. */
+export interface StreamStep {
+  step: number;
+  label: string;
+  detail?: string;
+  status: 'running' | 'done';
+}
+
+export interface StreamHandlers {
+  onStart?: (d: { totalSteps: number; paragraphCount: number; eligible: boolean }) => void;
+  onStep?: (s: StreamStep) => void;
+  /** 문단 하나가 끝날 때마다. `progress` 는 0~100 정수 */
+  onParagraph?: (d: { key: ParagraphKey; done: number; total: number; progress: number }) => void;
+  onDone?: (d: { applicationId: string; fallbackCount: number }) => void;
+  onError?: (message: string) => void;
+}
+
+/**
+ * `GET /api/subsidy/applications/{id}/stream` 을 구독합니다.
+ *
+ * **반환된 함수를 반드시 호출해 정리하세요.** EventSource 는 스스로 닫히지 않고
+ * 서버가 끊으면 자동 재연결을 시도하므로, 그대로 두면 문단 생성이 무한히
+ * 반복됩니다 (무료 티어에서는 곧바로 429).
+ */
+export function streamApplication(id: string, h: StreamHandlers): () => void {
+  const es = new EventSource(`${BASE}/${encodeURIComponent(id)}/stream`);
+  let closed = false;
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    es.close();
+  };
+
+  const on = <T>(event: string, fn?: (d: T) => void) =>
+    es.addEventListener(event, (e) => {
+      if (!fn) return;
+      try {
+        fn(JSON.parse((e as MessageEvent).data) as T);
+      } catch {
+        /* 잘린 프레임은 무시 — 다음 이벤트로 회복된다 */
+      }
+    });
+
+  on('start', h.onStart);
+  on('step', h.onStep);
+  on('paragraph', h.onParagraph);
+  on('done', (d: { applicationId: string; fallbackCount: number }) => {
+    close(); // 서버가 닫기 전에 우리가 먼저 닫는다 — 재연결 방지
+    h.onDone?.(d);
+  });
+  on('error', (d: { message: string }) => {
+    close();
+    h.onError?.(d.message);
+  });
+
+  // 전송 계층 오류(네트워크 끊김 등). 위의 'error' 이벤트와 다른 경로다.
+  es.onerror = () => {
+    if (closed) return;
+    close();
+    h.onError?.('진행률 연결이 끊겼습니다.');
+  };
+
+  return close;
 }
 
 // ── #33 조회 ───────────────────────────────────────────────────

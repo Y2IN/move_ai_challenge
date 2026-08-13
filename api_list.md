@@ -36,13 +36,13 @@
   - 마스터: master/stations · master/wagon-types
 - **🟡 부분 (2):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재)
 - **❌ 미구현 (3):** #30 preflight · #36 문단재생성 · #43 코레일승인
-- **🔶 데모(LLM 후속):** #10 파싱(케이스 반환) · #21 classify(규칙기반) — Claude 붙이면 교체
+- **🔶 데모(LLM 후속):** #10 파싱(케이스 반환) · #21 classify(규칙기반) — Gemini 붙이면 교체
 - **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
 - **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
 
 > **주의 2가지:**
 > ① **FE는 아직 API 미연동** — 화면은 전부 목 데이터. API는 seed 기반으로 실제 동작하지만 UI와 안 이어짐.
-> ② **LLM 라우트**(#22 조율 · #41 ESG · #32/#35/#37 보조금 서술)는 `ANTHROPIC_API_KEY` 있으면 실제 Claude, 없으면 규칙 폴백.
+> ② **LLM 라우트**(#22 조율 · #41 ESG · #32/#35/#37 보조금 서술)는 `GEMINI_API_KEY` 있으면 실제 Gemini, 없으면 규칙 폴백.
 > 남은 우선순위: 인증 #3 데모(P0) · #27 benefits 라우트(대시보드 라이브 연결) · #10 파싱 · FE↔API 연동.
 
 ---
@@ -110,7 +110,7 @@
 | 14 | ✅ | PATCH | `/api/freights/{id}` | 수정 (부분 수정 재검증) | |
 | 15 | ✅ | DELETE | `/api/freights/{id}` | 삭제 | |
 
-> **현재 데모 버전(LLM 미연결):** Claude 대신 `BE/src/parse.ts`의 미리 준비한 케이스에서 결과를 반환합니다. `GET`으로 케이스를 고르고 `POST {caseId}` 또는 `POST {text}`(키워드 매칭)로 실행하며, 응답 `notice`에 데모 안내가 담깁니다. LLM 붙일 땐 `parseFreightText` 내부만 교체(스키마 유지).
+> **현재 데모 버전(LLM 미연결):** Gemini 대신 `BE/src/parse.ts`의 미리 준비한 케이스에서 결과를 반환합니다. `GET`으로 케이스를 고르고 `POST {caseId}` 또는 `POST {text}`(키워드 매칭)로 실행하며, 응답 `notice`에 데모 안내가 담깁니다. LLM 붙일 땐 `parseFreightText` 내부만 교체(스키마 유지).
 
 ### #10이 이 서비스의 첫 번째 LLM 지점
 

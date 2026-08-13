@@ -107,6 +107,30 @@ async function main() {
     report.generation.aiCount + report.generation.fallbackCount <= report.sections.length,
   );
 
+  // ── 3. 폴백 초안 회전 ────────────────────────────────────────
+  //
+  // 서버는 "몇 번째 초안까지 보여줬는지"를 저장하지 않습니다. 호출자가 draftSeed 를
+  // 올려 보냅니다. 서버가 상태를 들면 서버리스 콜드 스타트마다 리셋되어 재생성이
+  // 멈춘 화면처럼 보이고, 반대로 seed 를 무시하면 재생성 자체가 무의미해집니다.
+  console.log("\n── draftSeed 로 초안이 회전하는가 (인증 없음 → 전부 폴백) ──");
+
+  const draft = async (seed: number) => {
+    const r = await generateReport(base, { sections: ["overview"], draftSeed: seed });
+    return r.sections.find((s) => s.key === "overview")!;
+  };
+
+  const seed7 = await draft(7);
+  assert("인증이 없으면 폴백으로 떨어진다", seed7.source === "fallback", seed7.source);
+  assert("같은 seed 는 같은 초안 (재현 가능)", (await draft(7)).text === seed7.text);
+  assert("seed 를 올리면 다른 초안", (await draft(8)).text !== seed7.text);
+  assert("seed 를 두 번 올려도 다른 초안", (await draft(9)).text !== seed7.text);
+  assert("seed 가 한 바퀴 돌면 되돌아온다", (await draft(10)).text === seed7.text);
+  assert(
+    "폴백 경고가 데모 안내 문구다",
+    seed7.warnings.some((w) => w.startsWith("데모 모드 —")),
+    seed7.warnings[0],
+  );
+
   console.log(`\n통과 ${pass} · 실패 ${fail}`);
   process.exit(fail === 0 ? 0 : 1);
 }

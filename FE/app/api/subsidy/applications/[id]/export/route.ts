@@ -37,7 +37,7 @@ export async function GET(
   }
 
   // 없는 초안을 200 으로 렌더하면 형제 라우트(404)와 동작이 갈린다.
-  const app = find(id);
+  const app = await find(id);
   if (!app) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }

@@ -49,15 +49,24 @@ export function previewBulk(csv: string, data: SeedData = seed): BulkPreview {
   return { mode: "preview", total: rows.length, valid, invalid: rows.length - valid, rows };
 }
 
-/** 확정 — 유효한 행만 등록하고, 실패한 행은 사유와 함께 돌려준다. */
-export function commitBulk(csv: string, data: SeedData = seed): BulkCommitResult {
+/**
+ * 확정 — 유효한 행만 등록하고, 실패한 행은 사유와 함께 돌려준다.
+ *
+ * 등록이 DB 왕복을 하므로 **순차로 돌린다.** 병렬로 던지면 시퀀스는 안전하지만
+ * 배열에 담기는 순서가 CSV 행 순서와 달라져, 화면의 "N행" 표시와 어긋난다.
+ */
+export async function commitBulk(
+  csv: string,
+  data: SeedData = seed,
+): Promise<BulkCommitResult> {
   const registered: Shipment[] = [];
   const skipped: BulkRowResult[] = [];
-  parseCsv(csv).forEach((raw, i) => {
+  const rows = parseCsv(csv);
+  for (const [i, raw] of rows.entries()) {
     const v = validateShipmentInput(raw, data);
-    if (v.ok && v.value) registered.push(registerShipment(v.value, data));
+    if (v.ok && v.value) registered.push(await registerShipment(v.value, data));
     else skipped.push({ row: i + 1, ok: false, errors: v.errors, raw });
-  });
+  }
   return { mode: "commit", total: registered.length + skipped.length, registered, skipped };
 }
 

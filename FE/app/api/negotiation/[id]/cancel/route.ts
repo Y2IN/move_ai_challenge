@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /** POST /api/negotiation/{id}/cancel */
 export async function POST(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-  const record = cancelNegotiation(id);
+  const record = await cancelNegotiation(id);
   if (!record) {
     return Response.json({ error: `조율 세션을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }

@@ -16,10 +16,11 @@ import type { EsgSectionKey } from "@railhub/be/esg/types";
  *   period?, from?, to?, shipperId?   조회 조건 (#40 과 동일)
  *   sections?: string[]               일부 문단만 재생성 (↻ 버튼). 생략 시 전체
  *   previous?: EsgSection[]           재생성 시 유지할 기존 문단
+ *   draftSeed?: number                폴백 초안 회전 인덱스 — 재생성마다 화면이 1씩 올려 보냅니다
  * }
  *
- * 문단 생성이 실패해도 200 입니다. 템플릿 문장으로 대체되고 `source: "fallback"`
- * 배지가 붙습니다 — 리포트가 통째로 죽는 것보다 낫습니다.
+ * 문단 생성이 실패해도 200 입니다. 사전 작성된 서술 초안으로 대체되고
+ * `source: "fallback"` 배지가 붙습니다 — 리포트가 통째로 죽는 것보다 낫습니다.
  */
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,6 +33,7 @@ interface ReportBody {
   shipperId?: string;
   sections?: unknown;
   previous?: unknown;
+  draftSeed?: unknown;
 }
 
 export async function POST(request: Request) {
@@ -57,6 +59,13 @@ export async function POST(request: Request) {
     sections = body.sections.filter((k): k is EsgSectionKey => typeof k === "string" && isSectionKey(k));
   }
 
+  // 회전 인덱스입니다. 값 자체는 `fallbackText` 가 초안 개수로 나머지 연산해 감싸므로
+  // 범위 제한이 필요 없지만, 숫자가 아닌 값이 오면 `Math.trunc` 가 NaN 을 만들어
+  // 조용히 1번 초안으로 굳어버립니다. 모양만 여기서 막습니다.
+  if (body.draftSeed !== undefined && !Number.isFinite(body.draftSeed)) {
+    return Response.json({ error: "draftSeed 는 숫자여야 합니다." }, { status: 400 });
+  }
+
   // previous 도 sections 와 같은 수준으로 검증합니다. 여기를 비워두면
   // 배열이 아닌 값이 generateReport 안에서 TypeError 를 내 400 이어야 할 요청이 500 이 됩니다.
   let previous;
@@ -77,7 +86,11 @@ export async function POST(request: Request) {
       shipperId: body.shipperId,
     });
 
-    const report = await generateReport(agg, { sections, previous });
+    const report = await generateReport(agg, {
+      sections,
+      previous,
+      draftSeed: body.draftSeed as number | undefined,
+    });
     return Response.json(report);
   } catch (error) {
     if (error instanceof EsgQueryError) {

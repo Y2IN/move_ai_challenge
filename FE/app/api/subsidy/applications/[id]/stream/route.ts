@@ -3,7 +3,7 @@ import { resolveReportInput } from "@railhub/be/report/source";
 import {
   generateFallbackOnly,
   generateParagraphs,
-  isClaudeConfigured,
+  isLlmConfigured,
 } from "@railhub/be/report/generate";
 import { find, replaceParagraph } from "@railhub/be/report/store";
 
@@ -30,7 +30,7 @@ export async function GET(
 
   // 진행률 스트림은 **이미 만들어진 초안**을 채운다. 여기서 새 초안을 만들면
   // 스트림을 열 때마다 유령 초안이 하나씩 쌓이고 findLatest() 가 그걸 가리킨다.
-  const app = find(id);
+  const app = await find(id);
   if (!app) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
@@ -94,7 +94,7 @@ export async function GET(
           status: "running",
         });
 
-        const result = isClaudeConfigured()
+        const result = isLlmConfigured()
           ? await generateParagraphs(input, (done, total, key) => {
               send("paragraph", {
                 key,
@@ -110,7 +110,7 @@ export async function GET(
 
         const at = new Date().toISOString();
         for (const key of PARAGRAPH_KEYS) {
-          replaceParagraph(id, key, result.paragraphs[key], "generate", at);
+          await replaceParagraph(id, key, result.paragraphs[key], "generate", at);
         }
         app.diagnostics = result.diagnostics;
 

@@ -120,8 +120,8 @@ export interface Paragraph {
   type: "ai";
   key: ParagraphKey;
   text: string;
-  /** "claude" | "fallback" | "user" — 화면 배지로 표시 */
-  source: "claude" | "fallback" | "user" | "pending";
+  /** "ai" | "fallback" | "user" — 화면 배지로 표시 */
+  source: "ai" | "fallback" | "user" | "pending";
   editable: boolean;
   editedByUser: boolean;
 }

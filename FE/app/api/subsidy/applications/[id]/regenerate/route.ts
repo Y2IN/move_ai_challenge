@@ -2,7 +2,7 @@ import { PARAGRAPH_KEYS } from "@railhub/be/report/contract";
 import {
   generateFallbackOnly,
   generateParagraphs,
-  isClaudeConfigured,
+  isLlmConfigured,
 } from "@railhub/be/report/generate";
 import { find, replaceParagraph } from "@railhub/be/report/store";
 
@@ -20,7 +20,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const app = find(id);
+  const app = await find(id);
   if (!app) {
     return Response.json({ error: `초안을 찾을 수 없습니다: ${id}` }, { status: 404 });
   }
@@ -28,7 +28,7 @@ export async function POST(
   const force = new URL(req.url).searchParams.get("force") === "true";
   const input = app.input;
 
-  const { paragraphs, diagnostics } = isClaudeConfigured()
+  const { paragraphs, diagnostics } = isLlmConfigured()
     ? await generateParagraphs(input)
     : generateFallbackOnly(input);
 
@@ -40,7 +40,7 @@ export async function POST(
       kept.push(key);
       continue;
     }
-    replaceParagraph(id, key, paragraphs[key], "regenerate", now);
+    await replaceParagraph(id, key, paragraphs[key], "regenerate", now);
   }
 
   app.diagnostics = diagnostics;

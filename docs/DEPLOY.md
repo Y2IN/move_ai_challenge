@@ -39,13 +39,43 @@ git push
 
 | Key | 상태 | 비고 |
 |---|---|---|
-| `CLAUDE_MODEL` | ✅ `claude-opus-5` | 코드 기본값과 동일. 모델을 바꿀 때만 손댄다 |
-| `ANTHROPIC_API_KEY` | ⬜ **미등록** | 없으면 AI 서술이 전부 사전 작성 문장으로 나온다 (화면은 정상) |
+| `GEMINI_API_KEY` | ⬜ **미등록** | 없으면 AI 서술이 전부 사전 작성 문장으로 나온다 (화면은 정상, 단 "데모 모드" 배너가 뜬다) |
+| `GEMINI_MODEL` | ⬜ 미등록 | 비우면 코드 기본값 `gemini-3.6-flash`. 무료 티어는 flash 계열만 쓸 수 있다 |
+| `SUPABASE_URL` | ⬜ **미등록** | 없으면 등록 화물·초안이 인메모리로만 남는다 (콜드 스타트마다 소실) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ⬜ **미등록** | ⚠️ **`NEXT_PUBLIC_` 접두어 금지.** 붙는 순간 브라우저 번들에 박혀 DB 전체가 공개된다 |
 
-- 키 발급: https://platform.claude.com → Settings → API keys
-- **배포에 계정 세션 토큰(`ANTHROPIC_AUTH_TOKEN`)을 쓰지 말 것.** 몇 시간이면 만료되어 발표 당일 죽는다. 배포는 만료 없는 콘솔 API 키를 쓴다
+- **AI Studio 에서 `Set up Billing` 을 누르지 말 것.** 무료 티어에 머무는 한 과금이 구조적으로 불가능하다 — 그게 곧 지출 상한이다
 - **환경변수를 추가·수정한 뒤에는 재배포해야 반영된다** (Deployments → 최신 항목 → ⋯ → Redeploy)
-- 로컬은 `FE/.env.local` 을 쓴다. `npm run session-token` 으로 계정 세션을 넣으면 키 발급 없이 개발할 수 있다. 이 파일은 `.gitignore` 처리되어 있으니 **절대 커밋하지 말 것**
+- 로컬은 `FE/.env.local` 을 쓴다. 이 파일은 `.gitignore` 처리되어 있으니 **절대 커밋하지 말 것**
+
+#### Gemini API 키 발급 (2분, 카드 불필요)
+
+1. https://aistudio.google.com/apikey → Google 계정 로그인
+2. **Create API key** → 프로젝트 선택 (없으면 자동 생성)
+3. 키 복사
+4. ⚠️ **`Set up Billing` 은 누르지 말 것.** 누르는 순간 유료 티어로 올라가고 지출 상한이 사라진다
+5. Vercel → Settings → Environment Variables → `GEMINI_API_KEY` 추가 (Production + Preview 둘 다 체크)
+6. **Redeploy** — 환경변수는 재배포해야 반영된다
+
+> **왜 무료 티어인가.** Google 은 Anthropic 의 선불 크레딧 같은 하드 캡이 없다. Cloud Billing 의
+> 예산(budget)은 **알림일 뿐 자동 차단이 아니라서**, 진짜로 끊으려면 Pub/Sub + Cloud Function 으로
+> 결제 계정을 해제하는 배선을 직접 짜야 한다. 결제 수단을 아예 등록하지 않는 쪽이 확실하고 간단하다.
+>
+> 대가는 **분당·일일 요청 제한**이다. 한도에 걸리면 그 호출만 폴백 문장으로 떨어지고
+> (화면에는 "데모 모드" 배너), 잠시 뒤 재생성하면 다시 AI 문장이 나온다. 앱이 죽지는 않는다.
+
+#### Supabase 키 발급
+
+1. https://supabase.com → **New project** (리전은 `Northeast Asia (Seoul)`)
+2. **SQL Editor** 에 `BE/src/db/schema.sql` 을 통째로 붙여넣고 **Run** (몇 번을 다시 돌려도 안전하다)
+3. **Project Settings → API** 에서 두 값을 복사
+   - `Project URL` → `SUPABASE_URL`
+   - `service_role` (secret) → `SUPABASE_SERVICE_ROLE_KEY` — `anon` 키가 아니다
+4. `FE/.env.local` 에 넣고 루트에서 `npm run db:push` — seed.json + ledger.json 이 통째로 들어간다
+5. 같은 두 값을 Vercel 환경변수에도 등록 → **Redeploy**
+
+> 데이터를 고칠 땐 `seed.json` / `ledger.json` 만 수정하고 `npm run db:push` 를 다시 돌린다.
+> 대시보드에서 손으로 칠 일은 없다.
 
 **GitHub Actions** (저장소 → Settings → Secrets and variables → Actions)
 
@@ -101,20 +131,21 @@ vercel deploy --prod --yes    # 현재 작업 디렉터리를 그대로 올린�
 Root Directory 가 `FE` 이므로 이 파일도 FE 안에 있어야 인식된다. 경로 패턴도 FE 기준이다.
 
 - `regions: ["icn1"]` — 서울 리전. 심사장에서 접속하므로 지연시간을 줄인다.
-- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Claude 호출(조율안 탐색·리포트 생성)은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다. 특히 `/api/negotiate` 는 화주 수만큼 메시지를 생성하므로 가장 오래 걸린다.
+- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** 생성 AI 호출(조율안 탐색·리포트 생성)은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다. 특히 `/api/negotiate` 는 화주 수만큼 메시지를 생성하므로 가장 오래 걸린다.
 
 ### `.github/workflows/ci.yml`
 - push(main) / PR 마다 `typecheck` + `build` 실행. 루트 스크립트가 워크스페이스로 위임하므로(`typecheck --workspaces`, `build -w FE`) CI 파일은 폴더 분리 후에도 그대로다
-- 빌드에 더미 `ANTHROPIC_API_KEY` 를 주입한다. **Claude 클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `getClaude()` 를 호출할 것 (`BE/src/claude.ts` 가 그렇게 되어 있음)
+- 빌드에 더미 `GEMINI_API_KEY` 를 주입한다. **클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `generateText()` 를 호출할 것 (`BE/src/llm.ts` 가 지연 초기화로 되어 있음)
 
 ---
 
 ## 4. 발표 당일 체크리스트
 
 - [ ] https://railhub-x.vercel.app 가 열리는가 (**휴대폰 데이터로도** 한 번 확인 — 현장 와이파이가 막혀 있는 경우가 있다. 로그인 벽이 뜨면 SSO 보호가 다시 켜진 것)
-- [ ] Vercel 환경변수에 `ANTHROPIC_API_KEY` 가 실제로 들어가 있는가 (로컬만 되고 배포는 안 되는 사고가 가장 흔하다)
+- [ ] Vercel 환경변수에 `GEMINI_API_KEY` 가 실제로 들어가 있는가 (로컬만 되고 배포는 안 되는 사고가 가장 흔하다) — `/api/health` 의 `llm.ready` 로 확인
 - [ ] 최신 커밋이 프로덕션에 반영됐는가 (Deployments 목록 최상단 = `main` 최신 해시)
-- [ ] Claude API 일일 할당량이 남아 있는가
+- [ ] **`/api/health` 가 `"reachable": true` 를 주는가** — `false` 면 Supabase 가 잠들었거나 키가 빠진 것이다. 앱은 뜨지만 등록한 화물이 안 쌓인다
+- [ ] 직전에 AI 서술을 한 번 생성해 봤는가 (무료 티어 일일 한도에 걸려 있으면 "데모 모드" 배너가 뜬다)
 - [ ] **발표 30분 전부터는 main에 push 금지** (배포 중 상태로 시연하는 사고 방지)
 - [ ] 최후의 보루: `npm run dev` 로컬 구동본을 띄워두고 백업 시연 준비
 
