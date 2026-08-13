@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { HomeScreen } from "@/src/screens/HomeScreen";
+import { LandingScreen } from "@/src/screens/LandingScreen";
 
-export default function Home() {
+export default function Landing() {
   const router = useRouter();
-  // ponytail: 아직 없는 화면(/freight/new 등)은 push 시 404. 화면 추가되면 그대로 동작한다.
-  return <HomeScreen onNavigate={(to) => router.push(to)} />;
+  // ponytail: 문의(onContact)는 받을 곳이 없어 미연결. 폼/메일 정해지면 붙인다.
+  return <LandingScreen onLogin={() => router.push("/login")} onStart={() => router.push("/demo")} />;
 }
