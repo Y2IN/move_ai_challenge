@@ -1,0 +1,31 @@
+#!/bin/sh
+# main으로의 직접 push를 차단한다. 모든 변경은 PR을 거친다.
+#
+# 최종 방어선은 GitHub 브랜치 보호 규칙이고, 이 훅은 네트워크 왕복 전에
+# 로컬에서 먼저 끊어 실수를 빨리 알려주는 역할만 한다.
+#
+# 활성화: git config core.hooksPath .githooks  (npm install 시 자동 설정)
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+	case "$remote_ref" in
+	refs/heads/main)
+		cat >&2 <<-'EOF'
+
+			✗ main으로 직접 push 할 수 없습니다.
+
+			  브랜치를 만들어 PR로 올리세요:
+			    npm run pr
+
+			  main에 이미 커밋했다면 npm run pr 이 그 커밋들을
+			  새 브랜치로 옮기고 main을 origin/main으로 되돌립니다.
+
+			  (--no-verify로 이 훅은 건너뛸 수 있지만,
+			   GitHub 브랜치 보호가 서버에서 동일하게 거부합니다.)
+
+		EOF
+		exit 1
+		;;
+	esac
+done
+
+exit 0

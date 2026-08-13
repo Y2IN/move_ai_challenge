@@ -7,6 +7,8 @@
     "dev": "npm run dev -w FE",
     "build": "npm run build -w FE",
     "start": "npm run start -w FE",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "pr": "sh scripts/pr.sh",
+    "prepare": "git config core.hooksPath .githooks || true"
   }
 }
