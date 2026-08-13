@@ -209,7 +209,7 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
               </div>
             </div>
 
-            <div className="flex flex-1 items-center gap-[22px] rounded-[18px] bg-[#F2F4F6] px-[26px] py-[22px]">
+            <div className="flex flex-1 items-center gap-[22px] rounded-[18px] bg-[#EAF2FE] px-[26px] py-[22px]">
               <img
                 src="/truck.png"
                 alt=""
@@ -218,8 +218,8 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
                 className="flex-none rounded-2xl bg-white/70 p-3"
               />
               <div className="flex flex-col gap-1.5">
-                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#191F28]">45대</span>
-                <span className="text-base font-semibold text-[#6B7684]">도심 진입을 막은 대형 트럭</span>
+                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#1B64DA]">45대</span>
+                <span className="text-base font-semibold text-[#3182F6]">도심 진입을 막은 대형 트럭</span>
               </div>
             </div>
           </div>
