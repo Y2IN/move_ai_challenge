@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     | null;
 
   // 실제 계산으로 만들고, 편성이 확정 안 됐거나 계산이 실패하면 fixture 로 떨어진다.
-  const source = resolveReportInput({
+  const source = await resolveReportInput({
     shipment: body?.shipment ?? null,
     trips: body?.trips,
     now: body?.now ? new Date(body.now) : undefined,

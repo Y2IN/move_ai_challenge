@@ -78,13 +78,16 @@ function useActiveSection() {
 }
 
 /**
- * 히어로 숫자 — 이번 분기 보조금 예상액과 편익 4항목.
+ * 히어로 숫자 — 이번 분기 사회환경적 편익 환산액과 편익 항목들.
  *
- * `label`("3억 4,200만")은 서버가 만든 표시 문자열입니다. 화면에서 다시 축약하면
+ * `label`("206만")은 서버가 만든 표시 문자열입니다. 화면에서 다시 축약하면
  * 홈 대시보드와 반올림 자리가 어긋납니다.
+ *
+ * 보조금 예상액이 아닙니다 — 시드 기준으로 전환 추가비용이 음수라 보조금 산정
+ * 결과가 "대상 아님"이고, 랜딩에서 보조금을 띄우면 로그인 후 화면과 어긋납니다.
  */
 function HeroFigures({ stats }: { stats: PublicStats }) {
-  const delta = stats.quarterSubsidy.deltaPct;
+  const delta = stats.quarterBenefit.deltaPct;
   const chips = stats.breakdown;
 
   return (
@@ -92,13 +95,13 @@ function HeroFigures({ stats }: { stats: PublicStats }) {
       <div className="mt-0.5 flex flex-col items-center">
         {/* 숫자는 흰→블루 그라디언트를 글자에 클립, '원'만 단색 블루로 남김 */}
         <div className="bg-[linear-gradient(180deg,#FFFFFF_38%,#8FC2FF_100%)] bg-clip-text text-[116px] font-extrabold leading-[1.04] tracking-[-0.055em] text-transparent">
-          {stats.quarterSubsidy.label}
+          {stats.quarterBenefit.label}
           <span className="ml-3 text-[58px] font-bold tracking-[-0.03em] text-[#8FC2FF]">원</span>
         </div>
         <div className="h-[3px] w-[640px] rounded-full bg-[linear-gradient(90deg,transparent,#3182F6,transparent)]" />
         <div className="mt-3.5 flex items-center gap-2.5">
           <span className="text-base font-semibold tabular-nums text-[#8B95A1]">
-            {formatWonSign(stats.quarterSubsidy.amount)}
+            {formatWonSign(stats.quarterBenefit.amount)}
           </span>
           {delta != null && (
             <span className="rounded-full bg-[#15C47E]/[0.16] px-3 py-1.5 text-sm font-bold text-[#34D399]">
@@ -144,8 +147,9 @@ function HeroPlaceholder() {
 /** 01 — 로그인 전 서비스 소개 랜딩 */
 export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
   const { active, onJump } = useActiveSection();
-  // 히어로 수치는 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
+  // 히어로 수치·문서 미리보기 금액은 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
   const stats = usePublicStats();
+  const statsData = stats.status === 'ready' ? stats.data : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -196,7 +200,9 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             {brand.headline[1]}
           </h1>
 
-          <div className="mt-[34px] text-base font-semibold text-[#8B95A1]">{heroCaption}</div>
+          <div className="mt-[34px] text-base font-semibold text-[#8B95A1]">
+            {stats.status === 'ready' ? `${stats.data.periodLabel} ${heroCaption}` : heroCaption}
+          </div>
 
           {stats.status === 'ready' ? <HeroFigures stats={stats.data} /> : <HeroPlaceholder />}
 
@@ -297,8 +303,8 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             <SectionHeader badge={esgSection.badge} title={esgSection.title} lead={esgSection.lead} />
 
             <div className="grid grid-cols-2 items-start gap-5">
-              <PlanDocPreview />
-              <EsgDocPreview />
+              <PlanDocPreview stats={statsData} />
+              <EsgDocPreview stats={statsData} />
             </div>
 
             <div className="flex items-center justify-center gap-7 rounded-2xl bg-[#F9FAFB] px-6 py-5">

@@ -29,7 +29,7 @@ export async function GET(
 
   // 저장된 초안이 없으면 **수치만 채운 빈 서식**을 만들어 준다.
   // 저장하지 않는다 — 조회가 초안을 만들어 버리면 findLatest() 가 오염된다.
-  const source = resolveReportInput();
+  const source = await resolveReportInput();
   return Response.json({
     applicationId: id,
     stage: "draft",

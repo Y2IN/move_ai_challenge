@@ -36,6 +36,20 @@ export interface Lane {
   transitHours: number;
 }
 
+/**
+ * 화주가 약속한 전환 물량. **실적은 여기 없습니다** — 실적은 수송 실적 원장
+ * (`esg/ledger.json`)에서 집계합니다. 약속과 실적을 같은 곳에 두면 둘이 어긋나도
+ * 아무도 모릅니다.
+ */
+export interface ShipperContract {
+  no: string;
+  periodFrom: string;
+  periodTo: string;
+  contractTon: number;
+  /** 재계약 기한. 영업 화면의 D-day 가 여기서 나옵니다 */
+  renewalDueDate: string;
+}
+
 export interface Shipper {
   id: string;
   name: string;
@@ -43,6 +57,43 @@ export interface Shipper {
   companyGrade: CompanyGrade;
   esgDisclosureRequired: boolean;
   contact: { manager: string; role: string; email: string };
+  contract: ShipperContract;
+}
+
+/**
+ * 로그인 계정 표시값.
+ *
+ * ⚠️ 인증(#1~#5)이 MVP 범위 밖이라 시드에 둡니다. 인증이 붙으면 이 블록은
+ *    세션에서 나오고 시드에서는 지웁니다.
+ */
+export interface Account {
+  persona: Persona;
+  /** 사이드바 소속. 기업은 회사명, 코레일은 소속 본부 */
+  org: string;
+  name: string;
+  /** 아바타에 들어가는 성 한 글자 */
+  initial: string;
+  role: string;
+  email: string;
+}
+
+/** 전환교통 협약 — 약속한 물량과 기간. 이행 실적은 원장 집계로 계산합니다. */
+export interface TransportContract {
+  no: string;
+  name: string;
+  periodFrom: string;
+  periodTo: string;
+  contractTon: number;
+  /** 협약 당시 산정된 보조금. 정산 시 실적 기준으로 다시 계산됩니다 */
+  subsidyKrw: number;
+}
+
+/** 정산 증빙 서류. 업로드 상태는 서버가 들고 있어야 하는 값입니다. */
+export interface SettlementDocument {
+  key: string;
+  name: string;
+  required: boolean;
+  file: { name: string; uploadedAt: string } | null;
 }
 
 // ── 화물 ───────────────────────────────────────────────────────
@@ -150,6 +201,9 @@ export interface SeedData {
   shipments: Shipment[];
   emptyWagons: EmptyWagon[];
   dashboard: DashboardSeed;
+  accounts: Record<Persona, Account>;
+  contracts: TransportContract[];
+  settlementDocuments: SettlementDocument[];
 }
 
 // ── 사용자 입력 (디자인 04a 화물 등록 폼) ──────────────────────
@@ -375,11 +429,35 @@ export interface PublicStatsBreakdownItem {
   label: string;
   /** 표시 문자열 (예: "1억 5,800만") */
   value: string;
+  /**
+   * 금액(원). 표시 문자열만 주면 화면이 "1억 5,800만" 을 되짚어 숫자를 만들게
+   * 됩니다 — 표기 규칙이 바뀌는 순간 조용히 틀린 값이 나옵니다.
+   */
+  amountKrw: number;
+  /** 물리 감축량 표기 (예: "182 tCO₂eq"). 지표표 미리보기가 그대로 씁니다 */
+  quantity: string;
 }
 
-/** #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요) */
+/** 랜딩 히어로에 띄우는 이번 분기 사회환경적 편익 환산액 */
+export interface PublicBenefitTotal {
+  amount: number;
+  /** 서버가 만든 표시 문자열 (예: "206만"). 화면에서 다시 축약하지 마십시오 */
+  label: string;
+  /** 전 분기 대비 증감률. **비교할 실적이 없으면 생략됩니다** — 0을 넣지 않습니다 */
+  deltaPct?: number;
+}
+
+/**
+ * #6 GET /api/public/stats — 랜딩 히어로 수치 (공개, 인증 불필요)
+ *
+ * 히어로 금액은 **보조금이 아니라 편익 환산액**입니다. 시드 기준으로 전환 추가비용이
+ * 음수라 보조금 산정 결과가 "대상 아님 · 0원"인데, 랜딩에서 보조금을 띄우면
+ * 로그인 후 사업계획서와 정반대 숫자가 됩니다. 자세한 배경은 `public.ts` 주석 참고.
+ */
 export interface PublicStats {
-  quarterSubsidy: SubsidyEstimate;
+  /** 집계 기간 표기 (예: "2026년 2분기") — 어느 기간의 수치인지 화면에 밝힙니다 */
+  periodLabel: string;
+  quarterBenefit: PublicBenefitTotal;
   breakdown: PublicStatsBreakdownItem[];
   cumulative: { shippers: number; filledWagons: number };
   equivalents: DashboardEquivalents;

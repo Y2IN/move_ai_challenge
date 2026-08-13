@@ -131,7 +131,7 @@ export class LedgerDataError extends Error {}
  * 모르는 화주 id 를 400 으로 막는 것과 같은 이유입니다 — 조용히 틀린 숫자를 내는 것이
  * 제일 나쁩니다. 다만 이쪽은 사용자 입력이 아니라 우리 원장의 문제라 5xx 로 갑니다.
  */
-function railDistanceKm(trip: LedgerTrip): number {
+export function railDistanceKm(trip: LedgerTrip): number {
   const lane = seed.lanes.find((l) => l.id === trip.laneId);
   if (!lane) {
     throw new LedgerDataError(
@@ -153,7 +153,7 @@ function routeLabel(trip: LedgerTrip): string {
  * 편성 합계가 아니라 **화주 개별 거리**로 계산합니다. 셔틀 거리가 화주마다 다르므로
  * 편성 평균으로 뭉개면 화주별 Scope 3 배출량이 자기 실적과 안 맞게 됩니다.
  */
-function legInput(trip: LedgerTrip, member: LedgerMember, railKm: number): CalcInput {
+export function legInput(trip: LedgerTrip, member: LedgerMember, railKm: number): CalcInput {
   return {
     totalTon: member.weightTon,
     railDistanceKm: railKm,

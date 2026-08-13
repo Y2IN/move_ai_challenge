@@ -10,8 +10,10 @@
  */
 
 import { match } from "../matching";
+import type { MatchResult } from "../matching";
 import { seed } from "../seed";
 import type { ShipmentInput } from "../types";
+import { latestConfirmation } from "../store";
 import { buildReportInput } from "./adapter";
 import type { Applicant, ReportInput, ReportPeriod } from "./contract";
 import { fixtureReportInput } from "./fixture";
@@ -53,9 +55,49 @@ export interface ResolveOptions {
  *
  * 편성이 성립하지 않은 상태(shortfall)로는 사업계획서를 만들 수 없다.
  * 확정된 실적만 서식에 들어가야 하기 때문이다.
+ *
+ * ⚠️ **확정된 편성(#19)이 있으면 그걸 먼저 쓴다.**
+ *
+ *    예전에는 매번 `match(seed, ...)` 를 다시 돌렸다. 그런데 시연 시나리오는
+ *    일부러 정원 미달(14/18톤)이라 항상 shortfall 이 나왔고, 조율로 편성을
+ *    살려 확정(GRP-NNN)해도 보고서는 그 사실을 영영 모른 채 fixture 로 떨어졌다.
+ *    "조율 → 확정 → 보고서" 가 이 제품의 핵심 흐름인데 마지막 고리가 끊겨 있었다.
  */
-export function resolveReportInput(opts: ResolveOptions = {}): ReportSource {
+export async function resolveReportInput(opts: ResolveOptions = {}): Promise<ReportSource> {
   try {
+    // 1) 확정된 편성이 있으면 그 실적으로 만든다.
+    const confirmed = await latestConfirmation();
+    if (confirmed?.calc) {
+      // 서식에 인쇄할 노선명이 lane 에서 나오므로 화차의 laneId 로 되찾는다.
+      const lane = seed.lanes.find((l) => l.id === confirmed.wagon.laneId) ?? null;
+      const asMatch: MatchResult = {
+        status: "matched",
+        phase: "confirmed",
+        hoursToCutoff: 0,
+        wagon: confirmed.wagon,
+        lane,
+        members: confirmed.members,
+        totalTon: confirmed.totalTon,
+        capacityTon: confirmed.capacityTon,
+        loadFactor: confirmed.loadFactor,
+        shortfallTon: 0,
+        negotiationCandidates: [],
+        calc: confirmed.calc,
+        message: `${confirmed.groupId} 확정 편성`,
+      };
+
+      return {
+        input: buildReportInput(
+          [{ match: asMatch, trips: opts.trips ?? 12 }],
+          opts.applicant ?? DEMO_APPLICANT,
+          opts.period ?? DEMO_PERIOD,
+          seed.stations,
+        ),
+        origin: "live",
+      };
+    }
+
+    // 2) 확정이 없으면 지금 입력으로 매칭해 본다.
     const result = match(seed, opts.shipment ?? null, opts.now ?? new Date());
 
     if (result.status !== "matched" || !result.calc) {

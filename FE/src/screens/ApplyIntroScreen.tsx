@@ -2,10 +2,10 @@
 
 import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
+import { useAccount } from '../lib/account';
 import { fetchEsgIndicators, type EsgIndicatorsResponse } from '../lib/esg';
 import { formatDocDate, formatTon, formatTrips } from '../lib/format';
 import { useAsync } from '../lib/use-async';
-import { accounts } from '../mocks/home';
 import { applyMeta, breadcrumb, checklist, type ChecklistItem } from '../mocks/apply';
 
 /** 체크리스트 상태 문구 — 값이 있는 항목만 집계에서 채웁니다. */
@@ -35,6 +35,7 @@ export function ApplyIntroScreen({
 }: ApplyIntroScreenProps) {
   /** 이 화면의 수치는 전부 #40 집계입니다. LLM 을 타지 않아 재진입이 쌉니다. */
   const indicators = useAsync<EsgIndicatorsResponse>(useCallback(() => fetchEsgIndicators(), []));
+  const account = useAccount('corp');
   const res = indicators.state.status === 'ready' ? indicators.state.data : null;
 
   const criteria = [
@@ -47,7 +48,7 @@ export function ApplyIntroScreen({
       value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : '집계 중…',
     },
     // 인증(#1~#5)이 MVP 범위 밖이라 `/api/me` 가 없습니다. 신청 주체는 계정 표시값입니다.
-    { label: '신청 주체', value: res?.shipperName ?? accounts.corp.company },
+    { label: '신청 주체', value: res?.shipperName ?? account?.org ?? '확인 중…' },
     { label: '예상 소요', value: '약 10초' },
   ];
 
