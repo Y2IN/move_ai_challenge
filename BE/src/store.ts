@@ -26,6 +26,7 @@ import {
   cancelNegotiationRow,
   clearAll as clearDb,
   deleteShipmentRecord,
+  findLatestConfirmation,
   findNegotiation,
   findShipmentRecord,
   insertConfirmation,
@@ -295,6 +296,19 @@ export async function confirmMatch(
   if (!localOnly) await insertConfirmation(confirmation, n);
   confirmations.push(confirmation);
   return { status: "confirmed", confirmation };
+}
+
+/**
+ * 가장 최근에 확정된 편성. 없으면 null.
+ *
+ * 사업계획서(#31)가 "무엇을 실적으로 집계할지" 정할 때 쓴다. 이게 없으면
+ * 매번 시드로 매칭을 다시 돌리게 되는데, 시연 시나리오가 일부러 정원 미달이라
+ * 조율로 편성을 살려내도 보고서는 그 사실을 영영 모른다.
+ */
+export async function latestConfirmation(): Promise<Confirmation | null> {
+  const fromDb = await findLatestConfirmation();
+  if (fromDb) return fromDb;
+  return confirmations.length ? confirmations[confirmations.length - 1] : null;
 }
 
 // ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────

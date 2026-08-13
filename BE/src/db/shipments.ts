@@ -172,6 +172,44 @@ export async function insertConfirmation(
   });
 }
 
+interface ConfirmationRow {
+  group_id: string;
+  status: "confirmed";
+  wagon: EmptyWagon;
+  members: MatchCandidate[];
+  total_ton: number;
+  capacity_ton: number;
+  load_factor: number;
+  confirmed_at: string;
+  calc: CalcResult | null;
+}
+
+/** 가장 최근 확정 편성. 없으면 null. 사업계획서가 실적을 집계할 때 쓴다. */
+export async function findLatestConfirmation(): Promise<ConfirmationRecord | null> {
+  return tryDb("findLatestConfirmation", async (db) => {
+    const rows = unwrap(
+      await db
+        .from("confirmations")
+        .select("group_id, status, wagon, members, total_ton, capacity_ton, load_factor, confirmed_at, calc")
+        .order("confirmed_at", { ascending: false })
+        .limit(1),
+    ) as ConfirmationRow[];
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+      groupId: r.group_id,
+      status: r.status,
+      wagon: r.wagon,
+      members: r.members,
+      totalTon: r.total_ton,
+      capacityTon: r.capacity_ton,
+      loadFactor: r.load_factor,
+      confirmedAt: r.confirmed_at,
+      calc: r.calc,
+    };
+  });
+}
+
 // ── 조율 세션 ──────────────────────────────────────────────────
 
 export interface NegotiationRecord {
