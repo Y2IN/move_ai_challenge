@@ -2,7 +2,8 @@
 
 흩어진 소량 화물을 AI로 모아 코레일 빈 화차를 채우고, 철도 전환 편익을 ESG 자산으로 환전하는 B2B 물류 AI 에이전트.
 
-기획·산식·구현 순서는 [docs/PROJECT.md](docs/PROJECT.md) 참고.
+- 기획·산식·구현 순서 → [docs/PROJECT.md](docs/PROJECT.md)
+- 배포(Vercel)·환경변수·발표 체크리스트 → [docs/DEPLOY.md](docs/DEPLOY.md)
 
 ## 시작하기
 
