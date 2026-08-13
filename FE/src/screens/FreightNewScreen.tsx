@@ -59,7 +59,7 @@ export function FreightNewScreen({ onNavigate, prefilled = true }: FreightNewScr
       <section className="grid grid-cols-[1fr_320px] items-start gap-4">
         <div className="flex flex-col gap-4">
           <div className="rounded-[20px] bg-white p-6">
-            <div className="relative">
+            <div className="flex flex-col items-end gap-3">
               <textarea
                 value={natural}
                 onChange={(e) => setNatural(e.target.value)}
@@ -69,7 +69,7 @@ export function FreightNewScreen({ onNavigate, prefilled = true }: FreightNewScr
               <button
                 type="button"
                 onClick={runAiFill}
-                className="absolute bottom-3.5 right-3.5 h-11 rounded-xl bg-[#3182F6] px-[18px] text-[15px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+                className="h-14 rounded-[14px] bg-[#3182F6] px-7 text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
               >
                 AI로 채우기
               </button>

@@ -8,9 +8,19 @@ const TONE_CLASS: Record<MatchTone, string> = {
   queue: 'bg-[#F2F4F6] text-[#6B7684]',
 };
 
-export function StatusBadge({ tone, label }: { tone: MatchTone; label?: string }) {
+export function StatusBadge({
+  tone,
+  label,
+  small,
+}: {
+  tone: MatchTone;
+  label?: string;
+  /** 촘촘한 표에서 쓰는 축소 배지 */
+  small?: boolean;
+}) {
+  const size = small ? 'px-2 py-1 text-[11px]' : 'px-[11px] py-1.5 text-[13px]';
   return (
-    <span className={`inline-flex rounded-lg px-[11px] py-1.5 text-[13px] font-bold ${TONE_CLASS[tone]}`}>
+    <span className={`inline-flex whitespace-nowrap rounded-lg font-bold ${size} ${TONE_CLASS[tone]}`}>
       {label ?? TONE_LABEL[tone]}
     </span>
   );
