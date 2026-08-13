@@ -250,7 +250,7 @@ export interface DashboardEquivalents {
 
 export type MatchRowStatus = "done" | "group" | "wait";
 
-/** 행 펼침 상세 (#9 대신 #8 응답에 인라인) */
+/** 행 펼침 상세 (#9 GET /api/matches/{id}) */
 export interface MatchRowDetail {
   partners: string[];
   departAt: string;
@@ -258,7 +258,7 @@ export interface MatchRowDetail {
   equivalentKrw: number;
 }
 
-/** 매칭 현황 목록 한 행 (#8) */
+/** 매칭 한 건 전체 (상세 포함) — #9 응답 */
 export interface MatchRow {
   id: string;
   route: string;
@@ -271,6 +271,9 @@ export interface MatchRow {
   savingKrw: number;
   detail: MatchRowDetail;
 }
+
+/** #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다. */
+export type MatchSummary = Omit<MatchRow, "detail">;
 
 /** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
 export interface DashboardSeed {

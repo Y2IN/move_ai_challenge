@@ -7,7 +7,13 @@
  */
 
 import { seed } from "./seed";
-import type { DashboardResponse, MatchRow, Persona, SeedData } from "./types";
+import type {
+  DashboardResponse,
+  MatchRow,
+  MatchSummary,
+  Persona,
+  SeedData,
+} from "./types";
 
 /** #7 홈 대시보드 — persona별 KPI(큐레이션) + 편익 내역 */
 export function getDashboard(persona: Persona, data: SeedData = seed): DashboardResponse {
@@ -31,14 +37,17 @@ export function getDashboard(persona: Persona, data: SeedData = seed): Dashboard
 }
 
 export interface MatchesResult {
-  items: MatchRow[];
+  items: MatchSummary[];
   count: number;
   page: number;
   pageSize: number;
   total: number;
 }
 
-/** #8 매칭 현황 목록 — status 필터 + 페이지네이션. 상세(detail)는 각 행에 인라인. */
+/**
+ * #8 매칭 현황 목록 — status 필터 + 페이지네이션.
+ * 목록이 커질 수 있으므로 상세(detail)는 빼고 요약만 반환한다 (상세는 #9).
+ */
 export function listMatches(
   opts: { status?: string; page?: number; pageSize?: number } = {},
   data: SeedData = seed,
@@ -51,6 +60,16 @@ export function listMatches(
 
   const total = rows.length;
   const start = (page - 1) * pageSize;
-  const items = rows.slice(start, start + pageSize);
+  const items = rows.slice(start, start + pageSize).map(toSummary);
   return { items, count: items.length, page, pageSize, total };
+}
+
+/** #9 매칭 상세 — id 로 한 건 조회 (상세 detail 포함). 없으면 null. */
+export function getMatch(id: string, data: SeedData = seed): MatchRow | null {
+  return data.dashboard.matches.find((m) => m.id === id) ?? null;
+}
+
+/** 목록 행에서 상세(detail)를 떼어 요약만 남긴다. */
+function toSummary({ detail: _detail, ...summary }: MatchRow): MatchSummary {
+  return summary;
 }
