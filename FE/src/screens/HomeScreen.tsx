@@ -1,27 +1,27 @@
-import { useEffect, useState } from 'react';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { getRole, setRole } from '../lib/role';
+import { AsyncSection, CardSkeleton, SkeletonGrid } from '../components/AsyncSection';
 import { MatchRow, MatchRowHeader } from '../components/MatchRow';
 import { AnalogyCard, StatCard } from '../components/StatCard';
 import {
-  accounts,
-  benefitTotal,
-  breakdown,
-  corpRows,
-  corpStats,
-  freightSaving,
-  homeCopy,
-  korailHero,
-  korailPotential,
-  korailReportCard,
-  korailRows,
-  korailStats,
-  lastReport,
-  period,
-  subsidyAmount,
-  subsidyAmountKrw,
+  fetchDashboard,
+  fetchMatch,
+  fetchMatches,
+  toMatchDetail,
+  toMatchRowData,
+  toStatCards,
+  type DashboardResponse,
+  type MatchRowData,
   type Persona,
-} from '../mocks/home';
+} from '../lib/dashboard';
+import { formatCompact, formatKrw, formatNumber, formatPeriodLabel, formatWonSign } from '../lib/format';
+import { getRole, setRole } from '../lib/role';
+import { fetchLatestApplication, type LatestApplication } from '../lib/subsidy';
+import { useAsync } from '../lib/use-async';
+import { fetchVacancies, type Vacancy } from '../lib/wagons';
+import { accounts, basisNote, homeCopy, reportCard } from '../mocks/home';
 
 const PERSONAS: { key: Persona; label: string }[] = [
   { key: 'corp', label: '기업 물류 담당자' },
@@ -32,7 +32,13 @@ interface HomeScreenProps {
   onNavigate?: (to: string) => void;
 }
 
-/** 03 — 로그인 후 홈 대시보드 */
+/**
+ * 03 — 로그인 후 홈 대시보드.
+ *
+ * 페르소나 토글이 이 화면의 상태이고 그 상태가 조회 조건이라(#7 은 persona 별로
+ * 라벨·값이 완전히 다릅니다) 데이터 조회를 화면이 직접 들고 있습니다.
+ * 토글을 누르면 대시보드·매칭 목록이 함께 다시 옵니다.
+ */
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const [persona, setPersona] = useState<Persona>('corp');
   const [openRow, setOpenRow] = useState<string | null>(null);
@@ -40,12 +46,71 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // 로그인 시 고른 역할로 초기 뷰를 맞춘다
   useEffect(() => setPersona(getRole()), []);
 
-  const rows = persona === 'corp' ? corpRows : korailRows;
-  const stats = persona === 'corp' ? corpStats : korailStats;
+  const dashboard = useAsync<DashboardResponse>(useCallback(() => fetchDashboard(persona), [persona]));
+
+  const matches = useAsync<{ rows: MatchRowData[]; total: number }>(
+    useCallback(
+      () =>
+        fetchMatches().then((res) => ({
+          rows: res.items.map((m) => toMatchRowData(m, persona)),
+          total: res.total,
+        })),
+      [persona],
+    ),
+  );
+
+  /**
+   * 좌측 두 번째 카드용 보조 조회. 기업은 KPI 안에 값이 있고(운송비 절감),
+   * 코레일은 "채울 여지가 있는 공차"라 공차 현황(#18)을 따로 봅니다.
+   */
+  const vacancies = useAsync<Vacancy[] | null>(
+    useCallback(
+      () => (persona === 'korail' ? fetchVacancies().then((r) => r.vacancies) : Promise.resolve(null)),
+      [persona],
+    ),
+  );
+
+  /** 우측 하단 "최근 발행" 줄. 초안이 없으면 그렇게 적습니다. */
+  const latestDoc = useAsync<LatestApplication | null>(
+    useCallback(
+      () => (persona === 'corp' ? fetchLatestApplication() : Promise.resolve(null)),
+      [persona],
+    ),
+  );
+
   const account = accounts[persona];
   const copy = homeCopy[persona];
+  const card = reportCard[persona];
 
-  const toggleRow = (id: string) => setOpenRow((cur) => (cur === id ? null : id));
+  /** 행을 처음 펼칠 때만 상세(#9)를 받아 옵니다. */
+  const toggleRow = (id: string) => {
+    setOpenRow((cur) => (cur === id ? null : id));
+    if (openRow === id) return;
+
+    const row = matches.state.status === 'ready' ? matches.state.data.rows.find((r) => r.id === id) : null;
+    if (!row || row.detail) return;
+
+    fetchMatch(id)
+      .then((full) =>
+        matches.patch((prev) => ({
+          ...prev,
+          rows: prev.rows.map((r) => (r.id === id ? { ...r, detail: toMatchDetail(full) } : r)),
+        })),
+      )
+      .catch((error: Error) =>
+        matches.patch((prev) => ({
+          ...prev,
+          rows: prev.rows.map((r) =>
+            r.id === id ? { ...r, detail: [{ k: '상세', v: error.message }] } : r,
+          ),
+        })),
+      );
+  };
+
+  const periodLine =
+    dashboard.state.status === 'ready'
+      ? `${formatPeriodLabel(dashboard.state.data.period)} · ${basisNote}`
+      : basisNote;
 
   return (
     <AppLayout active="home" role={persona} account={account}>
@@ -54,7 +119,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">
             {account.name}님, 이번 분기 성과입니다
           </h1>
-          <p className="mt-2 text-base text-[#6B7684]">{period.basisNote}</p>
+          <p className="mt-2 text-base text-[#6B7684]">{periodLine}</p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -96,117 +161,57 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
       <section className="grid grid-cols-[460px_1fr] gap-4">
         <div className="flex flex-col gap-4">
-          {persona === 'corp' ? (
-            <>
-              <div className="rounded-[20px] bg-white p-7">
-                <div className="flex items-center justify-between">
-                  <span className="text-[15px] font-semibold text-[#6B7684]">
-                    이번 분기 전환교통 보조금 예상액
-                  </span>
-                  <span className="rounded-lg bg-[#E8F3FF] px-2.5 py-[5px] text-[13px] font-bold text-[#1B64DA]">
-                    산정 완료
-                  </span>
-                </div>
+          <AsyncSection
+            state={dashboard.state}
+            onRetry={dashboard.reload}
+            skeleton={<CardSkeleton height={392} />}
+          >
+            {(data) => (persona === 'corp' ? <CorpHero data={data} /> : <KorailHero data={data} />)}
+          </AsyncSection>
 
-                <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
-                  {subsidyAmount}
-                </div>
-                <div className="mt-1.5 text-[15px] text-[#8B95A1]">
-                  {subsidyAmountKrw} · 사회환경적 편익의 30% 상한
-                </div>
-
-                <div className="mt-[22px] flex flex-col gap-0.5">
-                  {breakdown.map((b) => (
-                    <div key={b.label} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
-                      <span className="text-[15px] text-[#4E5968]">{b.label}</span>
-                      <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
-                        {b.value}
-                      </span>
-                    </div>
-                  ))}
-
-                  <div className="mt-1.5 flex items-center justify-between border-t-2 border-[#191F28] pb-3 pt-3.5">
-                    <span className="text-[15px] font-bold text-[#191F28]">사회환경적 편익 계</span>
-                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#191F28]">
-                      {benefitTotal}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
-                    <span className="text-[15px] font-bold text-[#1B64DA]">× 30% (고시 상한)</span>
-                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
-                      3억 4,200만
-                    </span>
-                  </div>
-                </div>
-              </div>
-
+          <AsyncSection state={dashboard.state} onRetry={dashboard.reload} skeleton={<CardSkeleton height={86} />}>
+            {(data) => (
               <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[15px] font-semibold text-[#6B7684]">운송비 절감 (보조금과 별개)</span>
-                  <span className="text-[13px] text-[#B0B8C1]">합적 단가 18% 인하분</span>
-                </div>
-                <span className="text-2xl font-extrabold tracking-[-0.03em] text-[#191F28]">{freightSaving}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="rounded-[20px] bg-white p-7">
-                <div className="flex items-center justify-between">
-                  <span className="text-[15px] font-semibold text-[#6B7684]">{korailHero.label}</span>
-                  <span className="rounded-lg bg-[#EAF8F1] px-2.5 py-[5px] text-[13px] font-bold text-[#12A87A]">
-                    {korailHero.badge}
-                  </span>
-                </div>
-
-                <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
-                  {korailHero.value}
-                </div>
-                <div className="mt-1.5 text-[15px] text-[#8B95A1]">{korailHero.sub}</div>
-
-                <div className="mt-[22px] flex flex-col gap-0.5">
-                  {korailHero.drivers.map((d) => (
-                    <div key={d.label} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
-                      <span className="text-[15px] text-[#4E5968]">{d.label}</span>
-                      <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
-                        {d.value}
-                      </span>
-                    </div>
-                  ))}
-
-                  <div className="mt-1.5 flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
-                    <span className="text-[15px] font-bold text-[#1B64DA]">{korailHero.revenueLabel}</span>
-                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
-                      {korailHero.revenue}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[15px] font-semibold text-[#6B7684]">{korailPotential.label}</span>
-                  <span className="text-[13px] text-[#B0B8C1]">{korailPotential.note}</span>
+                  <span className="text-[15px] font-semibold text-[#6B7684]">{copy.savingLabel}</span>
+                  <span className="text-[13px] text-[#B0B8C1]">{copy.savingNote}</span>
                 </div>
                 <span className="text-2xl font-extrabold tracking-[-0.03em] text-[#191F28]">
-                  {korailPotential.value}
+                  {persona === 'corp'
+                    ? (kpi(data, 'costSaving')?.value ?? '—')
+                    : openWagonSummary(vacancies.state.status === 'ready' ? vacancies.state.data : null)}
                 </span>
               </div>
-            </>
-          )}
+            )}
+          </AsyncSection>
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            {stats.map((s) => (
-              <StatCard key={s.label} stat={s} />
-            ))}
-          </div>
+          <AsyncSection state={dashboard.state} onRetry={dashboard.reload} skeleton={<SkeletonGrid />}>
+            {(data) => (
+              <div className="grid grid-cols-2 gap-4">
+                {toStatCards(data.kpis).map((s) => (
+                  <StatCard key={s.label} stat={s} />
+                ))}
+              </div>
+            )}
+          </AsyncSection>
 
-          <div className="flex gap-4">
-            <AnalogyCard tone="green" value="4만 그루" label="소나무 식재 효과" />
-            <AnalogyCard value="45대" label="도심 진입 차단 트럭" />
-          </div>
+          <AsyncSection state={dashboard.state} skeleton={<CardSkeleton height={76} />}>
+            {(data) => (
+              <div className="flex gap-4">
+                <AnalogyCard
+                  tone="green"
+                  value={`${formatCompact(data.equivalents.pineTrees)} 그루`}
+                  label="소나무 식재 효과"
+                />
+                <AnalogyCard
+                  value={`${formatNumber(data.equivalents.trucksBlocked)}대`}
+                  label="도심 진입 차단 트럭"
+                />
+              </div>
+            )}
+          </AsyncSection>
         </div>
       </section>
 
@@ -215,61 +220,160 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-2.5">
               <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{copy.matchTitle}</span>
-              <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
-                {rows.length}건
-              </span>
+              {matches.state.status === 'ready' && (
+                <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
+                  {matches.state.data.total}건
+                </span>
+              )}
             </div>
             <span className="text-sm text-[#8B95A1]">행을 누르면 상세가 열립니다</span>
           </div>
 
           <MatchRowHeader />
 
-          {rows.map((row) => (
-            <MatchRow
-              key={row.id}
-              row={row}
-              open={openRow === row.id}
-              onToggle={toggleRow}
-              onNavigate={onNavigate}
-            />
-          ))}
+          <AsyncSection state={matches.state} onRetry={matches.reload} skeleton={<CardSkeleton height={260} />}>
+            {({ rows }) =>
+              rows.length ? (
+                <>
+                  {rows.map((row) => (
+                    <MatchRow key={row.id} row={row} open={openRow === row.id} onToggle={toggleRow} />
+                  ))}
+                </>
+              ) : (
+                <p className="px-5 py-10 text-center text-[15px] text-[#8B95A1]">
+                  아직 편성이 없습니다. 화물을 등록하면 여기에 나타납니다.
+                </p>
+              )
+            }
+          </AsyncSection>
         </div>
 
         <div className="flex flex-col gap-3.5 rounded-[20px] bg-white p-[26px]">
-          {persona === 'corp' ? (
-            <>
-              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">K-ESG 공시 리포트</span>
-              <span className="text-[15px] leading-relaxed text-[#6B7684]">
-                이번 분기 지표로 전환교통 보조금 신청서와 K-ESG 지표표를 만듭니다.
-              </span>
-              <button
-                type="button"
-                onClick={() => onNavigate?.('/subsidy/new')}
-                className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
-              >
-                신청서 만들기
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{korailReportCard.title}</span>
-              <span className="text-[15px] leading-relaxed text-[#6B7684]">{korailReportCard.body}</span>
-              <button
-                type="button"
-                onClick={() => onNavigate?.(korailReportCard.to)}
-                className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
-              >
-                {korailReportCard.button}
-              </button>
-            </>
+          <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{card.title}</span>
+          <span className="text-[15px] leading-relaxed text-[#6B7684]">{card.body}</span>
+          <button
+            type="button"
+            onClick={() => onNavigate?.(card.to)}
+            className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
+          >
+            {card.button}
+          </button>
+
+          {persona === 'corp' && (
+            <div className="mt-1 border-t border-[#F2F4F6] pt-4 text-sm leading-relaxed text-[#8B95A1]">
+              <LatestDocLine state={latestDoc.state.status === 'ready' ? latestDoc.state.data : null} />
+            </div>
           )}
-          <div className="mt-1 border-t border-[#F2F4F6] pt-4 text-sm leading-relaxed text-[#8B95A1]">
-            최근 발행 · {lastReport.title}
-            <br />
-            {lastReport.meta}
-          </div>
         </div>
       </section>
     </AppLayout>
+  );
+}
+
+// ── 좌측 hero ──────────────────────────────────────────────────
+
+const kpi = (data: DashboardResponse, key: string) => data.kpis.find((k) => k.key === key);
+
+/** 기업 — 보조금 예상액이 주인공. 편익 내역과 30% 상한을 함께 편다. */
+function CorpHero({ data }: { data: DashboardResponse }) {
+  return (
+    <div className="rounded-[20px] bg-white p-7">
+      <div className="flex items-center justify-between">
+        <span className="text-[15px] font-semibold text-[#6B7684]">{homeCopy.corp.heroLabel}</span>
+        <span className="rounded-lg bg-[#E8F3FF] px-2.5 py-[5px] text-[13px] font-bold text-[#1B64DA]">산정 완료</span>
+      </div>
+
+      <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
+        {data.subsidyEstimate.label}
+      </div>
+      <div className="mt-1.5 text-[15px] text-[#8B95A1]">
+        {formatWonSign(data.subsidyEstimate.amount)} · 사회환경적 편익의 30% 상한
+      </div>
+
+      <div className="mt-[22px] flex flex-col gap-0.5">
+        {data.breakdown.map((b) => (
+          <div key={b.key} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
+            <span className="text-[15px] text-[#4E5968]">{b.label}</span>
+            <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
+              {formatKrw(b.amountKrw)}
+            </span>
+          </div>
+        ))}
+
+        <div className="mt-1.5 flex items-center justify-between border-t-2 border-[#191F28] pb-3 pt-3.5">
+          <span className="text-[15px] font-bold text-[#191F28]">사회환경적 편익 계</span>
+          <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#191F28]">
+            {formatKrw(data.totalBenefitKrw)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
+          <span className="text-[15px] font-bold text-[#1B64DA]">× 30% (고시 상한)</span>
+          <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
+            {formatKrw(data.subsidyEstimate.amount)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 코레일 — 공차율이 주인공. 채운 화차·신규 화주가 그 아래 근거로 붙는다. */
+function KorailHero({ data }: { data: DashboardResponse }) {
+  const rate = kpi(data, 'emptyWagonRate');
+  const revenue = kpi(data, 'extraRevenue');
+  const drivers = [kpi(data, 'filledWagons'), kpi(data, 'newShippers')].filter(Boolean);
+
+  return (
+    <div className="rounded-[20px] bg-white p-7">
+      <div className="flex items-center justify-between">
+        <span className="text-[15px] font-semibold text-[#6B7684]">{homeCopy.korail.heroLabel}</span>
+        {rate?.deltaPct != null && rate.deltaPct < 0 && (
+          <span className="rounded-lg bg-[#EAF8F1] px-2.5 py-[5px] text-[13px] font-bold text-[#12A87A]">
+            {Math.abs(rate.deltaPct)}% 개선
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">{rate?.value ?? '—'}</div>
+      <div className="mt-1.5 text-[15px] text-[#8B95A1]">{formatPeriodLabel(data.period)} 기준</div>
+
+      <div className="mt-[22px] flex flex-col gap-0.5">
+        {drivers.map((d) => (
+          <div key={d!.key} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
+            <span className="text-[15px] text-[#4E5968]">{d!.label}</span>
+            <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">{d!.value}</span>
+          </div>
+        ))}
+
+        <div className="mt-1.5 flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
+          <span className="text-[15px] font-bold text-[#1B64DA]">{revenue?.label ?? '추가 수익'}</span>
+          <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
+            {revenue?.value ?? '—'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 아직 정원을 못 채운 공차 — 코레일이 "지금 채울 수 있는 것"입니다. */
+function openWagonSummary(vacancies: Vacancy[] | null): string {
+  if (!vacancies) return '…';
+  const open = vacancies.filter((v) => v.phase === 'open' || v.phase === 'negotiate');
+  if (!open.length) return '없음';
+  const capacity = open.reduce((sum, v) => sum + v.wagon.capacityTon, 0);
+  return `${open.length}편성 · ${formatNumber(capacity, 1)}t`;
+}
+
+function LatestDocLine({ state }: { state: LatestApplication | null }) {
+  if (!state) return <>최근 발행 이력을 확인하는 중…</>;
+  if (!state.exists) return <>아직 만든 신청서 초안이 없습니다.</>;
+  return (
+    <>
+      최근 초안 · 문단 {state.paragraphCount ?? 0}개
+      <br />
+      수정 {state.revisionCount ?? 0}회
+    </>
   );
 }

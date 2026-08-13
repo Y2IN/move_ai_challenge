@@ -14,10 +14,13 @@ export function AiBadge() {
 export function Field({
   label,
   ai,
+  error,
   children,
 }: {
   label: string;
   ai?: boolean;
+  /** 서버(#11)와 같은 규칙으로 화면이 먼저 거른 메시지 */
+  error?: string;
   children: ReactNode;
 }) {
   return (
@@ -27,6 +30,7 @@ export function Field({
         {ai && <AiBadge />}
       </span>
       {children}
+      {error && <span className="text-[13px] font-semibold text-[#D22030]">{error}</span>}
     </label>
   );
 }
@@ -73,6 +77,41 @@ export function SelectField<T extends string>({
       {options.map((o) => (
         <option key={o} value={o}>
           {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * 표시값과 전송값이 다른 셀렉트 — 역 목록처럼 라벨은 "울산화물역", 값은 코드
+ * ("ULS-FRT")인 경우. 자유 입력을 두면 BE 가 등록되지 않은 역 코드로 400 을
+ * 돌려주므로, 고를 수 있는 것만 보여줍니다.
+ */
+export function ChoiceField({
+  value,
+  options,
+  onChange,
+  placeholder = '선택하세요',
+  disabled,
+}: {
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${CONTROL} cursor-pointer appearance-none disabled:cursor-not-allowed disabled:bg-[#F9FAFB] disabled:text-[#B0B8C1]`}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
         </option>
       ))}
     </select>

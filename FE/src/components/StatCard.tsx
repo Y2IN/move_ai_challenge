@@ -1,4 +1,4 @@
-import type { StatData } from '../mocks/home';
+import type { StatData } from '../lib/dashboard';
 
 export function StatCard({ stat }: { stat: StatData }) {
   return (
