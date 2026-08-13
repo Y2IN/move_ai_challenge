@@ -1,5 +1,6 @@
 export type FreightItem = '석유화학제품' | '화학원료' | '철강재' | '기타';
 export type CorpType = '중소기업' | '우수물류기업' | '일반';
+export type TransportMode = '자차' | '위탁';
 
 export interface FreightForm {
   from: string;
@@ -8,12 +9,14 @@ export interface FreightForm {
   tons: string;
   departDate: string;
   corpType: CorpType;
+  transportMode: TransportMode;
 }
 
 export type FreightField = keyof FreightForm;
 
 export const FREIGHT_ITEMS: FreightItem[] = ['석유화학제품', '화학원료', '철강재', '기타'];
 export const CORP_TYPES: CorpType[] = ['중소기업', '우수물류기업', '일반'];
+export const TRANSPORT_MODES: TransportMode[] = ['자차', '위탁'];
 
 export const naturalPlaceholder =
   '울산 공장에서 의왕ICD까지 석유화학제품 1,860톤, 다음 주 화요일 출발';
@@ -26,6 +29,7 @@ export const emptyForm: FreightForm = {
   tons: '',
   departDate: '',
   corpType: '중소기업',
+  transportMode: '위탁',
 };
 
 /** 자연어 파싱 결과. 기업 구분은 AI가 채우지 않는다 */
@@ -36,6 +40,7 @@ export const parsedForm: FreightForm = {
   tons: '1860',
   departDate: '2026-08-18',
   corpType: '중소기업',
+  transportMode: '위탁',
 };
 
 export const aiFilledFields: FreightField[] = ['from', 'to', 'item', 'tons', 'departDate'];

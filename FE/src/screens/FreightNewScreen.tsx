@@ -4,6 +4,7 @@ import { Field, SelectField, TextField } from '../components/Field';
 import {
   CORP_TYPES,
   FREIGHT_ITEMS,
+  TRANSPORT_MODES,
   aiFilledFields,
   emptyForm,
   naturalPlaceholder,
@@ -13,6 +14,7 @@ import {
   type FreightField,
   type FreightForm,
   type FreightItem,
+  type TransportMode,
 } from '../mocks/freight';
 
 interface FreightNewScreenProps {
@@ -113,6 +115,14 @@ export function FreightNewScreen({ onNavigate, prefilled = true }: FreightNewScr
                   value={form.corpType}
                   options={CORP_TYPES}
                   onChange={(v) => setField('corpType', v)}
+                />
+              </Field>
+
+              <Field label="운송 방식" ai={isAi('transportMode')}>
+                <SelectField<TransportMode>
+                  value={form.transportMode}
+                  options={TRANSPORT_MODES}
+                  onChange={(v) => setField('transportMode', v)}
                 />
               </Field>
             </div>
