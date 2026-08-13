@@ -25,16 +25,17 @@
 화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
 각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
 
-- **✅ 완료 (30):**
+- **✅ 완료 (34):**
   - 랜딩·대시보드: #6 #7 #8 #9
   - 화물등록: #10 파싱(데모) · #11 #12 #13 #14 #15
   - 매칭: #16 #18 #19
   - 조율: #21 classify(데모) · #22 run · #23 stream(SSE) · #25 조회 · #26 취소
-  - 편익: #28 summary
+  - 편익: #27 calculate · #28 summary · #29 coefficients
   - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
   - ESG: #40 #41 #42
-- **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits/calculate(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
-- **❌ 미구현 (5):** #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+  - 마스터: master/stations · master/wagon-types
+- **🟡 부분 (2):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재)
+- **❌ 미구현 (3):** #30 preflight · #36 문단재생성 · #43 코레일승인
 - **🔶 데모(LLM 후속):** #10 파싱(케이스 반환) · #21 classify(규칙기반) — Claude 붙이면 교체
 - **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
 - **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
@@ -230,9 +231,9 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 
 | # | 상태 | Method | Path | 용도 | LLM |
 |---|---|---|---|---|---|
-| 27 | 🟡 | POST | `/api/benefits/calculate` | 도로 단독 vs 철도 합적 → 4대 편익 | ❌ 결정적 계산. `calc.ts` 엔진 완성, 라우트만 없음 |
+| 27 | ✅ | POST | `/api/benefits/calculate` | 도로 단독 vs 철도 합적 → 4대 편익 | ❌ 결정적 계산. match/accept로 편성→calc.ts 엔진 |
 | 28 | ✅ | GET | `/api/benefits/summary?period=2026Q2` | 대시보드용 집계 | ❌ 큐레이션 분기 편익 + 보조금 상한(고시 근거) |
-| 29 | 🟡 | GET | `/api/coefficients?year=2026` | 환경부 배출계수 · 사회적비용 단가 · KOTI 산식 파라미터 | ❌ `constants.ts`에 계수 있음, 라우트만 없음 |
+| 29 | ✅ | GET | `/api/coefficients?year=2026` | 환경부 배출계수 · 사회적비용 단가 · KOTI 산식 파라미터 | ❌ `constants.ts` 노출 + coefficientVersion |
 
 ```jsonc
 // POST /api/benefits/calculate
@@ -329,8 +330,8 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
 | # | 상태 | Method | Path | 용도 |
 |---|---|---|---|---|
 | 43 | ❌ | POST | `/api/korail/assignments/{id}/approve` | 화차 배정 승인 (코레일 담당자) |
-| — | ❌ | GET | `/api/master/stations` | 역 마스터 — 자연어 파싱 결과 정규화용 |
-| — | ❌ | GET | `/api/master/wagon-types` | 화차 종류 (컨테이너/유개/무개/탱크) |
+| — | ✅ | GET | `/api/master/stations` | 역 마스터 — 자연어 파싱 결과 정규화용 |
+| — | ✅ | GET | `/api/master/wagon-types` | 화차 종류 (컨테이너/유개/무개/탱크) |
 
 > 코레일 페르소나의 KPI·매칭 목록은 #7·#8에서 `persona=korail`로 이미 커버됩니다. 별도 엔드포인트를 만들지 마세요.
 
