@@ -18,7 +18,6 @@ import {
   VERIFIED,
 } from "../constants";
 import { seed } from "../seed";
-import type { Lane } from "../types";
 import { computePollutants, emptyPollutantTotals, type PollutantTotals } from "./emissions";
 import ledgerRaw from "./ledger.json";
 import type {
@@ -119,8 +118,28 @@ function previousQuarter(baseDate: string): EsgPeriod {
 
 // ── 2. 원장 → 계산 입력 ────────────────────────────────────────
 
-function findLane(laneId: string): Lane | null {
-  return seed.lanes.find((l) => l.id === laneId) ?? null;
+/** 원장이 우리 노선 마스터에 없는 노선을 가리킬 때. 입력 오류가 아니라 데이터 정합성 오류입니다. */
+export class LedgerDataError extends Error {}
+
+/**
+ * 노선을 못 찾으면 **던집니다.** `?? 0` 으로 넘기면 안 됩니다.
+ *
+ * railDistanceKm 이 0 이 되면 철도 간선 배출량이 통째로 0 이 되는데 기준선(도로)은
+ * 그대로라, 감축량과 감축률이 부풀어 오른 채 지표표와 Scope 3 명세에 그대로 실립니다.
+ * 명세에는 "철도간선거리(km) 0" 이라고 찍히지만 합계만 보는 사람은 눈치채지 못합니다.
+ *
+ * 모르는 화주 id 를 400 으로 막는 것과 같은 이유입니다 — 조용히 틀린 숫자를 내는 것이
+ * 제일 나쁩니다. 다만 이쪽은 사용자 입력이 아니라 우리 원장의 문제라 5xx 로 갑니다.
+ */
+function railDistanceKm(trip: LedgerTrip): number {
+  const lane = seed.lanes.find((l) => l.id === trip.laneId);
+  if (!lane) {
+    throw new LedgerDataError(
+      `수송 실적 원장 ${trip.id} 의 노선 ${trip.laneId} 를 노선 마스터에서 찾을 수 없습니다. ` +
+        `(등록된 노선: ${seed.lanes.map((l) => l.id).join(", ")})`,
+    );
+  }
+  return lane.railDistanceKm;
 }
 
 function routeLabel(trip: LedgerTrip): string {
@@ -175,7 +194,7 @@ export function aggregate({ period, shipperId }: AggregateOptions): EsgAggregate
   const countedShippers = new Set<string>();
 
   for (const trip of trips) {
-    const railKm = findLane(trip.laneId)?.railDistanceKm ?? 0;
+    const railKm = railDistanceKm(trip);
     const members = targetShipper
       ? trip.members.filter((m) => m.shipperId === targetShipper)
       : trip.members;
