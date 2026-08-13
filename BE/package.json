@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test:verify": "tsx src/report/verify.test.ts",
-    "test:esg": "tsx src/esg/verify.test.ts && tsx src/esg/export.test.ts"
+    "test:esg": "tsx src/esg/verify.test.ts && tsx src/esg/export.test.ts && tsx src/esg/guard.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

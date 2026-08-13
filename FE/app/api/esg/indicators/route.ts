@@ -1,5 +1,6 @@
 import { buildIndicators } from "@railhub/be/esg/indicators";
 import { EsgQueryError, resolveAggregate } from "@railhub/be/esg/query";
+import type { EsgIndicatorsResponse } from "@/src/lib/esg";
 
 /**
  * #40 GET /api/esg/indicators?period=&shipperId=
@@ -23,7 +24,8 @@ export function GET(request: Request) {
       shipperId: params.get("shipperId"),
     });
 
-    return Response.json({
+    // 응답 모양은 FE/src/lib/esg.ts 의 EsgIndicatorsResponse 가 소유합니다.
+    const payload: EsgIndicatorsResponse = {
       period: agg.period,
       shipperId: agg.shipperId,
       shipperName: agg.shipperName,
@@ -34,6 +36,10 @@ export function GET(request: Request) {
         shipperCount: agg.shipperCount,
         totalTon: agg.totalTon,
         avgLoadRate: agg.avgLoadRate,
+        // 편익 대시보드(05)의 도로 vs 철도 비교 막대에 필요합니다. 새 계산이 아니라
+        // 집계에 이미 있는 값의 노출입니다.
+        baselineCo2Ton: agg.baselineCo2Ton,
+        actualCo2Ton: agg.actualCo2Ton,
         reducedCo2Ton: agg.reducedCo2Ton,
         reductionRate: agg.reductionRate,
         totalBenefitKrw: agg.totalBenefitKrw,
@@ -43,7 +49,8 @@ export function GET(request: Request) {
       },
       coefficientVersion: agg.coefficientVersion,
       verified: agg.verified,
-    });
+    };
+    return Response.json(payload);
   } catch (error) {
     if (error instanceof EsgQueryError) {
       return Response.json({ error: error.message }, { status: 400 });

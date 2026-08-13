@@ -13,7 +13,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { claudeAuthMode, CLAUDE_MODEL, tryGetClaude } from "../claude";
 import { collectAllowedNumbers, findHallucinatedNumbers } from "../report/verify";
 import { buildIndicators, SCOPE3_CATEGORY } from "./indicators";
-import { buildFacts, PARAGRAPHS, type ParagraphSpec } from "./paragraphs";
+import {
+  buildFacts,
+  isSectionKey,
+  PARAGRAPHS,
+  SECTION_KEYS,
+  type ParagraphSpec,
+} from "./paragraphs";
 import type { EsgAggregate, EsgReport, EsgSection, EsgSectionKey } from "./types";
 
 /** 화면 하단 고정 문구. 카피가 아니라 이 모듈이 지키는 계약입니다. */
@@ -168,6 +174,77 @@ async function generateSection(
   return fallback(["문단 생성 결과가 비어 있어 템플릿 문장으로 대체했습니다."]);
 }
 
+/** `previous` 가 문단 배열 모양이 아닐 때 */
+export class EsgSectionInputError extends Error {}
+
+/**
+ * 클라이언트가 보낸 기존 문단을 검증합니다. 모양이 틀리면 던집니다.
+ *
+ * 검증 없이 `generateReport` 로 넘기면 배열이 아닌 값에서 for-of 가 TypeError 를 내
+ * 400 이어야 할 요청이 500 이 됩니다. `sections` 는 검증하면서 `previous` 만
+ * 그냥 통과시키고 있었습니다.
+ */
+export function parsePreviousSections(value: unknown): EsgSection[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new EsgSectionInputError("previous 는 문단 객체의 배열이어야 합니다.");
+  }
+
+  return value.map((raw, i) => {
+    const at = `previous[${i}]`;
+    if (typeof raw !== "object" || raw === null) {
+      throw new EsgSectionInputError(`${at} 가 객체가 아닙니다.`);
+    }
+    const s = raw as Record<string, unknown>;
+    if (typeof s.key !== "string" || !isSectionKey(s.key)) {
+      throw new EsgSectionInputError(
+        `${at}.key 가 올바르지 않습니다 (가능한 값: ${SECTION_KEYS.join(", ")}).`,
+      );
+    }
+    if (typeof s.text !== "string") {
+      throw new EsgSectionInputError(`${at}.text 는 문자열이어야 합니다.`);
+    }
+    const spec = PARAGRAPHS.find((p) => p.key === s.key)!;
+    return {
+      key: spec.key,
+      // 제목·기준은 서버 정의를 씁니다. 클라이언트가 바꿔 보내도 서식이 흔들리면 안 됩니다.
+      title: spec.title,
+      standard: spec.standard,
+      text: s.text,
+      source: "user" as const,
+      warnings: [],
+    };
+  });
+}
+
+/**
+ * 넘겨받은 기존 문단을 리포트에 채택합니다.
+ *
+ * **출처를 `user` 로 내립니다.** 서버는 이 텍스트가 정말 우리가 생성한 것인지 알 수
+ * 없습니다. 그대로 `ai` 로 실어주면 호출자가 임의 문장을 "AI 가 작성한 공시 문단"으로
+ * 둔갑시킬 수 있고, 숫자 환각 검출기도 통째로 우회됩니다 — 검출기는 생성 경로에만
+ * 걸려 있기 때문입니다.
+ *
+ * 그래서 채택 시점에 **숫자 검증을 다시 겁니다.** 근거 없는 수치가 있으면 경고를 답니다.
+ * 문단을 버리지는 않습니다. 사용자가 직접 고친 문장일 수도 있고, 그건 정당합니다.
+ * 다만 검증을 통과하지 못했다는 사실이 응답에 남아야 합니다.
+ */
+function adoptPrevious(sections: EsgSection[], allowed: Set<string>): EsgSection[] {
+  return sections.map((section) => {
+    const check = findHallucinatedNumbers(section.text, allowed);
+    return {
+      ...section,
+      source: "user" as const,
+      warnings: check.clean
+        ? ["클라이언트가 보낸 문단입니다. 서버가 생성을 보증하지 않습니다."]
+        : [
+            "클라이언트가 보낸 문단입니다. 서버가 생성을 보증하지 않습니다.",
+            `근거 없는 수치가 있습니다 — ${check.message}`,
+          ],
+    };
+  });
+}
+
 export interface GenerateOptions {
   /** 일부 문단만 다시 생성. 비우면 전체 */
   sections?: EsgSectionKey[];
@@ -221,7 +298,10 @@ export async function generateReport(
   );
 
   const byKey = new Map<EsgSectionKey, EsgSection>();
-  for (const section of options.previous ?? []) byKey.set(section.key, section);
+  // 클라이언트가 보낸 문단은 출처를 user 로 내리고 숫자 검증을 다시 겁니다.
+  for (const section of adoptPrevious(options.previous ?? [], allowed)) {
+    byKey.set(section.key, section);
+  }
   for (const section of generated) byKey.set(section.key, section);
 
   // 출력 순서는 항상 서식 순서입니다. 재생성 순서에 흔들리면 안 됩니다.
