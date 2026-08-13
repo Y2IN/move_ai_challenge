@@ -1,5 +1,7 @@
+import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/http";
 import { match } from "@railhub/be/matching";
 import { seed } from "@railhub/be/seed";
+import { validateShipmentInput } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 /**
@@ -8,21 +10,34 @@ import type { ShipmentInput } from "@railhub/be/types";
  * 시드 화물 풀 + 사용자가 방금 등록한 화물을 합쳐 편성을 만든다.
  * 정원 미달이면 `status: "shortfall"` 로 돌려주고 조율 에이전트(#22)로 넘긴다.
  *
- * `now` 를 받는 이유: 마감시한 기준 상태(phase)가 시각에 따라 달라지므로
- * 시연에서 특정 시점을 고정할 수 있어야 한다.
+ * body: { shipment?: ShipmentInput, now?: string }
+ *  - shipment 가 있으면 검증 후 포함, 없으면 시드 단독(시연 실패 시나리오).
+ *  - now 는 마감시한 기준 상태(phase)를 시연에서 고정하기 위한 시각.
+ *  - 본문이 깨진 JSON 이면 400 (빈 본문과 구분).
  */
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as
-    | { shipment?: ShipmentInput; now?: string }
-    | null;
+  const parsed = await readBody(req);
+  if (parsed.kind === "invalid") return badJson();
+  const body = (
+    parsed.kind === "json" && parsed.value && typeof parsed.value === "object" && !Array.isArray(parsed.value)
+      ? parsed.value
+      : {}
+  ) as { shipment?: unknown; now?: string };
 
-  const now = body?.now ? new Date(body.now) : new Date();
+  const now = body.now ? new Date(body.now) : new Date();
   if (Number.isNaN(now.getTime())) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
-  const result = match(seed, body?.shipment ?? null, now);
-  return Response.json(result);
+  // 화물 입력이 있으면 검증, 없으면 시드 단독
+  let shipment: ShipmentInput | null = null;
+  if (!isEmptyObject(body.shipment)) {
+    const v = validateShipmentInput(body.shipment, seed);
+    if (!v.ok || !v.value) return validationError(v.errors);
+    shipment = v.value;
+  }
+
+  return Response.json(match(seed, shipment, now));
 }
