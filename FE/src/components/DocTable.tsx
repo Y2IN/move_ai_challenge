@@ -100,36 +100,95 @@ export function DocLegend({ note }: { note: string }) {
   );
 }
 
+/**
+ * 문단 출처별 톤. BE EsgSection.source 와 1:1 입니다.
+ *
+ *   ai        Claude 생성 + 숫자 검증 통과 (파랑)
+ *   fallback  템플릿 문장 — 인증 없음·호출 실패·검증 실패 (회색)
+ *   user      서버가 생성을 보증하지 않는 문단 — 재생성 시 유지분 등 (호박색)
+ */
+export type ParagraphTone = 'ai' | 'fallback' | 'user';
+
+const TONE_STYLE: Record<
+  ParagraphTone,
+  { border: string; bg: string; chip: string; text: string; badge: string; label: string }
+> = {
+  ai: {
+    border: 'border-[#3182F6]',
+    bg: 'bg-[#F5F9FF]',
+    chip: 'bg-[#D6E7FF]',
+    text: 'text-[#1B64DA]',
+    badge: 'AI',
+    label: 'AI 서술 · 편집 가능',
+  },
+  fallback: {
+    border: 'border-[#8B95A1]',
+    bg: 'bg-[#F9FAFB]',
+    chip: 'bg-[#E5E8EB]',
+    text: 'text-[#4E5968]',
+    badge: '템플릿',
+    label: '템플릿 문장 · 재생성하면 AI 서술로 대체됩니다',
+  },
+  user: {
+    border: 'border-[#F2B33D]',
+    bg: 'bg-[#FFF8EB]',
+    chip: 'bg-[#FCEBC5]',
+    text: 'text-[#A96A00]',
+    badge: '검증 필요',
+    label: '서버가 생성을 보증하지 않는 문단',
+  },
+};
+
 /** AI가 쓴 서술 문단. hover 시 재생성 칩이 뜬다 */
 export function AiParagraphBlock({
   body,
   onRegenerate,
   className = '',
+  tone = 'ai',
+  label,
+  busy = false,
+  footer,
 }: {
   body: string;
   onRegenerate?: () => void;
   className?: string;
+  /** 문단 출처. 생략하면 기존과 동일한 AI(파랑) 스타일 */
+  tone?: ParagraphTone;
+  /** 배지 옆 라벨 문구 오버라이드 */
+  label?: string;
+  /** 재생성 진행 중 — 본문을 흐리게 하고 재생성 버튼을 잠근다 */
+  busy?: boolean;
+  /** 경고 등 본문 아래 붙는 노드 */
+  footer?: ReactNode;
 }) {
+  const t = TONE_STYLE[tone];
   return (
     <div
-      className={`group relative rounded-r-[10px] border-l-[3px] border-[#3182F6] bg-[#F5F9FF] px-[18px] pb-4 pt-3.5 ${className}`}
+      className={`group relative rounded-r-[10px] border-l-[3px] ${t.border} ${t.bg} px-[18px] pb-4 pt-3.5 ${className}`}
     >
       <div className="flex items-center gap-[7px]">
-        <span className="inline-flex h-4 items-center justify-center rounded bg-[#D6E7FF] px-1.5 text-[10px] font-extrabold tracking-wide text-[#1B64DA]">
-          AI
+        <span
+          className={`inline-flex h-4 items-center justify-center rounded ${t.chip} px-1.5 text-[10px] font-extrabold tracking-wide ${t.text}`}
+        >
+          {t.badge}
         </span>
-        <span className="text-[11px] font-bold text-[#1B64DA]">AI 서술 · 편집 가능</span>
+        <span className={`text-[11px] font-bold ${t.text}`}>{busy ? '문단 재생성 중…' : (label ?? t.label)}</span>
       </div>
 
-      <p className="mt-2 text-sm leading-[1.85] text-[#333D4B]">{body}</p>
+      <p className={`mt-2 text-sm leading-[1.85] text-[#333D4B] ${busy ? 'animate-pulse opacity-50' : ''}`}>{body}</p>
 
-      <button
-        type="button"
-        onClick={onRegenerate}
-        className="absolute right-3.5 top-3 rounded-lg border border-[#D6E7FF] bg-white px-2.5 py-[5px] text-xs font-bold text-[#3182F6] opacity-0 transition-opacity group-hover:opacity-100"
-      >
-        ↻ 문단 재생성
-      </button>
+      {footer}
+
+      {onRegenerate && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRegenerate}
+          className="absolute right-3.5 top-3 rounded-lg border border-[#D6E7FF] bg-white px-2.5 py-[5px] text-xs font-bold text-[#3182F6] opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-default disabled:text-[#B0B8C1]"
+        >
+          {busy ? '생성 중…' : '↻ 문단 재생성'}
+        </button>
+      )}
     </div>
   );
 }
