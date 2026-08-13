@@ -2,12 +2,23 @@ import { AppLayout } from '../components/AppLayout';
 import { applyMeta, breadcrumb, checklist, criteria } from '../mocks/apply';
 
 interface ApplyIntroScreenProps {
+  /** 초안 발급 중. 연타로 초안이 여러 개 생기는 걸 막는다 */
+  busy?: boolean;
+  error?: string | null;
+  /** "보고서 초안 생성" — 컨테이너가 빈 서식을 발급하고 06b 로 보낸다 */
+  onStart?: () => void;
   onNavigate?: (to: string) => void;
   onBack?: () => void;
 }
 
 /** 06a — 보조금 신청서 생성 전 */
-export function ApplyIntroScreen({ onNavigate, onBack }: ApplyIntroScreenProps) {
+export function ApplyIntroScreen({
+  busy = false,
+  error = null,
+  onStart,
+  onNavigate,
+  onBack,
+}: ApplyIntroScreenProps) {
   return (
     <AppLayout active="subsidy">
       <header className="flex flex-col gap-2">
@@ -77,10 +88,11 @@ export function ApplyIntroScreen({ onNavigate, onBack }: ApplyIntroScreenProps) 
           <div className="flex flex-col gap-2.5 rounded-[20px] bg-white p-6">
             <button
               type="button"
-              onClick={() => onNavigate?.('/subsidy/generating')}
-              className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+              onClick={onStart}
+              disabled={busy}
+              className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA] disabled:cursor-not-allowed disabled:bg-[#C4CBD4]"
             >
-              보고서 초안 생성
+              {busy ? '초안 준비 중…' : '보고서 초안 생성'}
             </button>
             <button
               type="button"
@@ -88,6 +100,11 @@ export function ApplyIntroScreen({ onNavigate, onBack }: ApplyIntroScreenProps) 
             >
               빈 서식 미리보기
             </button>
+            {error && (
+              <p className="mt-1.5 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
+                초안을 시작하지 못했습니다 — {error}
+              </p>
+            )}
             <p className="mt-1.5 text-[13px] leading-relaxed text-[#8B95A1]">{applyMeta.disclaimer}</p>
           </div>
         </div>
