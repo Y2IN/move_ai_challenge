@@ -47,7 +47,7 @@ function ShipperCard({ profile }: { profile: ShipperProfile }) {
           {profile.name}{' '}
           <span className="text-sm font-semibold tabular-nums text-[#8B95A1]">{profile.tons}</span>
         </span>
-        <span className={`rounded-md px-[9px] py-1 text-xs font-bold ${TRAIT_CLASS[profile.traitTone]}`}>
+        <span className={`whitespace-nowrap rounded-md px-[9px] py-1 text-xs font-bold ${TRAIT_CLASS[profile.traitTone]}`}>
           {profile.trait}
         </span>
       </div>
@@ -89,11 +89,11 @@ function StepItem({ step }: { step: NegoStep }) {
           <span className={`text-[15px] font-bold ${muted ? 'text-[#6B7684]' : 'text-[#191F28]'}`}>
             {step.title}
           </span>
-          <span className={`rounded-md px-2 py-[3px] text-xs font-bold ${STATUS_CLASS[step.status]}`}>
+          <span className={`whitespace-nowrap rounded-md px-2 py-[3px] text-xs font-bold ${STATUS_CLASS[step.status]}`}>
             {step.statusLabel}
           </span>
           {step.saving && (
-            <span className="ml-auto text-[13px] tabular-nums text-[#B0B8C1]">{step.saving}</span>
+            <span className="ml-auto whitespace-nowrap text-[13px] tabular-nums text-[#B0B8C1]">{step.saving}</span>
           )}
         </div>
 
@@ -118,7 +118,7 @@ interface NegotiationScreenProps {
   onNavigate?: (to: string) => void;
 }
 
-/** 04d — 조율 진행. 1440px 한 화면에 스크롤 없이 들어오도록 패널 높이를 560px로 고정 */
+/** 04d — 조율 진행. 좌우 패널은 내용만큼 늘고, 내용 많은 쪽 높이에 서로 맞춘다 */
 export function NegotiationScreen({ onNavigate }: NegotiationScreenProps) {
   return (
     <AppLayout active="matching">
@@ -161,23 +161,24 @@ export function NegotiationScreen({ onNavigate }: NegotiationScreenProps) {
         </div>
       </section>
 
-      <section className="grid grid-cols-[480px_1fr] items-start gap-4">
-        <div className="flex h-[560px] flex-col gap-3 rounded-[20px] bg-white px-6 py-[22px]">
+      {/* items-start 없이 stretch — 두 패널이 내용 많은 쪽 높이에 맞춰 함께 늘어난다 */}
+      <section className="grid grid-cols-[480px_1fr] gap-4">
+        <div className="flex flex-col gap-3 rounded-[20px] bg-white px-6 py-[22px]">
           <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">화주 제약 분류</span>
-          <div className="flex flex-col gap-2.5 overflow-hidden">
+          <div className="flex flex-col gap-2.5">
             {shipperProfiles.map((p) => (
               <ShipperCard key={p.name} profile={p} />
             ))}
           </div>
         </div>
 
-        <div className="flex h-[560px] flex-col gap-3 rounded-[20px] bg-white px-6 py-[22px]">
+        <div className="flex flex-col gap-3 rounded-[20px] bg-white px-6 py-[22px]">
           <div className="flex items-center justify-between">
             <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">협상 타임라인</span>
             <span className="text-sm text-[#8B95A1]">{negoMeta.retries}</span>
           </div>
 
-          <div className="flex flex-1 flex-col gap-2.5 overflow-hidden">
+          <div className="flex flex-1 flex-col gap-2.5">
             {negoSteps.map((s) => (
               <StepItem key={s.id} step={s} />
             ))}
