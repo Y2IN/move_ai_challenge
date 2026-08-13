@@ -1,5 +1,16 @@
-@import "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css";
+/* Pretendard는 app/layout.tsx의 <link>로 로드 (CSS @import보다 먼저 받아옴) */
 @import "tailwindcss";
+
+/* 상단바 앵커 이동을 부드럽게 (섹션별 scroll-mt로 고정 헤더 높이 보정) */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 
 html,
 body {
@@ -11,4 +22,25 @@ body {
 body {
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", sans-serif;
+}
+
+/* 랜딩 히어로 칩 회전초밥 벨트 (트랙에 목록 2벌 → -50%가 이음매) */
+@keyframes chip-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.chip-marquee {
+  animation: chip-marquee 32s linear infinite;
+}
+
+.chip-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-marquee {
+    animation: none;
+  }
 }

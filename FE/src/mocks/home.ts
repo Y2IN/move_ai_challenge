@@ -245,7 +245,7 @@ export const korailRows: MatchRowData[] = [
     load: 41,
     saving: "산정 전",
     tone: "nego",
-    navTo: "/matching/negotiation",
+    // 코레일 행은 기업 조율 화면으로 보내지 않고 인라인 펼침 (navTo 없음)
     detail: [
       { k: "조율 대상", v: "한림케미칼 · 우진산업 · 남광유화" },
       { k: "출발 예정", v: "2026.08.18 06:20" },
@@ -339,3 +339,45 @@ export const lastReport = {
   title: "2026년 1분기 리포트",
   meta: "PDF · 5월 9일",
 };
+
+/** 코레일 홈 — 좌측 hero (기업 보조금 카드 자리). 공차율이 주인공 */
+export const korailHero = {
+  label: '이번 분기 공차율',
+  badge: '12.5%p 개선',
+  value: '18.7%',
+  sub: '전 분기 31.2%',
+  drivers: [
+    { label: '채운 화차', value: '128량' },
+    { label: '재판매 공차 노선', value: '34개' },
+    { label: '신규 B2B 화주', value: '24개사' },
+  ],
+  revenueLabel: '추가 운송 수익',
+  revenue: '8,700만 원',
+};
+
+/** 코레일 홈 — 좌측 2번째 카드 (기업 '운송비 절감' 자리) */
+export const korailPotential = {
+  label: '미배정 공차 잠재 수익',
+  note: '적재 미달 공차 3편성 채우면',
+  value: '2,340만 원',
+};
+
+/** 코레일 홈 — 하단 우측 카드 (기업 'K-ESG 리포트' 자리) */
+export const korailReportCard = {
+  title: '수송 실적 리포트',
+  body: '이번 분기 공차율·재판매 수익 실적을 리포트로 정리합니다.',
+  button: '실적 리포트 보기',
+  to: '/korail/performance', // 아직 없는 화면. 버튼만 걸어둠
+};
+
+/** 헤더 버튼·섹션 제목 persona 분기 */
+export const homeCopy = {
+  corp: {
+    primaryBtn: { label: '화물 등록', to: '/freight/new' },
+    matchTitle: 'AI 합적 매칭 현황',
+  },
+  korail: {
+    primaryBtn: { label: '공차 관리', to: '/korail/wagons' }, // 아직 없는 화면
+    matchTitle: '공차 편성 현황',
+  },
+} as const;

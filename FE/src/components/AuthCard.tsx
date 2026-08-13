@@ -4,27 +4,26 @@ import { brand, landingStats } from '../mocks/marketing';
 /** 02 로그인 · 회원가입 좌측 브랜드 패널 */
 export function AuthBrandPanel() {
   return (
-    <div className="flex flex-col justify-between bg-[#F9FAFB] px-10 py-11">
+    // 랜딩('/') 다크 히어로와 같은 팔레트
+    <div className="flex flex-col justify-between bg-[#0B1220] px-10 py-11">
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-[#3182F6] text-sm font-extrabold text-white">
-          X
-        </span>
-        <span className="text-[17px] font-extrabold tracking-[-0.03em] text-[#191F28]">{brand.name}</span>
+        <img src="/train.png" alt="" width={28} height={28} className="rounded-lg" />
+        <span className="text-[17px] font-extrabold tracking-[-0.03em] text-white">{brand.name}</span>
       </div>
 
       <div className="flex flex-col gap-4">
-        <h2 className="text-3xl font-extrabold leading-[1.35] tracking-[-0.035em] text-[#191F28]">
+        <h2 className="text-3xl font-extrabold leading-[1.35] tracking-[-0.035em] text-white">
           철도를 채우는 순간,
           <br />
           ESG가 완성됩니다
         </h2>
-        <p className="text-base leading-[1.62] text-[#6B7684]">{brand.subheadline}</p>
+        <p className="text-base leading-[1.62] text-[#B0B8C1]">{brand.subheadline}</p>
       </div>
 
       <div className="flex flex-col gap-2.5 text-[15px] text-[#8B95A1]">
         {landingStats.map((s) => (
           <span key={s.label}>
-            {s.label} <b className="text-[#333D4B]">{s.value}</b>
+            {s.label} <b className="text-white">{s.value}</b>
           </span>
         ))}
       </div>
