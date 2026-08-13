@@ -13,6 +13,7 @@
 import { match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
 import { accept } from "./negotiate";
+import type { NegotiationResult } from "./negotiate";
 import { seed } from "./seed";
 import type {
   CalcResult,
@@ -42,12 +43,46 @@ interface StoredShipment {
   shipment: Shipment;
   seq: number;
 }
-const registered: StoredShipment[] = [];
-let seq = 0;
+/**
+ * ⚠️ 모듈 최상위에 배열을 그냥 두면 안 된다.
+ *
+ * Next 는 라우트 핸들러마다 서버 번들을 따로 만든다. 그러면 이 모듈도 번들마다
+ * 한 벌씩 생겨서 `POST /api/freights` 가 채운 배열과 `PATCH·DELETE /api/freights/{id}`
+ * 가 읽는 배열이 **서로 다른 객체**가 된다. 방금 등록한 화물이 수정·삭제(#14/#15)에서
+ * 곧바로 404 로 나온다. (report/store.ts 에서 이미 한 번 밟은 사고다)
+ *
+ * globalThis 에 한 번만 매달아 번들이 몇 벌이든 같은 저장소를 보게 한다.
+ * (콜드 스타트마다 비워지는 건 그대로다 — 영속이 필요하면 이 파일만 교체한다)
+ */
+interface ShipmentStoreState {
+  registered: StoredShipment[];
+  seq: number;
+  /** 확정된 편성(코레일 공차 수송 확정) 기록 */
+  confirmations: Confirmation[];
+  confirmSeq: number;
+  /** 조율(negotiation) 세션 기록 (#25 조회 · #26 취소) */
+  negotiations: StoredNegotiation[];
+  negSeq: number;
+}
 
-/** 확정된 편성(코레일 공차 수송 확정) 기록 */
-const confirmations: Confirmation[] = [];
-let confirmSeq = 0;
+const globalRef = globalThis as typeof globalThis & {
+  __railhubShipmentStore?: ShipmentStoreState;
+};
+
+const state: ShipmentStoreState = (globalRef.__railhubShipmentStore ??= {
+  registered: [],
+  seq: 0,
+  confirmations: [],
+  confirmSeq: 0,
+  negotiations: [],
+  negSeq: 0,
+});
+
+// 배열은 참조를 그대로 쓴다 (push/splice/length=0 모두 같은 객체를 건드린다).
+// 카운터는 재대입이 필요하므로 `state.seq` 처럼 state 를 거쳐 쓴다.
+const registered = state.registered;
+const confirmations = state.confirmations;
+const negotiations = state.negotiations;
 
 /** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
 function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipment {
@@ -61,9 +96,9 @@ function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipmen
 
 /** 등록: 입력을 Shipment 로 정규화해 스토어에 넣고, 만들어진 레코드를 돌려줍니다. */
 export function registerShipment(input: ShipmentInput, data: SeedData = seed): Shipment {
-  seq += 1;
-  const shipment = buildShipment(input, seq, data);
-  registered.push({ input, shipment, seq });
+  state.seq += 1;
+  const shipment = buildShipment(input, state.seq, data);
+  registered.push({ input, shipment, seq: state.seq });
   return shipment;
 }
 
@@ -117,9 +152,11 @@ export function deleteShipment(id: string): boolean {
 /** 테스트·시연 리셋용 */
 export function clearShipments(): void {
   registered.length = 0;
-  seq = 0;
+  state.seq = 0;
   confirmations.length = 0;
-  confirmSeq = 0;
+  state.confirmSeq = 0;
+  negotiations.length = 0;
+  state.negSeq = 0;
 }
 
 // ── 편성 확정 (#19) ────────────────────────────────────────────
@@ -158,9 +195,9 @@ export function confirmMatch(
     return { status: "notMatched", match: result };
   }
 
-  confirmSeq += 1;
+  state.confirmSeq += 1;
   const confirmation: Confirmation = {
-    groupId: `GRP-${String(confirmSeq).padStart(3, "0")}`,
+    groupId: `GRP-${String(state.confirmSeq).padStart(3, "0")}`,
     status: "confirmed",
     wagon: result.wagon,
     members: result.members,
@@ -172,6 +209,41 @@ export function confirmMatch(
   };
   confirmations.push(confirmation);
   return { status: "confirmed", confirmation };
+}
+
+// ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────
+
+export interface StoredNegotiation {
+  id: string;
+  status: "open" | "cancelled";
+  result: NegotiationResult;
+  createdAt: string;
+}
+
+/** 조율 실행 결과를 저장하고 NEG-NNN id 를 발급한다 (#22 run 이 호출). */
+export function saveNegotiation(result: NegotiationResult): StoredNegotiation {
+  state.negSeq += 1;
+  const record: StoredNegotiation = {
+    id: `NEG-${String(state.negSeq).padStart(3, "0")}`,
+    status: "open",
+    result,
+    createdAt: new Date().toISOString(),
+  };
+  negotiations.push(record);
+  return record;
+}
+
+/** #25 — 조율 세션(최종 편성 결과) 조회. 없으면 null. */
+export function getNegotiation(id: string): StoredNegotiation | null {
+  return negotiations.find((n) => n.id === id) ?? null;
+}
+
+/** #26 — 조율 취소("다음 공차 일정 대기"). 상태만 cancelled 로. 없으면 null. */
+export function cancelNegotiation(id: string): StoredNegotiation | null {
+  const record = negotiations.find((n) => n.id === id);
+  if (!record) return null;
+  record.status = "cancelled";
+  return record;
 }
 
 // ── 입력 검증 ──────────────────────────────────────────────────
