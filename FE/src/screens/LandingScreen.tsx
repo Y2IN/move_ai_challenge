@@ -1,6 +1,11 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { AgentFlowCard, EsgDocPreview, PlanDocPreview } from '../components/DocPreview';
 import { AiChip, LandingSection, SectionHeader } from '../components/LandingSection';
+import { formatNumber, formatWonSign } from '../lib/format';
+import { usePublicStats } from '../lib/landing';
+import type { PublicStats } from '../lib/public';
 import {
   agentInput,
   agentOutput,
@@ -8,9 +13,7 @@ import {
   brand,
   esgSection,
   howSection,
-  heroAmount,
-  heroChips,
-  heroFootnote,
+  heroCaption,
   howItWorks,
   landingCta,
   marketingNav,
@@ -74,9 +77,75 @@ function useActiveSection() {
   };
 }
 
+/**
+ * 히어로 숫자 — 이번 분기 보조금 예상액과 편익 4항목.
+ *
+ * `label`("3억 4,200만")은 서버가 만든 표시 문자열입니다. 화면에서 다시 축약하면
+ * 홈 대시보드와 반올림 자리가 어긋납니다.
+ */
+function HeroFigures({ stats }: { stats: PublicStats }) {
+  const delta = stats.quarterSubsidy.deltaPct;
+  const chips = stats.breakdown;
+
+  return (
+    <>
+      <div className="mt-0.5 flex flex-col items-center">
+        {/* 숫자는 흰→블루 그라디언트를 글자에 클립, '원'만 단색 블루로 남김 */}
+        <div className="bg-[linear-gradient(180deg,#FFFFFF_38%,#8FC2FF_100%)] bg-clip-text text-[116px] font-extrabold leading-[1.04] tracking-[-0.055em] text-transparent">
+          {stats.quarterSubsidy.label}
+          <span className="ml-3 text-[58px] font-bold tracking-[-0.03em] text-[#8FC2FF]">원</span>
+        </div>
+        <div className="h-[3px] w-[640px] rounded-full bg-[linear-gradient(90deg,transparent,#3182F6,transparent)]" />
+        <div className="mt-3.5 flex items-center gap-2.5">
+          <span className="text-base font-semibold tabular-nums text-[#8B95A1]">
+            {formatWonSign(stats.quarterSubsidy.amount)}
+          </span>
+          {delta != null && (
+            <span className="rounded-full bg-[#15C47E]/[0.16] px-3 py-1.5 text-sm font-bold text-[#34D399]">
+              전 분기 대비 {delta > 0 ? '+' : ''}
+              {delta}%
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ponytail: 벨트 폭을 중앙 720px로 고정 — 목록 1벌(약 800px)이 이보다 넓어야 빈칸이 안 생김 */}
+      <div className="mx-auto mt-[22px] max-w-[720px] overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_12%,#000_88%,transparent)]">
+        {/* ponytail: 컨테이너 gap 대신 칩마다 mr-2 — 그래야 -50%가 이음매에 정확히 맞음 */}
+        <div className="chip-marquee flex w-max">
+          {[...chips, ...chips].map((c, i) => (
+            <span
+              key={`${c.key}-${i}`}
+              className="mr-2 shrink-0 rounded-full bg-white/[0.07] px-[18px] py-[11px] text-[15px] text-[#D1D6DB]"
+            >
+              {c.label} <b className="ml-1.5 text-white">{c.value}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * 수치가 오기 전/실패했을 때. **옛 상수를 대신 띄우지 않습니다** — 랜딩의 금액은
+ * 홈·신청서와 같은 집계라, 여기서만 다른 값을 보여주면 시연 중 바로 어긋납니다.
+ */
+function HeroPlaceholder() {
+  return (
+    <div className="mt-0.5 flex flex-col items-center">
+      <div className="h-[122px] w-[520px] animate-pulse rounded-3xl bg-white/[0.06]" />
+      <div className="mt-3.5 h-[30px] w-[280px] animate-pulse rounded-full bg-white/[0.06]" />
+      <div className="mt-[22px] h-[42px] w-[640px] animate-pulse rounded-full bg-white/[0.04]" />
+    </div>
+  );
+}
+
 /** 01 — 로그인 전 서비스 소개 랜딩 */
 export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
   const { active, onJump } = useActiveSection();
+  // 히어로 수치는 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
+  const stats = usePublicStats();
 
   return (
     <div className="min-h-screen bg-white">
@@ -127,39 +196,9 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             {brand.headline[1]}
           </h1>
 
-          <div className="mt-[34px] text-base font-semibold text-[#8B95A1]">{heroAmount.caption}</div>
+          <div className="mt-[34px] text-base font-semibold text-[#8B95A1]">{heroCaption}</div>
 
-          <div className="mt-0.5 flex flex-col items-center">
-            {/* 숫자는 흰→블루 그라디언트를 글자에 클립, '원'만 단색 블루로 남김 */}
-            <div className="bg-[linear-gradient(180deg,#FFFFFF_38%,#8FC2FF_100%)] bg-clip-text text-[116px] font-extrabold leading-[1.04] tracking-[-0.055em] text-transparent">
-              {heroAmount.value}
-              <span className="ml-3 text-[58px] font-bold tracking-[-0.03em] text-[#8FC2FF]">
-                {heroAmount.unit}
-              </span>
-            </div>
-            <div className="h-[3px] w-[640px] rounded-full bg-[linear-gradient(90deg,transparent,#3182F6,transparent)]" />
-            <div className="mt-3.5 flex items-center gap-2.5">
-              <span className="text-base font-semibold tabular-nums text-[#8B95A1]">{heroAmount.krw}</span>
-              <span className="rounded-full bg-[#15C47E]/[0.16] px-3 py-1.5 text-sm font-bold text-[#34D399]">
-                {heroAmount.delta}
-              </span>
-            </div>
-          </div>
-
-          {/* ponytail: 벨트 폭을 중앙 720px로 고정 — 목록 1벌(약 800px)이 이보다 넓어야 빈칸이 안 생김 */}
-          <div className="mx-auto mt-[22px] max-w-[720px] overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_12%,#000_88%,transparent)]">
-            {/* ponytail: 컨테이너 gap 대신 칩마다 mr-2 — 그래야 -50%가 이음매에 정확히 맞음 */}
-            <div className="chip-marquee flex w-max">
-              {[...heroChips, ...heroChips].map((c, i) => (
-                <span
-                  key={`${c.label}-${i}`}
-                  className="mr-2 shrink-0 rounded-full bg-white/[0.07] px-[18px] py-[11px] text-[15px] text-[#D1D6DB]"
-                >
-                  {c.label} <b className="ml-1.5 text-white">{c.value}</b>
-                </span>
-              ))}
-            </div>
-          </div>
+          {stats.status === 'ready' ? <HeroFigures stats={stats.data} /> : <HeroPlaceholder />}
 
           <div className="mt-[30px] flex gap-2.5">
             <button
@@ -171,7 +210,13 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             </button>
           </div>
 
-          <div className="mt-[18px] text-[15px] text-[#6B7684]">{heroFootnote}</div>
+          <div className="mt-[18px] text-[15px] text-[#6B7684]">
+            {stats.status === 'ready'
+              ? `누적 합적 화주 ${formatNumber(stats.data.cumulative.shippers)}개사 · 채운 공차 ${formatNumber(
+                  stats.data.cumulative.filledWagons,
+                )}량 · 코레일 공차 노선 실시간 연동`
+              : '코레일 공차 노선 실시간 연동'}
+          </div>
         </div>
       </section>
 

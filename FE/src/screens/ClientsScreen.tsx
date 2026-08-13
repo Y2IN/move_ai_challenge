@@ -1,4 +1,5 @@
 import { AppLayout } from '../components/AppLayout';
+import { DemoDataBadge } from '../components/AsyncSection';
 import { LoadBar } from '../components/StatusBadge';
 import { StatCard } from '../components/StatCard';
 import { accounts } from '../mocks/home';
@@ -27,7 +28,11 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
   return (
     <AppLayout active="clients" role="korail" account={accounts.korail}>
       <header className="flex flex-col gap-2">
-        <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">{header.title}</h1>
+        {/* 화주별 협약 이행 API 가 아직 없습니다. 실데이터와 구분되게 표시합니다. */}
+        <span className="flex items-center gap-2.5">
+          <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">{header.title}</h1>
+          <DemoDataBadge api="화주 협약 API" />
+        </span>
         <p className="text-base text-[#6B7684]">{header.lead}</p>
       </header>
 

@@ -100,7 +100,9 @@ function NegotiationBody({
   onNavigate?: (to: string) => void;
 }) {
   const { negotiation: n, match: m } = data;
-  const pct = (rate: number) => Math.round(rate * 100);
+  // 적재율은 정원 대비 비율이라 100% 를 넘을 수 없습니다. 스트림 재생값이 어긋나도
+  // 화면이 있을 수 없는 숫자를 띄우지 않도록 여기서 한 번 더 막습니다.
+  const pct = (rate: number) => Math.min(Math.round(rate * 100), 100);
 
   const startPct = pct(n.before.loadRate);
   const currentPct = pct(stream.loadRate ?? n.before.loadRate);

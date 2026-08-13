@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { AsyncSection, SkeletonGrid } from '../components/AsyncSection';
+import { AsyncSection, DemoDataBadge, SkeletonGrid } from '../components/AsyncSection';
 import { StatCard } from '../components/StatCard';
 import { TrendChart } from '../components/TrendChart';
 import { fetchDashboard, toStatCards, type StatData } from '../lib/dashboard';
@@ -52,9 +52,22 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
         </AsyncSection>
       </section>
 
+      {/* 분기 시계열 API 가 없어 이 두 차트만 큐레이션 값입니다. 화면에 그렇게 적습니다. */}
       <section className="grid grid-cols-2 gap-4">
-        <TrendChart title="공차율 추이" note={trendNotes.vacancy} data={wagonTrend} suffix="%" />
-        <TrendChart title="추가 수익 추이" note={trendNotes.revenue} data={revenueTrend} suffix="만원" />
+        <TrendChart
+          title="공차율 추이"
+          note={trendNotes.vacancy}
+          data={wagonTrend}
+          suffix="%"
+          demoApi="시계열 API"
+        />
+        <TrendChart
+          title="추가 수익 추이"
+          note={trendNotes.revenue}
+          data={revenueTrend}
+          suffix="만원"
+          demoApi="시계열 API"
+        />
       </section>
 
       <section className="grid grid-cols-[1fr_360px] items-start gap-4">
@@ -65,6 +78,7 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
               <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
                 최근 {perfHistory.length}분기
               </span>
+              <DemoDataBadge api="시계열 API" />
             </div>
             <span className="text-sm text-[#8B95A1]">공차 회송 노선 기준</span>
           </div>

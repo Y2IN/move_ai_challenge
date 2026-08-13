@@ -7,22 +7,12 @@ export const brand = {
   subheadline: '소량 화물을 모아 코레일 빈 화차에 매칭하고, 그 기록을 공시 가능한 자산으로 환전합니다.',
 };
 
-export const heroAmount = {
-  caption: '이번 분기 전환교통 보조금 예상액',
-  value: '3억 4,200만',
-  unit: '원',
-  krw: '₩342,000,000',
-  delta: '전 분기 대비 +38%',
-};
-
-export const heroChips = [
-  { label: '온실가스 감축', value: '1억 5,800만' },
-  { label: '대기오염 저감', value: '6,400만' },
-  { label: '교통사고 예방', value: '5,300만' },
-  { label: '도로혼잡 완화', value: '8억 6,500만' },
-];
-
-export const heroFootnote = '누적 합적 화주 128개사 · 채운 공차 1,043량 · 코레일 공차 노선 실시간 연동';
+/**
+ * 히어로 금액·편익 칩·누적 실적은 **#6(`/api/public/stats`)** 에서 옵니다.
+ * 여기 상수로 두면 홈 대시보드(#7)와 같은 집계를 쓰는데도 값이 갈라집니다.
+ * 화면은 `lib/landing.ts` 의 `usePublicStats()` 를 쓰세요.
+ */
+export const heroCaption = '이번 분기 전환교통 보조금 예상액';
 
 export const marketingNav = [
   { label: '서비스 소개', href: '#how' },
@@ -53,11 +43,6 @@ export const landingCta = {
   body: '첫 화물 등록부터 리포트 발행까지 5분이면 충분합니다.',
   button: '바로 시작하기',
 };
-
-export const landingStats = [
-  { label: '누적 합적 화주', value: '128개사' },
-  { label: '채운 공차', value: '1,043량' },
-];
 
 export const howSection = {
   badge: '서비스 소개',
