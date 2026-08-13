@@ -1,0 +1,609 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "baseDate": "2026-08-13",
+    "fictional": true,
+    "notes": [
+      "K-ESG 리포트(#40~#42)가 집계하는 '확정 수송 실적 원장'입니다. 시연용 가상 데이터입니다.",
+      "seed.json 은 '지금 매칭 대기 중인 화물'을, 이 파일은 '이미 수송이 끝난 과거 실적'을 담습니다. 역할이 다르므로 파일을 분리했습니다.",
+      "계수(배출원단위·사회적비용)는 여기 없습니다. BE/src/constants.ts 한 곳에만 둡니다.",
+      "실제 서비스에서는 코레일 배차 확정 이력 DB가 이 자리를 대체합니다."
+    ]
+  },
+  "trips": [
+    {
+      "id": "TRP-2026Q1-01",
+      "date": "2026-01-15",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-A17",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260115-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 582000.0
+        },
+        {
+          "lotId": "LOT-20260115-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.0,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 495000.0
+        },
+        {
+          "lotId": "LOT-20260115-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 3.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 420000.0
+        },
+        {
+          "lotId": "LOT-20260115-A02",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 3.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 291000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q1-02",
+      "date": "2026-02-05",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-C09",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260205-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 630000.0
+        },
+        {
+          "lotId": "LOT-20260205-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 544000.0
+        },
+        {
+          "lotId": "LOT-20260205-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 480000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q1-03",
+      "date": "2026-03-12",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-B04",
+      "wagonType": "open",
+      "wagonCapacityTon": 22.0,
+      "members": [
+        {
+          "lotId": "LOT-20260312-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 7.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 679000.0
+        },
+        {
+          "lotId": "LOT-20260312-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 6.0,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 594000.0
+        },
+        {
+          "lotId": "LOT-20260312-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 540000.0
+        },
+        {
+          "lotId": "LOT-20260312-B02",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 3.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 346000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-04",
+      "date": "2026-04-09",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-A17",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260409-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 582000.0
+        },
+        {
+          "lotId": "LOT-20260409-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 544000.0
+        },
+        {
+          "lotId": "LOT-20260409-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 480000.0
+        },
+        {
+          "lotId": "LOT-20260409-C02",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 2.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 240000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-05",
+      "date": "2026-04-23",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-C09",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260423-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 630000.0
+        },
+        {
+          "lotId": "LOT-20260423-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.0,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 495000.0
+        },
+        {
+          "lotId": "LOT-20260423-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 3.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 420000.0
+        },
+        {
+          "lotId": "LOT-20260423-A02",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 2.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 242000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-06",
+      "date": "2026-05-07",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-B04",
+      "wagonType": "open",
+      "wagonCapacityTon": 22.0,
+      "members": [
+        {
+          "lotId": "LOT-20260507-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 7.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 728000.0
+        },
+        {
+          "lotId": "LOT-20260507-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 6.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 644000.0
+        },
+        {
+          "lotId": "LOT-20260507-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 480000.0
+        },
+        {
+          "lotId": "LOT-20260507-B02",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 3.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 346000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-07",
+      "date": "2026-05-21",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-A17",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260521-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 582000.0
+        },
+        {
+          "lotId": "LOT-20260521-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 544000.0
+        },
+        {
+          "lotId": "LOT-20260521-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 540000.0
+        },
+        {
+          "lotId": "LOT-20260521-A02",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 1.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 146000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-08",
+      "date": "2026-06-04",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-C09",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260604-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 630000.0
+        },
+        {
+          "lotId": "LOT-20260604-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 6.0,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 594000.0
+        },
+        {
+          "lotId": "LOT-20260604-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 480000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q2-09",
+      "date": "2026-06-18",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-B04",
+      "wagonType": "open",
+      "wagonCapacityTon": 22.0,
+      "members": [
+        {
+          "lotId": "LOT-20260618-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 7.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 679000.0
+        },
+        {
+          "lotId": "LOT-20260618-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 6.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 644000.0
+        },
+        {
+          "lotId": "LOT-20260618-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 5.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 600000.0
+        },
+        {
+          "lotId": "LOT-20260618-C02",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 3.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 360000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q3-10",
+      "date": "2026-07-09",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-A17",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260709-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 630000.0
+        },
+        {
+          "lotId": "LOT-20260709-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 544000.0
+        },
+        {
+          "lotId": "LOT-20260709-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.0,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 480000.0
+        },
+        {
+          "lotId": "LOT-20260709-B02",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 1.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 148000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q3-11",
+      "date": "2026-07-23",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-C09",
+      "wagonType": "covered",
+      "wagonCapacityTon": 18.0,
+      "members": [
+        {
+          "lotId": "LOT-20260723-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 6.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 582000.0
+        },
+        {
+          "lotId": "LOT-20260723-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 5.5,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 544000.0
+        },
+        {
+          "lotId": "LOT-20260723-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 540000.0
+        }
+      ]
+    },
+    {
+      "id": "TRP-2026Q3-12",
+      "date": "2026-08-06",
+      "laneId": "LANE-ULS-OBONG",
+      "originStationId": "ULS-FRT",
+      "destStationId": "OBONG",
+      "wagonId": "WGN-B04",
+      "wagonType": "open",
+      "wagonCapacityTon": 22.0,
+      "members": [
+        {
+          "lotId": "LOT-20260806-A01",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 7.5,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 728000.0
+        },
+        {
+          "lotId": "LOT-20260806-B01",
+          "shipperId": "SHP-B",
+          "shipperName": "한결소재",
+          "category": "석유화학제품",
+          "weightTon": 6.0,
+          "shuttleKm": 66.4,
+          "roadDirectDistanceKm": 370.0,
+          "currentRoadFareKrw": 594000.0
+        },
+        {
+          "lotId": "LOT-20260806-C01",
+          "shipperId": "SHP-C",
+          "shipperName": "가온밸브",
+          "category": "철강재",
+          "weightTon": 4.5,
+          "shuttleKm": 50.8,
+          "roadDirectDistanceKm": 372.0,
+          "currentRoadFareKrw": 540000.0
+        },
+        {
+          "lotId": "LOT-20260806-A02",
+          "shipperId": "SHP-A",
+          "shipperName": "누리정공",
+          "category": "기타",
+          "weightTon": 3.0,
+          "shuttleKm": 19.4,
+          "roadDirectDistanceKm": 385.0,
+          "currentRoadFareKrw": 291000.0
+        }
+      ]
+    }
+  ]
+}
