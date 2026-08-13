@@ -13,9 +13,13 @@ export function LoginScreen({ onLogin, onDemo, onSignup }: LoginScreenProps) {
   const [role, setRole] = useState<Role>('corp');
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12 font-['Pretendard',system-ui,sans-serif] antialiased">
+    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
       <AuthCard>
         <div className="flex flex-col justify-center gap-[22px] px-16 py-14">
+          <div className="rounded-xl bg-[#F5F9FF] px-4 py-3.5 text-[15px] leading-[1.55] text-[#1B64DA]">
+            계정 없이 <b className="font-bold">데모 계정으로 둘러보기</b>로 바로 확인하실 수 있습니다.
+          </div>
+
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">로그인</h1>
             <p className="text-base text-[#8B95A1]">역할에 따라 보이는 화면이 달라집니다</p>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
+import { getRole, setRole } from '../lib/role';
 import { MatchRow, MatchRowHeader } from '../components/MatchRow';
 import { AnalogyCard, StatCard } from '../components/StatCard';
 import {
@@ -9,6 +10,10 @@ import {
   corpRows,
   corpStats,
   freightSaving,
+  homeCopy,
+  korailHero,
+  korailPotential,
+  korailReportCard,
   korailRows,
   korailStats,
   lastReport,
@@ -32,13 +37,17 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const [persona, setPersona] = useState<Persona>('corp');
   const [openRow, setOpenRow] = useState<string | null>(null);
 
+  // 로그인 시 고른 역할로 초기 뷰를 맞춘다
+  useEffect(() => setPersona(getRole()), []);
+
   const rows = persona === 'corp' ? corpRows : korailRows;
   const stats = persona === 'corp' ? corpStats : korailStats;
+  const copy = homeCopy[persona];
 
   const toggleRow = (id: string) => setOpenRow((cur) => (cur === id ? null : id));
 
   return (
-    <AppLayout active="home">
+    <AppLayout active="home" role={persona}>
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">
@@ -48,13 +57,16 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => onNavigate?.('/freight/new')}
-            className="h-11 rounded-xl bg-[#3182F6] px-[18px] text-[15px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
-          >
-            화물 등록
-          </button>
+          {/* 코레일은 leftbar에 공차 관리가 있어 헤더 버튼 중복 → 기업(화물 등록)만 노출 */}
+          {persona === 'corp' && (
+            <button
+              type="button"
+              onClick={() => onNavigate?.(copy.primaryBtn.to)}
+              className="h-11 rounded-xl bg-[#3182F6] px-[18px] text-[15px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+            >
+              {copy.primaryBtn.label}
+            </button>
+          )}
 
           <div className="flex gap-1 rounded-xl bg-[#EDEEF0] p-1">
             {PERSONAS.map((p) => {
@@ -65,6 +77,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                   type="button"
                   onClick={() => {
                     setPersona(p.key);
+                    setRole(p.key); // leftbar가 이후 페이지에서도 같은 역할을 따르도록
                     setOpenRow(null);
                   }}
                   className={[
@@ -82,56 +95,104 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
       <section className="grid grid-cols-[460px_1fr] gap-4">
         <div className="flex flex-col gap-4">
-          <div className="rounded-[20px] bg-white p-7">
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-semibold text-[#6B7684]">
-                이번 분기 전환교통 보조금 예상액
-              </span>
-              <span className="rounded-lg bg-[#E8F3FF] px-2.5 py-[5px] text-[13px] font-bold text-[#1B64DA]">
-                산정 완료
-              </span>
-            </div>
-
-            <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
-              {subsidyAmount}
-            </div>
-            <div className="mt-1.5 text-[15px] text-[#8B95A1]">
-              {subsidyAmountKrw} · 사회환경적 편익의 30% 상한
-            </div>
-
-            <div className="mt-[22px] flex flex-col gap-0.5">
-              {breakdown.map((b) => (
-                <div key={b.label} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
-                  <span className="text-[15px] text-[#4E5968]">{b.label}</span>
-                  <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
-                    {b.value}
+          {persona === 'corp' ? (
+            <>
+              <div className="rounded-[20px] bg-white p-7">
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-semibold text-[#6B7684]">
+                    이번 분기 전환교통 보조금 예상액
+                  </span>
+                  <span className="rounded-lg bg-[#E8F3FF] px-2.5 py-[5px] text-[13px] font-bold text-[#1B64DA]">
+                    산정 완료
                   </span>
                 </div>
-              ))}
 
-              <div className="mt-1.5 flex items-center justify-between border-t-2 border-[#191F28] pb-3 pt-3.5">
-                <span className="text-[15px] font-bold text-[#191F28]">사회환경적 편익 계</span>
-                <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#191F28]">
-                  {benefitTotal}
-                </span>
+                <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
+                  {subsidyAmount}
+                </div>
+                <div className="mt-1.5 text-[15px] text-[#8B95A1]">
+                  {subsidyAmountKrw} · 사회환경적 편익의 30% 상한
+                </div>
+
+                <div className="mt-[22px] flex flex-col gap-0.5">
+                  {breakdown.map((b) => (
+                    <div key={b.label} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
+                      <span className="text-[15px] text-[#4E5968]">{b.label}</span>
+                      <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
+                        {b.value}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="mt-1.5 flex items-center justify-between border-t-2 border-[#191F28] pb-3 pt-3.5">
+                    <span className="text-[15px] font-bold text-[#191F28]">사회환경적 편익 계</span>
+                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#191F28]">
+                      {benefitTotal}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
+                    <span className="text-[15px] font-bold text-[#1B64DA]">× 30% (고시 상한)</span>
+                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
+                      3억 4,200만
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
-                <span className="text-[15px] font-bold text-[#1B64DA]">× 30% (고시 상한)</span>
-                <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
-                  3억 4,200만
+              <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[15px] font-semibold text-[#6B7684]">운송비 절감 (보조금과 별개)</span>
+                  <span className="text-[13px] text-[#B0B8C1]">합적 단가 18% 인하분</span>
+                </div>
+                <span className="text-2xl font-extrabold tracking-[-0.03em] text-[#191F28]">{freightSaving}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-[20px] bg-white p-7">
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-semibold text-[#6B7684]">{korailHero.label}</span>
+                  <span className="rounded-lg bg-[#EAF8F1] px-2.5 py-[5px] text-[13px] font-bold text-[#12A87A]">
+                    {korailHero.badge}
+                  </span>
+                </div>
+
+                <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
+                  {korailHero.value}
+                </div>
+                <div className="mt-1.5 text-[15px] text-[#8B95A1]">{korailHero.sub}</div>
+
+                <div className="mt-[22px] flex flex-col gap-0.5">
+                  {korailHero.drivers.map((d) => (
+                    <div key={d.label} className="flex items-center justify-between border-t border-[#F2F4F6] py-[11px]">
+                      <span className="text-[15px] text-[#4E5968]">{d.label}</span>
+                      <span className="text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
+                        {d.value}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="mt-1.5 flex items-center justify-between rounded-xl bg-[#F5F9FF] px-4 py-3.5">
+                    <span className="text-[15px] font-bold text-[#1B64DA]">{korailHero.revenueLabel}</span>
+                    <span className="text-lg font-extrabold tabular-nums tracking-[-0.03em] text-[#1B64DA]">
+                      {korailHero.revenue}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[15px] font-semibold text-[#6B7684]">{korailPotential.label}</span>
+                  <span className="text-[13px] text-[#B0B8C1]">{korailPotential.note}</span>
+                </div>
+                <span className="text-2xl font-extrabold tracking-[-0.03em] text-[#191F28]">
+                  {korailPotential.value}
                 </span>
               </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
-            <div className="flex flex-col gap-1">
-              <span className="text-[15px] font-semibold text-[#6B7684]">운송비 절감 (보조금과 별개)</span>
-              <span className="text-[13px] text-[#B0B8C1]">합적 단가 18% 인하분</span>
-            </div>
-            <span className="text-2xl font-extrabold tracking-[-0.03em] text-[#191F28]">{freightSaving}</span>
-          </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -152,7 +213,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
           <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-2.5">
-              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">AI 합적 매칭 현황</span>
+              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{copy.matchTitle}</span>
               <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
                 {rows.length}건
               </span>
@@ -174,17 +235,33 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
 
         <div className="flex flex-col gap-3.5 rounded-[20px] bg-white p-[26px]">
-          <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">K-ESG 공시 리포트</span>
-          <span className="text-[15px] leading-relaxed text-[#6B7684]">
-            이번 분기 지표로 전환교통 보조금 신청서와 K-ESG 지표표를 만듭니다.
-          </span>
-          <button
-            type="button"
-            onClick={() => onNavigate?.('/subsidy/new')}
-            className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
-          >
-            신청서 만들기
-          </button>
+          {persona === 'corp' ? (
+            <>
+              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">K-ESG 공시 리포트</span>
+              <span className="text-[15px] leading-relaxed text-[#6B7684]">
+                이번 분기 지표로 전환교통 보조금 신청서와 K-ESG 지표표를 만듭니다.
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('/subsidy/new')}
+                className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
+              >
+                신청서 만들기
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{korailReportCard.title}</span>
+              <span className="text-[15px] leading-relaxed text-[#6B7684]">{korailReportCard.body}</span>
+              <button
+                type="button"
+                onClick={() => onNavigate?.(korailReportCard.to)}
+                className="h-[52px] rounded-[14px] bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
+              >
+                {korailReportCard.button}
+              </button>
+            </>
+          )}
           <div className="mt-1 border-t border-[#F2F4F6] pt-4 text-sm leading-relaxed text-[#8B95A1]">
             최근 발행 · {lastReport.title}
             <br />

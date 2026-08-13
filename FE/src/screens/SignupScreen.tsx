@@ -13,8 +13,13 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
   const org = orgField[role];
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12 font-['Pretendard',system-ui,sans-serif] antialiased">
-      <div className="flex h-[720px] w-[620px] flex-col gap-[22px] overflow-auto rounded-[20px] bg-white px-12 pb-10 pt-12 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
+      {/* 높이 고정 없이 내용만큼 — 카드 안에서 스크롤되지 않게 */}
+      <div className="flex w-[620px] flex-col gap-[22px] rounded-[20px] bg-white px-12 pb-10 pt-12 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+        <div className="rounded-xl bg-[#FFFBF2] px-4 py-3.5 text-[15px] font-semibold text-[#B45309]">
+          데모 버전에서는 회원가입이 불가합니다.
+        </div>
+
         <div className="flex flex-col gap-2">
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">회원가입</h1>
           <p className="text-base text-[#8B95A1]">먼저 역할을 선택해 주세요</p>
@@ -65,7 +70,7 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
         <button
           type="button"
           onClick={() => onSubmit?.(role)}
-          className="mt-auto h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+          className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
         >
           {signupCta[role]}
         </button>
