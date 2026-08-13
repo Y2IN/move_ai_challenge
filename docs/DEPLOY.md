@@ -70,7 +70,7 @@ git push -u origin feat/matching-engine
 
 ### `vercel.json`
 - `regions: ["icn1"]` — 서울 리전. 심사장에서 접속하므로 지연시간을 줄인다.
-- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Claude 리포트 생성은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다.
+- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Claude 호출(조율안 탐색·리포트 생성)은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다. 특히 `/api/negotiate` 는 화주 수만큼 메시지를 생성하므로 가장 오래 걸린다.
 
 ### `.github/workflows/ci.yml`
 - push(main) / PR 마다 `typecheck` + `build` 실행
