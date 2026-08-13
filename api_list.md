@@ -25,16 +25,16 @@
 화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
 각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
 
-- **✅ 완료 (28):**
+- **✅ 완료 (29):**
   - 랜딩·대시보드: #6 #7 #8 #9
   - 화물등록: #10 파싱(데모) · #11 #12 #13 #14 #15
   - 매칭: #16 #18 #19
-  - 조율: #22 run · #25 조회 · #26 취소
+  - 조율: #22 run · #23 stream(SSE) · #25 조회 · #26 취소
   - 편익: #28 summary
   - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
   - ESG: #40 #41 #42
 - **🟡 부분 (4):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재) · #27 benefits/calculate(calc 엔진 O·라우트 X) · #29 coefficients(constants O·라우트 X)
-- **❌ 미구현 (7):** #21 classify · #23 조율SSE · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
+- **❌ 미구현 (6):** #21 classify · #30 preflight · #36 문단재생성 · #43 코레일승인 · master 2종
 - **🔶 데모(LLM 후속):** #10 파싱 — 케이스 반환, Claude 붙이면 교체
 - **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
 - **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
@@ -182,7 +182,7 @@
 |---|---|---|---|---|---|
 | 21 | ❌ | POST | `/api/negotiation/classify` | 화주 자연어 제약 → **절대조건 / 조정가능** 분류 | ✅ |
 | 22 | ✅ | POST | `/api/negotiation/run` | 조율 에이전트 실행 (`negotiate.ts` — 양보 조합 탐색 + 제안 생성). NEG-NNN id 발급 | ✅ |
-| 23 | ❌ | GET | `/api/negotiation/{id}/stream` | **SSE.** 적재율 41→75→94% 진행 | ✅ |
+| 23 | ✅ | GET | `/api/negotiation/{id}/stream` | **SSE.** 적재율 진행 | 저장된 NEG 세션 결과를 단계 재생(LLM·재계산 없음) |
 | 24 | 🟡 | POST | `/api/negotiation/{id}/proposals/{pid}/reply` | 화주 회신 입력 → 재제안 | ✅ · `negotiation/accept`(수락 재매칭)는 있음, reply 형태는 미구현 |
 | 25 | ✅ | GET | `/api/negotiation/{id}` | 최종 편성 결과 | run(#22)이 발급한 NEG-NNN 세션 조회 (인메모리) |
 | 26 | ✅ | POST | `/api/negotiation/{id}/cancel` | "다음 공차 일정 대기" | 세션 cancelled + 다음 공차 안내 |
