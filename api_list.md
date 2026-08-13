@@ -42,7 +42,7 @@
 | 1 | POST | `/api/auth/signup` | 회원가입 | `role`, `email`, `password`, `orgName`, `termsAgreed`. role이 korail이면 orgName은 "소속 본부·지사" |
 | 2 | POST | `/api/auth/login` | 로그인 | → `{ accessToken, user, role, org }` |
 | 3 | POST | `/api/auth/demo` | 데모 계정 입장 | **해커톤 시연 필수.** role만 받아 즉시 세션 발급. 02b 화면 "역할만 고르면 바로 입장" |
-| 4 | GET | `/api/me` | 세션 확인 | 사이드바 "대성물산 · 김철도" 렌더 |
+| 4 | GET | `/api/me` | 세션 확인 | 사이드바 "embark · 최현지" 렌더 |
 | 5 | POST | `/api/auth/logout` | 로그아웃 | |
 
 ---
@@ -267,7 +267,7 @@ event: done        data: { "finalLoadRate": 0.94, "groupId": "..." }
   "meta": { "period": "2026-04-01~2026-06-30", "createdAt": "2026-08-12T14:32:00+09:00",
             "paragraphCount": 6, "form": "별지 제3호" },
   "sections": {
-    "applicant":  { "type": "computed", "bizNo": "220-81-04512", "ceo": "이대성", ... },
+    "applicant":  { "type": "computed", "bizNo": "111-11-11111", "ceo": "제예인", ... },
     "plan":       { "type": "computed", "rows": [
                       { "route": "울산 → 의왕ICD", "item": "석유화학제품",
                         "tons": 1860, "trips": 5, "wagonType": "컨테이너" }, ...],

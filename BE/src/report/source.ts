@@ -18,12 +18,12 @@ import { fixtureReportInput } from "./fixture";
 
 /** 시연용 신청인. 계정 기능이 붙으면 세션에서 가져온다. */
 export const DEMO_APPLICANT: Applicant = {
-  name: "대성물산 주식회사",
-  bizNo: "220-81-04512",
-  ceo: "이대성",
-  manager: "김철도",
+  name: "embark 주식회사",
+  bizNo: "111-11-11111",
+  ceo: "제예인",
+  manager: "최현지",
   phone: "02-6000-1234",
-  address: "울산광역시 남구 여천로 217",
+  address: "서울특별시 oorn oo동",
 };
 
 export const DEMO_PERIOD: ReportPeriod = {

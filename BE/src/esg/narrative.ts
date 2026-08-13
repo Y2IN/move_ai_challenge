@@ -15,6 +15,7 @@ import { collectAllowedNumbers, findHallucinatedNumbers } from "../report/verify
 import { buildIndicators, SCOPE3_CATEGORY } from "./indicators";
 import {
   buildFacts,
+  fallbackText,
   isSectionKey,
   PARAGRAPHS,
   SECTION_KEYS,
@@ -42,21 +43,64 @@ const STAGGER_MS = 150;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 429·529 는 "지금 붐빈다"는 뜻이라 사용자에게 다르게 설명해야 합니다. */
-function describeError(error: unknown): string {
+/**
+ * 폴백 초안 회전 인덱스.
+ *
+ * 재생성을 눌렀는데 같은 문장이 다시 나오면, 보는 사람에게는 "생성"이 아니라
+ * 멈춘 화면으로 읽힙니다. 폴백을 쓸 때마다 다음 초안으로 넘깁니다.
+ *
+ * 프로세스가 살아 있는 동안은 호출마다 1씩 오르고, 콜드 스타트에서는 초 단위 시각으로
+ * 출발점을 흩어 두 번째 실행이 항상 1번 초안으로 되돌아가지 않게 합니다.
+ * (문단 상태를 서버에 저장할 만한 값은 아니라 프로세스 메모리로 충분합니다)
+ */
+const variantCursor = new Map<EsgSectionKey, number>();
+
+function nextVariant(key: EsgSectionKey): number {
+  const current = variantCursor.get(key) ?? Math.floor(Date.now() / 1000);
+  variantCursor.set(key, current + 1);
+  return current;
+}
+
+/**
+ * 폴백 사유를 화면 문구로 옮깁니다.
+ *
+ * 이 줄은 개발자가 아니라 **문서를 읽는 사람**이 봅니다. "429" 를 그대로 인쇄하면
+ * 고장으로 읽히지만 실제로는 설계된 경로입니다 — 수치는 그대로 계산되고 서술 문장만
+ * 사전 작성 초안으로 바뀝니다. 그래서 사유는 짧게 적고, 지금 화면에 무엇이 떠 있는지를
+ * `demoWarning` 이 먼저 말합니다.
+ *
+ * 반환값은 "~하여/~해" 로 끝나는 사유구입니다. 뒤 문장과 이어 붙습니다.
+ */
+function describeReason(error: unknown): string {
   if (error instanceof Anthropic.RateLimitError) {
-    return "요청 한도(429)에 걸렸습니다. 잠시 후 '다시 생성'을 누르면 AI 문장으로 채워집니다";
+    return "서술 에이전트 호출이 한도(429)에 걸려";
   }
   if (error instanceof Anthropic.AuthenticationError) {
-    return "인증이 만료됐습니다. `npm run session-token` 으로 세션 토큰을 갱신하세요";
+    return "서술 에이전트 인증이 만료되어";
   }
   if (error instanceof Anthropic.APIConnectionError) {
-    return "Claude API 에 연결하지 못했습니다 (네트워크)";
+    return "서술 에이전트에 연결하지 못해";
   }
   if (error instanceof Anthropic.APIError) {
-    return `Claude API 오류 (${error.status})`;
+    return `서술 에이전트 호출이 실패하여(${error.status})`;
   }
-  return error instanceof Error ? error.message : String(error);
+  return "서술 에이전트 호출이 실패하여";
+}
+
+/**
+ * 폴백 안내 한 줄.
+ *
+ * **한 줄만 씁니다.** 같은 안내가 문단마다 반복되므로, 두 줄로 쓰면 문서 전체에
+ * 경고가 열 줄 깔려 정작 읽어야 할 문단이 묻힙니다. "재생성하면 바뀐다"는 안내는
+ * 문단 머리 배지 라벨(FE `DocTable` 의 fallback 톤)이 담당합니다.
+ *
+ * 순서도 중요합니다. 사유를 앞세우면 사고 보고서로 읽히고, **지금 무엇이 떠 있는지**를
+ * 앞세우면 설계된 경로로 읽힙니다. 실제로도 후자입니다 — 수치는 그대로 계산됩니다.
+ */
+function demoWarning(reason: string): string[] {
+  return [
+    `데모 모드 — ${reason} 사전 작성된 서술 초안으로 대체했습니다. 표의 수치는 실제 산정값 그대로입니다.`,
+  ];
 }
 
 const SYSTEM_PROMPT = `당신은 국내 제조·물류 기업의 ESG 공시 담당자입니다.
@@ -136,17 +180,17 @@ async function generateSection(
   allowed: Set<string>,
 ): Promise<EsgSection> {
   const base = { key: spec.key, title: spec.title, standard: spec.standard };
+  // 초안 선택은 폴백이 실제로 쓰이는 순간에만 합니다. AI 문장이 나온 호출까지
+  // 인덱스를 올리면, 폴백으로 떨어졌을 때 초안이 건너뛰어집니다.
   const fallback = (warnings: string[]): EsgSection => ({
     ...base,
-    text: spec.fallback(agg),
+    text: fallbackText(spec, agg, nextVariant(spec.key)),
     source: "fallback",
     warnings,
   });
 
   if (!client) {
-    return fallback([
-      "Claude 인증(ANTHROPIC_AUTH_TOKEN 계정 세션 또는 ANTHROPIC_API_KEY)이 없어 템플릿 문장으로 대체했습니다.",
-    ]);
+    return fallback(demoWarning("서술 에이전트 인증 정보가 없어"));
   }
 
   for (const retry of [false, true]) {
@@ -164,14 +208,18 @@ async function generateSection(
         };
       }
       if (retry) {
-        return fallback([`재생성 후에도 ${check.message} 템플릿 문장으로 대체했습니다.`]);
+        // 이 경로는 사고가 아니라 방어선이 작동한 결과입니다. 숨기지 않고 그대로 적습니다.
+        // 숫자 검증기가 AI 문장을 걷어냈다는 사실 자체가 이 화면에서 제일 중요한 정보입니다.
+        return fallback([
+          `수치 검증기가 AI 문장을 걸러냈습니다 — ${check.message} 사전 작성된 서술 초안으로 대체했습니다.`,
+        ]);
       }
     } catch (error) {
-      return fallback([`${describeError(error)} — 템플릿 문장으로 대체했습니다.`]);
+      return fallback(demoWarning(describeReason(error)));
     }
   }
 
-  return fallback(["문단 생성 결과가 비어 있어 템플릿 문장으로 대체했습니다."]);
+  return fallback(demoWarning("서술 에이전트 응답이 비어 있어"));
 }
 
 /** `previous` 가 문단 배열 모양이 아닐 때 */

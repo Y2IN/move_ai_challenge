@@ -3,7 +3,7 @@ import { AppLayout } from '../components/AppLayout';
 import { MatchRow, MatchRowHeader } from '../components/MatchRow';
 import { AnalogyCard, StatCard } from '../components/StatCard';
 import {
-  account,
+  accounts,
   benefitTotal,
   breakdown,
   corpRows,
@@ -34,11 +34,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   const rows = persona === 'corp' ? corpRows : korailRows;
   const stats = persona === 'corp' ? corpStats : korailStats;
+  const account = accounts[persona];
 
   const toggleRow = (id: string) => setOpenRow((cur) => (cur === id ? null : id));
 
   return (
-    <AppLayout active="home">
+    <AppLayout active="home" account={account}>
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">

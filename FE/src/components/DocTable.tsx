@@ -104,7 +104,7 @@ export function DocLegend({ note }: { note: string }) {
  * 문단 출처별 톤. BE EsgSection.source 와 1:1 입니다.
  *
  *   ai        Claude 생성 + 숫자 검증 통과 (파랑)
- *   fallback  템플릿 문장 — 인증 없음·호출 실패·검증 실패 (회색)
+ *   fallback  사전 작성 서술 초안 — 인증 없음·호출 실패·검증 실패 (회색)
  *   user      서버가 생성을 보증하지 않는 문단 — 재생성 시 유지분 등 (호박색)
  */
 export type ParagraphTone = 'ai' | 'fallback' | 'user';
@@ -119,15 +119,22 @@ const TONE_STYLE: Record<
     chip: 'bg-[#D6E7FF]',
     text: 'text-[#1B64DA]',
     badge: 'AI',
-    label: 'AI 서술 · 편집 가능',
+    label: 'AI 에이전트 서술 · 숫자 검증 통과 · 편집 가능',
   },
   fallback: {
     border: 'border-[#8B95A1]',
     bg: 'bg-[#F9FAFB]',
     chip: 'bg-[#E5E8EB]',
     text: 'text-[#4E5968]',
-    badge: '템플릿',
-    label: '템플릿 문장 · 재생성하면 AI 서술로 대체됩니다',
+    // 배지가 "템플릿" 이면 미완성으로 읽힙니다. 실제로는 수치가 살아 있는 정식 문단이고
+    // 서술만 사전 작성분입니다. 배지에서 그 사실이 먼저 보여야 합니다.
+    //
+    // 라벨은 **이 블록이 원래 무엇인지**부터 말합니다 — AI 에이전트가 산정 수치를 읽고
+    // 공시 문체로 쓰는 자리입니다. 그 역할을 안 적으면 폴백 문단이 그냥 하드코딩된
+    // 문장으로 보이고, 에이전트가 하는 일이 화면에서 사라집니다.
+    // "재생성하면 바뀐다"도 여기 둡니다. BE 경고 줄에 같이 쓰면 문단마다 반복됩니다.
+    badge: '데모',
+    label: 'AI 에이전트 서술 영역 · 현재는 사전 작성 초안 · ↻ 재생성하면 바뀝니다',
   },
   user: {
     border: 'border-[#F2B33D]',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchEsgIndicators,
   generateEsgReport,
@@ -11,13 +11,26 @@ import {
   type EsgSectionKey,
   type Scope3Format,
 } from "@/src/lib/esg";
+import {
+  applicationExportUrl,
+  createApplication,
+  fetchApplication,
+  fetchLatestApplication,
+  regenerateAll,
+  regenerateParagraph,
+  type ApplicationPayload,
+  type ParagraphKey,
+  type SubsidyExportFormat,
+} from "@/src/lib/subsidy";
+import { toApplyDocView } from "@/src/lib/subsidy-view";
 import { ApplyDoneScreen } from "@/src/screens/ApplyDoneScreen";
 
 /**
  * 06c 컨테이너.
  *
+ * - 사업계획서 탭: 초안이 이미 있으면 #34→#33 으로 재사용하고, 없을 때만 #31 로
+ *   새로 만듭니다. #31 은 문단 6개를 LLM 으로 쓰기 때문에 재진입마다 부르면 안 됩니다.
  * - K-ESG 탭: #40(지표표)은 즉시, #41(문단)은 LLM 호출이라 뒤늦게 채워집니다.
- * - 사업계획서 탭(#31~#39)은 아직 목데이터입니다 — 리포트 모듈 연동 전.
  */
 export default function SubsidyDone() {
   const [indicators, setIndicators] = useState<EsgIndicatorsResponse | null>(null);
@@ -25,6 +38,92 @@ export default function SubsidyDone() {
   const [report, setReport] = useState<EsgReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [busyKeys, setBusyKeys] = useState<EsgSectionKey[]>([]);
+
+  // ── 사업계획서 탭 (#31·#33~#36·#39) ──────────────────────────
+  const [application, setApplication] = useState<ApplicationPayload | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [docBusyKeys, setDocBusyKeys] = useState<ParagraphKey[]>([]);
+  const [docRegenerating, setDocRegenerating] = useState(false);
+  const [keptUserEdits, setKeptUserEdits] = useState<ParagraphKey[]>([]);
+  const applicationId = application?.applicationId ?? null;
+
+  /**
+   * 초안이 있으면 그대로 가져오고(#34→#33), 없을 때만 새로 만듭니다(#31).
+   * 조회는 LLM 을 타지 않으므로 재진입이 싸집니다.
+   */
+  const loadDoc = useCallback(() => {
+    setApplication(null);
+    setDocError(null);
+    setKeptUserEdits([]);
+    fetchLatestApplication()
+      .then((latest) =>
+        latest.exists && latest.applicationId
+          ? fetchApplication(latest.applicationId)
+          : createApplication(),
+      )
+      .then(setApplication)
+      .catch((error: Error) => setDocError(error.message));
+  }, []);
+
+  /** #36 문단 하나만 재생성(↻). 응답 문단만 갈아 끼웁니다. */
+  const regenerateDocParagraph = useCallback(
+    (key: ParagraphKey) => {
+      if (!applicationId) return;
+      setDocBusyKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+      setDocError(null);
+
+      regenerateParagraph(applicationId, key)
+        .then((res) => {
+          setApplication((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  document: {
+                    ...prev.document,
+                    paragraphs: { ...prev.document.paragraphs, [key]: res.paragraph },
+                  },
+                }
+              : prev,
+          );
+        })
+        // 실패해도 기존 문서는 그대로 둡니다 — 배너로만 알립니다.
+        .catch((error: Error) => setDocError(`문단 재생성 실패 — ${error.message}`))
+        .finally(() => setDocBusyKeys((prev) => prev.filter((k) => k !== key)));
+    },
+    [applicationId],
+  );
+
+  /** #35 전체 재생성. 사용자가 편집한 문단은 서버가 보존하고 목록으로 알려줍니다. */
+  const regenerateAllDoc = useCallback(() => {
+    if (!applicationId) return;
+    setDocRegenerating(true);
+    setDocError(null);
+
+    regenerateAll(applicationId)
+      .then((res) => {
+        setApplication((prev) =>
+          prev ? { ...prev, document: res.document, diagnostics: res.diagnostics } : prev,
+        );
+        setKeptUserEdits(res.keptUserEdits);
+      })
+      .catch((error: Error) => setDocError(`전체 재생성 실패 — ${error.message}`))
+      .finally(() => setDocRegenerating(false));
+  }, [applicationId]);
+
+  /** #39 내보내기. 인쇄용 HTML 이라 새 탭에서 인쇄 대화상자가 뜹니다. */
+  const exportDoc = useCallback(
+    (format: SubsidyExportFormat) => {
+      if (!applicationId) return;
+      window.open(applicationExportUrl(applicationId, format), "_blank");
+    },
+    [applicationId],
+  );
+
+  // 숫자를 서식 표기로 옮기는 건 순수 변환이라 문서가 바뀔 때만 다시 합니다.
+  const docView = useMemo(
+    () => (application ? toApplyDocView(application.document) : null),
+    [application],
+  );
 
   const loadIndicators = useCallback(() => {
     setIndicators(null);
@@ -49,9 +148,10 @@ export default function SubsidyDone() {
     // 그대로 두면 문단 10개 값을 지불합니다.
     if (started.current) return;
     started.current = true;
+    loadDoc();
     loadIndicators();
     generateAll();
-  }, [loadIndicators, generateAll]);
+  }, [loadDoc, loadIndicators, generateAll]);
 
   /**
    * 문단 하나만 재생성(↻). 응답에는 요청한 문단만 담겨 오므로 그 문단만 바꿔 끼웁니다.
@@ -128,6 +228,20 @@ export default function SubsidyDone() {
 
   return (
     <ApplyDoneScreen
+      doc={{
+        applicationId,
+        doc: docView,
+        error: docError,
+        busyKeys: docBusyKeys,
+        regenerating: docRegenerating,
+        inputOrigin: application?.inputOrigin ?? null,
+        inputNote: application?.inputNote ?? null,
+        keptUserEdits,
+      }}
+      onRegenerateParagraph={regenerateDocParagraph}
+      onRegenerateAllDoc={regenerateAllDoc}
+      onRetryDoc={loadDoc}
+      onExportDoc={exportDoc}
       esg={{ indicators, indicatorsError, report, reportError, busyKeys }}
       onRegenerateSection={regenerateSection}
       onRegenerateAllEsg={generateAll}

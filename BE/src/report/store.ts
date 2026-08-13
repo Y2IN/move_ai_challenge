@@ -43,12 +43,35 @@ export interface Revision {
   source: Paragraph["source"];
 }
 
-const store = new Map<string, StoredApplication>();
-let seq = 0;
+/**
+ * ⚠️ 모듈 최상위에 `new Map()` 을 두면 안 된다.
+ *
+ * Next 는 라우트 핸들러마다 서버 번들을 따로 만든다. 그러면 이 모듈도 번들마다
+ * 한 벌씩 생겨서 `POST /applications` 가 저장한 Map 과 `GET /applications/{id}` 가
+ * 읽는 Map 이 **서로 다른 객체**가 된다. 방금 만든 초안이 곧바로 404 로 나온다.
+ *
+ * globalThis 에 한 번만 매달아 번들이 몇 벌이든 같은 저장소를 보게 한다.
+ * (콜드 스타트마다 비워지는 건 그대로다 — 영속이 필요하면 이 파일만 교체한다)
+ */
+interface ReportStoreState {
+  apps: Map<string, StoredApplication>;
+  seq: number;
+}
+
+const globalRef = globalThis as typeof globalThis & {
+  __railhubReportStore?: ReportStoreState;
+};
+
+const state: ReportStoreState = (globalRef.__railhubReportStore ??= {
+  apps: new Map(),
+  seq: 0,
+});
+
+const store = state.apps;
 
 export function nextApplicationId(): string {
-  seq += 1;
-  return `APP-${String(seq).padStart(4, "0")}`;
+  state.seq += 1;
+  return `APP-${String(state.seq).padStart(4, "0")}`;
 }
 
 export function save(app: StoredApplication): StoredApplication {
@@ -97,5 +120,5 @@ export function replaceParagraph(
 /** 테스트·시연 리셋용 */
 export function clear(): void {
   store.clear();
-  seq = 0;
+  state.seq = 0;
 }

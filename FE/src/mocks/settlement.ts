@@ -148,7 +148,7 @@ export const docChecklist: DocCheckItem[] = [
   { name: '운송 실적 증빙', status: '8건', ok: true, file: { name: '실적내역_2026-2차.xlsx', date: '08.10' } },
   { name: '세금계산서', status: '완료', ok: true, file: { name: '세금계산서_2026-2차.pdf', date: '07.02' } },
   { name: '운송장 사본', status: '1건 누락', ok: false }, // 파일 없음 → 인라인 업로드
-  { name: '사업자등록증 사본', status: '완료', ok: true, file: { name: '사업자등록증_대성물산.pdf', date: '04.01' } },
+  { name: '사업자등록증 사본', status: '완료', ok: true, file: { name: '사업자등록증_embark.pdf', date: '04.01' } },
 ];
 
 export const reportBlockedNote = '운송장 사본 1건을 업로드해주세요';
