@@ -125,8 +125,9 @@ export function AppLayout({
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#3182F6] text-[13px] font-bold text-white">
               {account.initial}
             </span>
-            <span className="text-sm font-semibold text-[#D1D6DB]">
-              {account.company} · {account.name}
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[13px] text-[#8B95A1]">{account.company}</span>
+              <span className="truncate text-sm font-semibold text-[#D1D6DB]">{account.name}</span>
             </span>
           </div>
         </div>
