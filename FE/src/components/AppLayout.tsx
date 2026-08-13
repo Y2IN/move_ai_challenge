@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { account } from '../mocks/home';
+import { accounts, type Account } from '../mocks/home';
 import type { Role } from '../mocks/marketing';
 import { getRole } from '../lib/role';
 
@@ -54,10 +54,18 @@ interface AppLayoutProps {
   /** 명시하면 그 역할 메뉴. 없으면 로그인 시 저장된 역할을 읽는다 */
   role?: Role;
   onNavigate?: (key: NavKey) => void;
+  /** 페르소나를 토글하는 화면만 넘긴다. 나머지는 기업 계정 고정 */
+  account?: Account;
 }
 
 /** 로그인 후 공통 셸. 사이드바 240px + 콘텐츠 1200px 중앙 정렬 */
-export function AppLayout({ active, children, role: roleProp, onNavigate }: AppLayoutProps) {
+export function AppLayout({
+  active,
+  children,
+  role: roleProp,
+  onNavigate,
+  account = accounts.corp,
+}: AppLayoutProps) {
   const router = useRouter();
   const [storedRole, setStoredRole] = useState<Role>('corp');
   useEffect(() => setStoredRole(getRole()), []);

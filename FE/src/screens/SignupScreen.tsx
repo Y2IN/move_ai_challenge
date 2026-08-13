@@ -49,7 +49,7 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <AuthInput label="이름" placeholder="김철도" />
+          <AuthInput label="이름" placeholder="최현지" />
           <AuthInput label={org.label} placeholder={org.placeholder} />
         </div>
 

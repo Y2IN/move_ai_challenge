@@ -1,6 +1,7 @@
 import { AppLayout } from '../components/AppLayout';
 import { LoadBar } from '../components/StatusBadge';
 import { StatCard } from '../components/StatCard';
+import { accounts } from '../mocks/home';
 import {
   RISK_RATE,
   STATUS_STYLE,
@@ -24,7 +25,7 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
   const riskCount = rows.filter((r) => r.status === '미달 위험').length;
 
   return (
-    <AppLayout active="clients" role="korail">
+    <AppLayout active="clients" role="korail" account={accounts.korail}>
       <header className="flex flex-col gap-2">
         <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">{header.title}</h1>
         <p className="text-base text-[#6B7684]">{header.lead}</p>

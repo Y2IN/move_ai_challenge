@@ -1,7 +1,7 @@
 import { AppLayout } from '../components/AppLayout';
 import { StatCard } from '../components/StatCard';
 import { TrendChart } from '../components/TrendChart';
-import { korailStats } from '../mocks/home';
+import { accounts, korailStats } from '../mocks/home';
 import { header, perfHistory, perfReport, revenueTrend, trendNotes } from '../mocks/performance';
 import { wagonTrend } from '../mocks/wagons';
 
@@ -15,7 +15,7 @@ interface PerformanceScreenProps {
 /** 코레일 — 수송 실적. 공차 운영 성과와 리포트 발행 */
 export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenProps) {
   return (
-    <AppLayout active="performance" role="korail">
+    <AppLayout active="performance" role="korail" account={accounts.korail}>
       <header className="flex flex-col gap-2">
         <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">{header.title}</h1>
         <p className="text-base text-[#6B7684]">{header.lead}</p>

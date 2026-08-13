@@ -9,49 +9,62 @@ import {
   DocTable,
   FormulaBadge,
 } from '../components/DocTable';
-import {
-  applicant,
-  applyMeta,
-  attachments,
-  benefitDocRows,
-  benefitDocTotal,
-  costRows,
-  costTotal,
-  docHeader,
-  paragraphs,
-  planRows,
-  planTotal,
-  subsidyResult,
-  subsidyRows,
-} from '../mocks/apply';
+import { SUBSIDY_DISCLAIMER, type ParagraphKey } from '../lib/subsidy';
+import type { ApplyDocView } from '../lib/subsidy-view';
 
 const PLAN_COLS = '1.4fr 1fr 1fr 0.9fr 1fr';
 const COST_COLS = '1.2fr 1.6fr 1fr';
 const BENEFIT_COLS = '1.1fr 1.1fr 1.1fr 1fr';
 const SUBSIDY_COLS = '1.4fr 1.6fr 1fr';
 
-/** 06c 탭 1 — 전환교통 지원사업 사업계획서 */
-export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) => void }) {
+export interface ApplyDocumentProps {
+  /** #33 이 준 문서를 서식 표기로 옮긴 것 (`toApplyDocView`) */
+  doc: ApplyDocView;
+  /** #36 문단 단위 재생성 */
+  onRegenerate?: (key: ParagraphKey) => void;
+  /** 재생성 중인 문단 — 해당 블록만 잠깁니다 */
+  busyKeys?: ParagraphKey[];
+}
+
+/** 06c 탭 1 — 전환교통 지원사업 사업계획서 (별지 제3호 서식) */
+export function ApplyDocument({ doc, onRegenerate, busyKeys = [] }: ApplyDocumentProps) {
+  /** 문단 블록. 서식의 각 장 아래에 붙습니다. */
+  const para = (key: ParagraphKey, className: string) => {
+    const p = doc.paragraphs[key];
+    return (
+      <AiParagraphBlock
+        className={className}
+        body={p.text}
+        tone={p.tone}
+        label={p.label}
+        busy={busyKeys.includes(key)}
+        onRegenerate={onRegenerate ? () => onRegenerate(key) : undefined}
+      />
+    );
+  };
+
   return (
     <DocSheet>
       <header className="border-b-2 border-[#191F28] pb-[22px] text-center">
-        <div className="text-[15px] font-semibold tracking-wide text-[#6B7684]">{docHeader.formNo}</div>
-        <h2 className="mt-3 text-[28px] font-extrabold tracking-[-0.02em] text-[#191F28]">{docHeader.title}</h2>
+        <div className="text-[15px] font-semibold tracking-wide text-[#6B7684]">{doc.header.formNo}</div>
+        <h2 className="mt-3 text-[28px] font-extrabold tracking-[-0.02em] text-[#191F28]">{doc.header.title}</h2>
         <div className="mt-3 text-[13px] leading-[1.7] text-[#6B7684]">
-          {docHeader.basis}
+          {doc.header.basis}
           <br />
-          {docHeader.org}
+          {doc.header.org}
         </div>
       </header>
 
-      <DocLegend note={applyMeta.disclaimer} />
+      <DocLegend note={SUBSIDY_DISCLAIMER} />
+
+      {para('overview', '')}
 
       <section>
         <DocSectionTitle>1. 신청인</DocSectionTitle>
         <div className="mt-2.5">
           <DocTable>
             <div className="grid" style={{ gridTemplateColumns: '130px 1fr 130px 1fr' }}>
-              {applicant.map((f) =>
+              {doc.applicant.map((f) =>
                 f.wide ? (
                   <Fragment key={f.label}>
                     <DocCell label>{f.label}</DocCell>
@@ -87,9 +100,9 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
               </DocCell>
             </DocRow>
 
-            {planRows.map((r) => (
-              <DocRow key={r.section} cols={PLAN_COLS}>
-                <DocCell>{r.section}</DocCell>
+            {doc.plan.rows.map((r) => (
+              <DocRow key={`${r.route}·${r.item}`} cols={PLAN_COLS}>
+                <DocCell>{r.route}</DocCell>
                 <DocCell>{r.item}</DocCell>
                 <DocCell right className="tabular-nums">
                   {r.tons}
@@ -104,26 +117,24 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
             ))}
 
             <DocRow cols={PLAN_COLS} total>
-              <DocCell>{planTotal.section}</DocCell>
-              <DocCell>{planTotal.item}</DocCell>
+              <DocCell>{doc.plan.total.route}</DocCell>
+              <DocCell>{doc.plan.total.item}</DocCell>
               <DocCell right className="tabular-nums">
-                {planTotal.tons}
+                {doc.plan.total.tons}
               </DocCell>
               <DocCell right className="tabular-nums">
-                {planTotal.trips}
+                {doc.plan.total.trips}
               </DocCell>
               <DocCell right last>
-                {planTotal.wagonType}
+                {doc.plan.total.wagonType}
               </DocCell>
             </DocRow>
           </DocTable>
         </div>
 
-        <AiParagraphBlock
-          className="mt-3"
-          body={paragraphs.plan.body}
-          onRegenerate={() => onRegenerate?.(paragraphs.plan.id)}
-        />
+        <div className="mt-2 text-xs text-[#6B7684]">{doc.plan.note}</div>
+
+        {para('plan', 'mt-3')}
       </section>
 
       <section>
@@ -138,7 +149,7 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
               </DocCell>
             </DocRow>
 
-            {costRows.map((r) => (
+            {doc.extraCost.rows.map((r) => (
               <DocRow key={r.label} cols={COST_COLS}>
                 <DocCell>{r.label}</DocCell>
                 <DocCell>
@@ -151,14 +162,18 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
             ))}
 
             <DocRow cols={COST_COLS} total>
-              <DocCell>{costTotal.label}</DocCell>
-              <DocCell className="text-[13px] font-semibold text-[#6B7684]">{costTotal.formula}</DocCell>
+              <DocCell>{doc.extraCost.total.label}</DocCell>
+              <DocCell className="text-[13px] font-semibold text-[#6B7684]">
+                {doc.extraCost.total.formula}
+              </DocCell>
               <DocCell right last className="tabular-nums">
-                {costTotal.amount}
+                {doc.extraCost.total.amount}
               </DocCell>
             </DocRow>
           </DocTable>
         </div>
+
+        {para('extraCost', 'mt-3')}
       </section>
 
       <section>
@@ -174,7 +189,7 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
               </DocCell>
             </DocRow>
 
-            {benefitDocRows.map((r) => (
+            {doc.benefit.rows.map((r) => (
               <DocRow key={r.label} cols={BENEFIT_COLS}>
                 <DocCell>{r.label}</DocCell>
                 <DocCell>
@@ -192,24 +207,22 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
               <DocCell />
               <DocCell />
               <DocCell right last className="tabular-nums">
-                {benefitDocTotal}
+                {doc.benefit.total}
               </DocCell>
             </DocRow>
           </DocTable>
         </div>
 
-        <AiParagraphBlock
-          className="mt-3"
-          body={paragraphs.benefit.body}
-          onRegenerate={() => onRegenerate?.(paragraphs.benefit.id)}
-        />
+        <div className="mt-2 text-xs leading-[1.7] text-[#6B7684]">{doc.benefit.note}</div>
+
+        {para('benefit', 'mt-3')}
       </section>
 
       <section>
         <DocSectionTitle>5. 보조금 산정 결과</DocSectionTitle>
         <div className="mt-2.5">
           <DocTable>
-            {subsidyRows.map((r) => (
+            {doc.subsidy.rows.map((r) => (
               <DocRow key={r.label} cols={SUBSIDY_COLS}>
                 <DocCell label>{r.label}</DocCell>
                 <DocCell>
@@ -222,37 +235,37 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
             ))}
 
             <DocRow cols={SUBSIDY_COLS} accent>
-              <DocCell className="py-[13px]">{subsidyResult.label}</DocCell>
+              <DocCell className="py-[13px]">{doc.subsidy.result.label}</DocCell>
               <DocCell className="py-[13px] text-[13px] font-semibold text-[#1B64DA]">
-                {subsidyResult.formula}
+                {doc.subsidy.result.formula}
               </DocCell>
               <DocCell right last className="py-[13px] text-base tabular-nums">
-                {subsidyResult.amount}
+                {doc.subsidy.result.amount}
               </DocCell>
             </DocRow>
           </DocTable>
         </div>
+
+        {para('result', 'mt-3')}
       </section>
 
       <section>
         <DocSectionTitle>6. 첨부 서류</DocSectionTitle>
         <div className="mt-2.5 flex flex-col gap-[7px] text-sm text-[#333D4B]">
-          {attachments.map((a) => (
+          {doc.attachments.map((a) => (
             <span key={a}>{a}</span>
           ))}
         </div>
 
-        <AiParagraphBlock
-          className="mt-3.5"
-          body={paragraphs.closing.body}
-          onRegenerate={() => onRegenerate?.(paragraphs.closing.id)}
-        />
+        {para('closing', 'mt-3.5')}
       </section>
 
       <footer className="mt-3 border-t border-[#E5E8EB] pt-5 text-center text-[13px] leading-[1.9] text-[#4E5968]">
         위와 같이 전환교통 지원사업 사업계획서를 제출합니다.
         <br />
-        <b className="text-[#191F28]">{docHeader.sign}</b>
+        <b className="text-[#191F28]">{doc.header.sign}</b>
+        <br />
+        <span className="text-xs text-[#8B95A1]">계수 버전 {doc.meta.coefficientVersion}</span>
       </footer>
     </DocSheet>
   );

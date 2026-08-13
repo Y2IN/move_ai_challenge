@@ -23,8 +23,11 @@ npm run dev                        # http://localhost:3000
 | **계정 세션** (권장) | `ANTHROPIC_AUTH_TOKEN` | `npm run session-token` 이 자동으로 채웁니다. 키 발급이 필요 없습니다. **몇 시간이면 만료**되므로 401 이 뜨면 다시 실행하세요 |
 | 콘솔 API 키 | `ANTHROPIC_API_KEY` | https://platform.claude.com → Settings → API keys |
 
-인증이 아예 없어도 서버는 뜹니다. LLM 문단은 템플릿 문장으로 대체되고 응답에
+인증이 아예 없어도 서버는 뜹니다. LLM 문단은 사전 작성된 서술 초안으로 대체되고 응답에
 `source: "fallback"` 배지가 붙습니다 — 시연이 인증 때문에 멈추지 않게 하려는 설계입니다.
+초안은 문단마다 여러 벌 있어 재생성할 때마다 다른 벌이 나옵니다
+(`BE/src/esg/paragraphs.ts` 의 `fallbacks`). 화면에는 인증 복구 명령 대신
+"데모 모드" 안내가 뜹니다 — 세션 토큰이 만료됐다면 `npm run session-token` 을 다시 실행하세요.
 
 ## 폴더 구조
 

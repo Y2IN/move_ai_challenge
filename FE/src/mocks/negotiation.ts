@@ -14,8 +14,8 @@ export const wagon = {
 
 export const unmatched = {
   loadRate: 41,
-  headline: '합적 그룹을 만들지 못했습니다 · 대성물산 1,860톤 단독, 적재율 41%로 최소 기준 60% 미달',
-  soloShipper: '대성물산 1,860톤',
+  headline: '합적 그룹을 만들지 못했습니다 · embark 1,860톤 단독, 적재율 41%로 최소 기준 60% 미달',
+  soloShipper: 'embark 1,860톤',
 };
 
 export type NegoKind = '발송일 조정' | '물량 당김' | '인도역 변경';
@@ -83,7 +83,7 @@ export interface ShipperProfile {
 
 export const shipperProfiles: ShipperProfile[] = [
   {
-    name: '대성물산',
+    name: 'embark',
     tons: '1,860톤',
     trait: '요청 없음',
     traitTone: 'none',
@@ -138,7 +138,7 @@ export interface NegoStep {
 export const negoSteps: NegoStep[] = [
   {
     id: 's1',
-    title: '대성물산 · 요청 없음',
+    title: 'embark · 요청 없음',
     status: 'accepted',
     statusLabel: '수락',
     saving: '16%',
@@ -185,7 +185,7 @@ export const gauge = {
   mid: 75,
   end: 94,
   minRate: 60,
-  startLabel: '대성물산 단독',
+  startLabel: 'embark 단독',
   midLabel: '한림케미칼 합류',
   endLabel: '우진산업 합류',
 };
@@ -204,10 +204,20 @@ export interface ConfirmedShipper {
 }
 
 export const confirmedShippers: ConfirmedShipper[] = [
-  { name: '대성물산', detail: '1,860톤 · 석유화학제품 · 조건 변경 없음', saving: '16% 절감' },
+  { name: 'embark', detail: '1,860톤 · 석유화학제품 · 조건 변경 없음', saving: '16% 절감' },
   { name: '한림케미칼', detail: '1,540톤 · 화학원료 · 발송 08.17 → 08.18', saving: '19% 절감' },
   { name: '우진산업', detail: '880톤 · 철강재 · 다음 주 물량 당김', saving: '24% 절감' },
 ];
+
+/**
+ * 편성이 확정되면 코레일 쪽에서 화차를 배정 승인한다.
+ * 기업 담당자 화면에도 **누가 승인했는지**가 남아야 정산·이의 제기 때 물어볼 데가 생긴다.
+ */
+export const assignmentApproval = {
+  label: '화차 배정 승인',
+  by: '코레일 물류사업본부 박예은',
+  at: '2026.08.14 11:20',
+};
 
 export const confirmHeadline =
   '조율 3회로 편성 확정 · 컨테이너 화차 1편성 · 적재율 94% · 평균 운송비 18% 절감';

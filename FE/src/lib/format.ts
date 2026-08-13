@@ -6,6 +6,9 @@
 const ko = (n: number, maxFrac = 0) =>
   n.toLocaleString('ko-KR', { maximumFractionDigits: maxFrac });
 
+/** 1234567 → "1,234,567" — 단위 없이 자릿수만 끊습니다 (산식 문구에 씁니다) */
+export const formatNumber = (n: number, maxFrac = 0) => ko(n, maxFrac);
+
 /** 1_140_000_000 → "11억 4,000만 원" · 64_000_000 → "6,400만 원" · 8_000 → "8,000원" */
 export function formatKrw(amount: number): string {
   const sign = amount < 0 ? '−' : '';
@@ -34,6 +37,22 @@ export const formatCo2 = (n: number) => `${ko(n, 1)} tCO₂eq`;
 
 /** 0.74 → "74%" */
 export const formatPct = (rate: number) => `${Math.round(rate * 100)}%`;
+
+/**
+ * 413_020_000 → "413,020,000원" · -93_000_000 → "△93,000,000원"
+ *
+ * 관공서 서식은 억/만 축약을 쓰지 않고 원 단위를 전부 적습니다. 음수는 회계 관례인
+ * △ 로 표기합니다 — `formatKrw` 의 − 와 달리 서식 인쇄본에서 차감 항목을 뜻합니다.
+ */
+export function formatKrwExact(amount: number): string {
+  return `${amount < 0 ? '△' : ''}${ko(Math.abs(amount))}원`;
+}
+
+/** 342_000_000 → "₩342,000,000" — 패널 보조 표기 */
+export const formatWonSign = (n: number) => `${n < 0 ? '−' : ''}₩${ko(Math.abs(n))}`;
+
+/** 12 → "12회" */
+export const formatTrips = (n: number) => `${ko(n)}회`;
 
 /** ISO → "2026.08.13 14:32" */
 export function formatDateTime(iso: string): string {

@@ -19,125 +19,127 @@
 import type { ReportInput } from "./contract";
 
 export const fixtureReportInput: ReportInput = {
-    "period": {
-      "from": "2026-04-01",
-      "to": "2026-06-30",
-      "label": "2026년 2분기"
-    },
-    "applicant": {
-      "name": "대성물산 주식회사",
-      "bizNo": "220-81-04512",
-      "ceo": "이대성",
-      "manager": "김철도",
-      "phone": "02-6000-1234",
-      "address": "울산광역시 남구 여천로 217"
-    },
-    "plan": {
-      "rows": [
-        {
-          "route": "울산화물역 → 오봉역",
-          "item": "석유화학제품 · 기타 · 철강재",
-          "tons": 216,
-          "trips": 12,
-          "wagonType": "유개화차"
-        }
-      ],
-      "total": {
-        "itemCount": 3,
-        "tons": 216,
-        "trips": 12,
-        "wagonTypeCount": 1
+  period: {
+    from: "2026-04-01",
+    to: "2026-06-30",
+    label: "2026년 2분기",
+  },
+  applicant: {
+    name: "embark 주식회사",
+    bizNo: "111-11-11111",
+    ceo: "제예인",
+    manager: "최현지",
+    phone: "02-6000-1234",
+    address: "서울특별시 oorn oo동",
+  },
+  plan: {
+    rows: [
+      {
+        route: "울산화물역 → 오봉역",
+        item: "석유화학제품 · 기타 · 철강재",
+        tons: 216,
+        trips: 12,
+        wagonType: "유개화차",
       },
-      "avgLoadRate": 1
+    ],
+    total: {
+      itemCount: 3,
+      tons: 216,
+      trips: 12,
+      wagonTypeCount: 1,
     },
-    "extraCost": {
-      "rows": [
-        {
-          "label": "철도수송비",
-          "formula": "간선 운임 · 복귀 공차 할인 적용",
-          "amount": 6137892
-        },
-        {
-          "label": "상하역비",
-          "formula": "216톤 × 양단 상하역",
-          "amount": 2592000
-        },
-        {
-          "label": "셔틀운송비",
-          "formula": "공장↔역 양단 도로 운송",
-          "amount": 1633044
-        },
-        {
-          "label": "도로수송비 (차감)",
-          "formula": "기존 도로 운송 실적 기준",
-          "amount": -22380000
-        }
-      ],
-      "totalA": -12017064
-    },
-    "benefit": {
-      "items": [
-        {
-          "label": "온실가스 감축",
-          "basis": "9.5 tCO₂eq",
-          "source": "국토교통부 수송수단별 온실가스 배출원단위 / 국가온실가스 인벤토리",
-          "amount": 476352,
-          "key": "ghg"
-        },
-        {
-          "label": "대기오염 저감",
-          "basis": "NOx·SOx·PM2.5",
-          "source": "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
-          "amount": 399180,
-          "key": "airPollution"
-        },
-        {
-          "label": "교통사고 예방",
-          "basis": "대형화물차 주행 감소",
-          "source": "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
-          "amount": 773100,
-          "key": "accident"
-        },
-        {
-          "label": "도로혼잡 완화",
-          "basis": "차량·km 감소분",
-          "source": "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
-          "amount": 2038584,
-          "key": "congestion"
-        },
-        {
-          "label": "도로유지비 절감",
-          "basis": "포장 손상 감소",
-          "source": "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
-          "amount": 354144,
-          "key": "roadWear"
-        }
-      ],
-      "totalB": 4041360,
-      "official": {
-        "year": 2026,
-        "roadUnitCost": 123.09,
-        "railUnitCost": 42.25,
-        "roadSocialKrw": 10026420,
-        "railSocialKrw": 4976088,
-        "savingKrw": 5050332
+    avgLoadRate: 1,
+  },
+  extraCost: {
+    rows: [
+      {
+        label: "철도수송비",
+        formula: "간선 운임 · 복귀 공차 할인 적용",
+        amount: 6137892,
       },
-      "co2ReducedTon": 9.5,
-      "co2ReductionRate": 0.7305377421374458,
-      "equivalents": {
-        "pineTrees": 1440,
-        "trucksBlocked": 12
-      }
+      {
+        label: "상하역비",
+        formula: "216톤 × 양단 상하역",
+        amount: 2592000,
+      },
+      {
+        label: "셔틀운송비",
+        formula: "공장↔역 양단 도로 운송",
+        amount: 1633044,
+      },
+      {
+        label: "도로수송비 (차감)",
+        formula: "기존 도로 운송 실적 기준",
+        amount: -22380000,
+      },
+    ],
+    totalA: -12017064,
+  },
+  benefit: {
+    items: [
+      {
+        label: "온실가스 감축",
+        basis: "9.5 tCO₂eq",
+        source:
+          "국토교통부 수송수단별 온실가스 배출원단위 / 국가온실가스 인벤토리",
+        amount: 476352,
+        key: "ghg",
+      },
+      {
+        label: "대기오염 저감",
+        basis: "NOx·SOx·PM2.5",
+        source: "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
+        amount: 399180,
+        key: "airPollution",
+      },
+      {
+        label: "교통사고 예방",
+        basis: "대형화물차 주행 감소",
+        source: "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
+        amount: 773100,
+        key: "accident",
+      },
+      {
+        label: "도로혼잡 완화",
+        basis: "차량·km 감소분",
+        source: "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
+        amount: 2038584,
+        key: "congestion",
+      },
+      {
+        label: "도로유지비 절감",
+        basis: "포장 손상 감소",
+        source: "한국교통연구원(KOTI) 「교통시설 투자평가지침」",
+        amount: 354144,
+        key: "roadWear",
+      },
+    ],
+    totalB: 4041360,
+    official: {
+      year: 2026,
+      roadUnitCost: 123.09,
+      railUnitCost: 42.25,
+      roadSocialKrw: 10026420,
+      railSocialKrw: 4976088,
+      savingKrw: 5050332,
     },
-    "result": {
-      "A": -12017064,
-      "B": 1515100,
-      "adopted": "none",
-      "subsidy": 0,
-      "eligible": false,
-      "legalBasis": "지속가능 교통물류 발전법 제21조 · 국토교통부고시 제2019-16호 「전환교통 협약에 관한 규정」 제17조 · 한국철도물류협회 2026년 전환교통지원사업 공고"
+    co2ReducedTon: 9.5,
+    co2ReductionRate: 0.7305377421374458,
+    equivalents: {
+      pineTrees: 1440,
+      trucksBlocked: 12,
     },
-    "coefficientVersion": "railhub-2026.2"
-  };
+  },
+  result: {
+    A: -12017064,
+    B: 1515100,
+    adopted: "none",
+    subsidy: 0,
+    eligible: false,
+    legalBasis:
+      "지속가능 교통물류 발전법 제21조 · 국토교통부고시 제2019-16호 「전환교통 협약에 관한 규정」 제17조 · 한국철도물류협회 2026년 전환교통지원사업 공고",
+  },
+  coefficientVersion: "railhub-2026.2",
+};
 
 export default fixtureReportInput;

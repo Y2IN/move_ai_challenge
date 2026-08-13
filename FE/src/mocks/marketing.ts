@@ -174,7 +174,7 @@ export const roles: RoleOption[] = [
 ];
 
 export const orgField: Record<Role, { label: string; placeholder: string }> = {
-  corp: { label: '회사명', placeholder: '대성물산' },
+  corp: { label: '회사명', placeholder: 'embark' },
   korail: { label: '소속 본부 · 지사', placeholder: '물류사업본부' },
 };
 

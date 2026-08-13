@@ -1,6 +1,7 @@
 import { AppLayout } from '../components/AppLayout';
 import { Banner, Card, CardTitle, WagonRouteCard } from '../components/Card';
 import {
+  assignmentApproval,
   confirmHeadline,
   confirmedShippers,
   costCompare,
@@ -72,6 +73,15 @@ export function ConfirmedScreen({ onNavigate }: ConfirmedScreenProps) {
 
               <MergeLines />
               <WagonBadge />
+            </div>
+
+            <div className="mt-[18px] flex items-center gap-2 border-t border-[#F2F4F6] pt-[14px] text-sm text-[#8B95A1]">
+              <span className="text-[13px] font-extrabold text-[#12A87A]">✓</span>
+              <span>
+                {assignmentApproval.label} ·{' '}
+                <b className="font-bold text-[#4E5968]">{assignmentApproval.by}</b> ·{' '}
+                <span className="tabular-nums">{assignmentApproval.at}</span>
+              </span>
             </div>
           </Card>
 

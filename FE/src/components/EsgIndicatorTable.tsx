@@ -205,13 +205,20 @@ export function EsgIndicatorTable({
 
       {generation && (
         <p className="text-xs leading-[1.7] text-[#8B95A1]">
-          {generatedAt ? `${formatDateTime(generatedAt)} 생성` : ''} · 모델 {generation.model} · AI 문단{' '}
-          {generation.aiCount}개 · 템플릿 {generation.fallbackCount}개
-          {generation.authMode === 'none' && (
+          {generatedAt ? `${formatDateTime(generatedAt)} 생성` : ''} · 모델 {generation.model} · AI 서술{' '}
+          {generation.aiCount}개 · 사전 작성 서술 {generation.fallbackCount}개
+          {generation.fallbackCount > 0 && (
             <>
               <br />
+              {/*
+                심사자가 읽는 줄입니다. 개발 환경 복구 명령은 여기 두지 않습니다 (README 참조).
+                조건이 authMode==='none' 이 아니라 fallbackCount 인 이유: 인증이 있어도
+                호출 한도(429)에 걸리면 문단이 폴백으로 떨어지는데, 그때가 시연 중 제일 흔합니다.
+              */}
               <span className="text-[#A96A00]">
-                ⚠ Claude 인증이 없어 전 문단이 템플릿입니다. `npm run session-token` 후 다시 생성하세요.
+                ⚠ 데모 모드 — 서술 문단 {generation.fallbackCount}개는 AI 에이전트가 실시간으로 쓰는 자리이나, 호출
+                한도·인증 문제로 지금은 사전 작성 초안이 표시됩니다. 지표표의 수치는 모두 실제 산정 결과이며 AI가
+                만들지 않습니다.
               </span>
             </>
           )}

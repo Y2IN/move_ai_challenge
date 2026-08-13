@@ -114,7 +114,7 @@ export const clientRows: ClientRow[] = [
   },
   {
     id: 'c8',
-    name: '대성물산',
+    name: 'embark',
     route: '울산 → 의왕ICD',
     contractTons: '1,940톤',
     actualTons: '1,860톤',
@@ -137,7 +137,7 @@ export const salesPanel = {
   title: '영업 액션',
   renewalTitle: '재계약 임박',
   renewals: [
-    { name: '대성물산', dday: 'D-18', note: '이행률 96% · 증액 제안 가능' },
+    { name: 'embark', dday: 'D-18', note: '이행률 96% · 증액 제안 가능' },
     { name: '동해철강', dday: 'D-31', note: '이행률 91% · 노선 추가 검토' },
     { name: '청우물류', dday: 'D-44', note: '이행률 55% · 물량 재조정 필요' },
   ] as RenewalItem[],

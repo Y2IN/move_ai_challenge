@@ -18,7 +18,7 @@
  */
 
 import { buildIndicators, SCOPE3_CATEGORY } from "./indicators";
-import { buildFacts, PARAGRAPHS } from "./paragraphs";
+import { buildFacts, fallbackText, PARAGRAPHS } from "./paragraphs";
 import { aggregate, parsePeriod } from "./period";
 import { collectAllowedNumbers, findHallucinatedNumbers } from "../report/verify";
 
@@ -95,7 +95,12 @@ function assert(label: string, condition: boolean, _unused = true) {
 const air = indicators.find((i) => i.code === "E-7-1")!;
 const increased = agg.pollutants.filter((p) => p.reducedKg < 0);
 const decreased = agg.pollutants.filter((p) => p.reducedKg >= 0);
-const airText = PARAGRAPHS.find((p) => p.key === "airQuality")!.fallback(agg);
+
+/** 문단 하나의 폴백 초안 전부. 한 벌만 검사하면 나머지는 무검증으로 화면에 나갑니다. */
+const draftsOf = (key: string) => {
+  const spec = PARAGRAPHS.find((p) => p.key === key)!;
+  return spec.fallbacks.map((_, v) => fallbackText(spec, agg, v));
+};
 
 console.log(
   `  현재 계수 기준: 감소 ${decreased.map((p) => p.label).join("·") || "없음"} / ` +
@@ -109,26 +114,67 @@ assert(
 );
 assert("'감축량' 이라고 단정하는 라벨이 없다", !air.metrics.some((m) => m.label.includes("감축량")), true);
 
+const airDrafts = draftsOf("airQuality");
+
 if (increased.length > 0) {
   assert("헤드라인 단위가 실제 방향과 일치", air.headlineUnit.includes("증가") === (agg.pollutants.find((p) => p.key === "nox")!.reducedKg < 0), true);
   assert("지표 근거에 증가 사실이 적혀 있다", air.basis.includes("증가"), true);
   assert("증가한 물질이 지표에 나열된다", increased.every((p) => air.metrics.some((m) => m.value.includes(p.label))), true);
-  assert("문단이 '증가' 를 명시한다", airText.includes("증가"), true);
-  assert("문단이 증가 원인(후처리 장치)을 설명한다", airText.includes("DPF") || airText.includes("매연저감"), true);
+  // 초안이 여러 벌이므로 **전 벌**을 검사합니다. 한 벌이라도 증가를 감추면
+  // 재생성 버튼이 "듣기 좋은 문장 뽑기"가 됩니다.
+  assert(`모든 초안(${airDrafts.length}벌)이 '증가' 를 명시한다`, airDrafts.every((t) => t.includes("증가")), true);
   assert(
-    "문단이 '모두 감소' 로 시작하지 않는다",
-    !airText.startsWith("수송수단 전환에 따라 대기오염물질 배출량도 함께 감소"),
+    "모든 초안이 증가 원인(후처리 장치)을 설명한다",
+    airDrafts.every((t) => t.includes("DPF") || t.includes("매연저감")),
+    true,
+  );
+  assert(
+    "모든 초안이 '모두 감소' 로 시작하지 않는다",
+    airDrafts.every((t) => !t.startsWith("수송수단 전환에 따라 대기오염물질 배출량도 함께 감소")),
+    true,
+  );
+  assert(
+    "증가한 물질이 모든 초안에 이름으로 나온다",
+    airDrafts.every((t) => increased.every((p) => t.includes(p.label))),
     true,
   );
 } else {
-  assert("전 물질 감소 시 문단이 감소로 서술한다", airText.includes("감소"), true);
+  assert("전 물질 감소 시 모든 초안이 감소로 서술한다", airDrafts.every((t) => t.includes("감소")), true);
 }
 
 assert(
-  "온실가스 문단은 감축으로 서술된다 (CO₂는 확실히 감소)",
-  agg.reducedCo2Ton > 0 && PARAGRAPHS.find((p) => p.key === "scope3")!.fallback(agg).includes("감축"),
+  "온실가스 초안은 전 벌이 감축으로 서술된다 (CO₂는 확실히 감소)",
+  agg.reducedCo2Ton > 0 && draftsOf("scope3").every((t) => t.includes("감축")),
   true,
 );
+
+// ── 폴백 초안 전수 검사 ────────────────────────────────────────
+//
+// 폴백은 재생성 때마다 다른 벌이 나옵니다. 검출기를 통과하지 않은 초안이 한 벌이라도
+// 섞여 있으면, 그 벌이 뽑히는 순간 근거 없는 숫자가 공시 문서에 인쇄됩니다.
+// 폴백 경로에는 재생성 방어선이 없으므로(이미 최후 경로입니다) 여기서 고정합니다.
+console.log("\n── 폴백 초안 전수 검사 (모든 벌이 검출기를 통과해야 함) ──");
+
+for (const spec of PARAGRAPHS) {
+  const drafts = spec.fallbacks.map((_, v) => fallbackText(spec, agg, v));
+  drafts.forEach((text, v) => check(`${spec.key} 초안 ${v + 1}/${drafts.length}`, text, true));
+  assert(
+    `${spec.key} 초안 ${drafts.length}벌이 서로 다르다 (같으면 재생성이 멈춘 화면으로 보임)`,
+    new Set(drafts).size === drafts.length,
+    true,
+  );
+  assert(`${spec.key} 초안이 2벌 이상이다`, drafts.length >= 2, true);
+}
+
+// 호출자는 단조 증가 카운터를 그대로 넘깁니다. 인덱스가 범위를 넘거나 음수여도
+// 던지지 않고 유효한 초안이 나와야 합니다.
+const rotate = PARAGRAPHS[0];
+assert(
+  "회전 인덱스가 범위를 넘어도 처음으로 되돌아온다",
+  fallbackText(rotate, agg, rotate.fallbacks.length) === fallbackText(rotate, agg, 0),
+  true,
+);
+assert("음수 인덱스도 유효한 초안을 준다", fallbackText(rotate, agg, -1).length > 0, true);
 
 console.log(`\n통과 ${pass} · 실패 ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

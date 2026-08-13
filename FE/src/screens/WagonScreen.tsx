@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { LoadBar, StatusBadge } from '../components/StatusBadge';
 import { StatCard } from '../components/StatCard';
-import { korailRows, korailStats, type MatchRowData } from '../mocks/home';
+import { accounts, korailRows, korailStats, type MatchRowData } from '../mocks/home';
 import { MIN_LOAD_RATE, fillPanel, header, wagonCapacity, wagonType } from '../mocks/wagons';
 
 // 각 열을 내용이 안 접히는 폭으로 고정하고, 부족하면 카드 안에서 가로 스크롤
@@ -34,7 +34,7 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
   const toggle = (id: string) => setOpenRow((cur) => (cur === id ? null : id));
 
   return (
-    <AppLayout active="wagons" role="korail">
+    <AppLayout active="wagons" role="korail" account={accounts.korail}>
       <header className="flex flex-col gap-2">
         <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">{header.title}</h1>
         <p className="text-base text-[#6B7684]">{header.lead}</p>
