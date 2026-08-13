@@ -18,6 +18,7 @@ import type {
   SeedData,
   Shipment,
   ShipmentInput,
+  TransportArrangement,
 } from "./types";
 
 const CATEGORIES: readonly ItemCategory[] = [
@@ -27,6 +28,7 @@ const CATEGORIES: readonly ItemCategory[] = [
   "기타",
 ];
 const GRADES: readonly CompanyGrade[] = ["sme", "excellentLogistics", "general"];
+const ARRANGEMENTS: readonly TransportArrangement[] = ["consignment", "own"];
 
 // ── 스토어 상태 ────────────────────────────────────────────────
 const registered: Shipment[] = [];
@@ -104,6 +106,10 @@ export function validateShipmentInput(
   if (!GRADES.includes(companyGrade))
     errors.companyGrade = "기업 구분이 올바르지 않습니다.";
 
+  const transportArrangement = b.transportArrangement as TransportArrangement;
+  if (!ARRANGEMENTS.includes(transportArrangement))
+    errors.transportArrangement = "운송 형태는 위탁(consignment) / 자차(own) 중 하나여야 합니다.";
+
   const weightTon = Number(b.weightTon);
   if (!Number.isFinite(weightTon) || weightTon <= 0)
     errors.weightTon = "중량(톤)은 0보다 큰 숫자여야 합니다.";
@@ -125,6 +131,7 @@ export function validateShipmentInput(
         weightTon,
         desiredDepartureDate,
         companyGrade,
+        transportArrangement,
         shipperName: str(b.shipperName) || undefined,
         originShuttleKm: num(b.originShuttleKm),
         destShuttleKm: num(b.destShuttleKm),

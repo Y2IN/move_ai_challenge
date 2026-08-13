@@ -82,6 +82,7 @@ export function normalizeInput(input: ShipmentInput, seed: SeedData): Shipment {
       requiredArrivalBy: input.requiredArrivalBy ?? input.desiredDepartureDate,
     },
     currentMode: "road",
+    transportArrangement: input.transportArrangement,
     roadDirectDistanceKm: roadKm,
     currentRoadFareKrw: input.currentRoadFareKrw ?? 0,
     constraintText: input.constraintText ?? "",

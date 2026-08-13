@@ -14,6 +14,9 @@ export type ItemCategory = "석유화학제품" | "화학원료" | "철강재" |
 /** 화물 등록 폼(디자인 04a)의 "기업 구분" — 전환교통 고시상 우대 등급 */
 export type CompanyGrade = "sme" | "excellentLogistics" | "general";
 
+/** 화물 등록 폼(디자인 04a)의 "운송 형태" — 위탁(제3자 물류 위탁) / 자차(자기 차량 운송) */
+export type TransportArrangement = "consignment" | "own";
+
 export interface Station {
   id: string;
   name: string;
@@ -86,6 +89,8 @@ export interface Shipment {
   destination: { name: string; address: string; stationId: string; shuttleKm: number };
   schedule: { requestedDepartureDate: string; requiredArrivalBy: string };
   currentMode: "road" | "rail";
+  /** 위탁 / 자차 운송 형태 (화물 등록 시 입력) */
+  transportArrangement: TransportArrangement;
   roadDirectDistanceKm: number;
   /** 화주가 지금 실제로 내고 있는 도로 운임 (baseline). 소량일수록 톤당 단가가 높습니다. */
   currentRoadFareKrw: number;
@@ -130,6 +135,8 @@ export interface ShipmentInput {
   weightTon: number;
   desiredDepartureDate: string; // YYYY-MM-DD
   companyGrade: CompanyGrade;
+  /** 위탁 / 자차 운송 형태 */
+  transportArrangement: TransportArrangement;
   /** 선택 — 비우면 lane 거리와 원단위로 추정합니다. */
   shipperName?: string;
   originShuttleKm?: number;
