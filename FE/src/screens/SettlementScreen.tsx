@@ -158,8 +158,8 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
 
         <div className="mt-7 grid grid-cols-[200px_1fr_1fr]">
           <span className="py-3.5 text-[13px] font-bold text-[#B0B8C1]">구분</span>
-          <span className="px-5 py-3.5 text-[13px] font-bold text-[#B0B8C1]">협약 기준</span>
-          <span className="rounded-t-xl bg-[#F5F9FF] px-5 py-3.5 text-[13px] font-bold text-[#1B64DA]">
+          <span className="px-5 py-3.5 text-right text-[13px] font-bold text-[#B0B8C1]">협약 기준</span>
+          <span className="rounded-t-xl bg-[#F5F9FF] px-5 py-3.5 text-right text-[13px] font-bold text-[#1B64DA]">
             현재 실적 기준
           </span>
 
@@ -167,24 +167,25 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
             <Fragment key={r.label}>
               <span className="border-t border-[#F2F4F6] py-3.5 text-[15px] text-[#4E5968]">{r.label}</span>
 
-              <span className="flex items-center gap-2 border-t border-[#F2F4F6] px-5 py-3.5">
-                <span className="text-[17px] font-bold tabular-nums tracking-[-0.02em] text-[#8B95A1]">
-                  {r.contract}
-                </span>
+              {/* 배지를 앞에 두어 숫자가 항상 오른쪽 끝에서 자릿수로 맞는다 */}
+              <span className="flex items-center justify-end gap-2 border-t border-[#F2F4F6] px-5 py-3.5">
                 {r.adopted && (
                   <span className="rounded-md bg-[#F2F4F6] px-2 py-[3px] text-[11px] font-bold text-[#6B7684]">
                     채택
                   </span>
                 )}
+                <span className="text-[17px] font-bold tabular-nums tracking-[-0.02em] text-[#8B95A1]">
+                  {r.contract}
+                </span>
               </span>
 
-              <span className="flex items-center gap-2 bg-[#F5F9FF] px-5 py-3.5">
-                <span className="text-[17px] font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
-                  {r.actual}
-                </span>
+              <span className="flex items-center justify-end gap-2 bg-[#F5F9FF] px-5 py-3.5">
                 {r.adopted && (
                   <span className="rounded-md bg-[#3182F6] px-2 py-[3px] text-[11px] font-bold text-white">채택</span>
                 )}
+                <span className="text-[17px] font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
+                  {r.actual}
+                </span>
               </span>
             </Fragment>
           ))}
@@ -192,15 +193,15 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
           <span className="border-t-2 border-[#191F28] py-[18px] text-base font-extrabold text-[#191F28]">
             {recalcResult.label}
           </span>
-          <span className="border-t-2 border-[#191F28] px-5 py-[18px] text-[22px] font-extrabold tabular-nums tracking-[-0.03em] text-[#8B95A1]">
+          <span className="border-t-2 border-[#191F28] px-5 py-[18px] text-right text-[22px] font-extrabold tabular-nums tracking-[-0.03em] text-[#8B95A1]">
             {recalcResult.contract}
           </span>
-          <span className="flex items-baseline gap-3 rounded-b-xl bg-[#F5F9FF] px-5 py-[18px]">
-            <span className="text-[28px] font-extrabold tabular-nums tracking-[-0.035em] text-[#191F28]">
-              {recalcResult.actual}
-            </span>
+          <span className="flex items-baseline justify-end gap-3 rounded-b-xl bg-[#F5F9FF] px-5 py-[18px]">
             <span className="rounded-lg bg-[#FFF4E0] px-2.5 py-[5px] text-sm font-bold tabular-nums text-[#B45309]">
               {recalcResult.diff}
+            </span>
+            <span className="text-[28px] font-extrabold tabular-nums tracking-[-0.035em] text-[#191F28]">
+              {recalcResult.actual}
             </span>
           </span>
         </div>
