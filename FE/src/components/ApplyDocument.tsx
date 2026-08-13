@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import {
   AiParagraphBlock,
   DocCell,
@@ -52,23 +53,19 @@ export function ApplyDocument({ onRegenerate }: { onRegenerate?: (id: string) =>
             <div className="grid" style={{ gridTemplateColumns: '130px 1fr 130px 1fr' }}>
               {applicant.map((f) =>
                 f.wide ? (
-                  <>
-                    <DocCell key={`${f.label}-l`} label>
-                      {f.label}
-                    </DocCell>
-                    <DocCell key={f.label} span={3} last>
+                  <Fragment key={f.label}>
+                    <DocCell label>{f.label}</DocCell>
+                    <DocCell span={3} last>
                       {f.value}
                     </DocCell>
-                  </>
+                  </Fragment>
                 ) : (
-                  <>
-                    <DocCell key={`${f.label}-l`} label className="border-b border-[#D1D6DB]">
+                  <Fragment key={f.label}>
+                    <DocCell label className="border-b border-[#D1D6DB]">
                       {f.label}
                     </DocCell>
-                    <DocCell key={f.label} className="border-b border-[#D1D6DB]">
-                      {f.value}
-                    </DocCell>
-                  </>
+                    <DocCell className="border-b border-[#D1D6DB]">{f.value}</DocCell>
+                  </Fragment>
                 ),
               )}
             </div>

@@ -24,7 +24,7 @@ const NAV_PATH: Record<NavKey, string | null> = {
   freight: '/freight/new',
   matching: '/matching/negotiation',
   subsidy: '/subsidy/done',
-  settlement: null,
+  settlement: '/settlement',
 };
 
 interface AppLayoutProps {
