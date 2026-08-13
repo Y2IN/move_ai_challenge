@@ -38,10 +38,10 @@ Vercel 대시보드 → **Settings → Environment Variables**
 
 | Key | Value | 적용 환경 |
 |---|---|---|
-| `GEMINI_API_KEY` | AI Studio에서 발급한 키 | Production, Preview, Development 전부 체크 |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | 전부 체크 |
+| `ANTHROPIC_API_KEY` | Claude Console에서 발급한 키 (`sk-ant-...`) | Production, Preview, Development 전부 체크 |
+| `CLAUDE_MODEL` | `claude-opus-5` | 전부 체크 |
 
-- 키 발급: https://aistudio.google.com/apikey
+- 키 발급: https://platform.claude.com → Settings → API keys
 - **환경변수를 추가·수정한 뒤에는 재배포해야 반영된다.** (Deployments → 최신 항목 → ⋯ → Redeploy)
 - 로컬은 `.env.local` 을 쓴다. 이 파일은 `.gitignore` 처리되어 있으니 **절대 커밋하지 말 것.**
 
@@ -70,20 +70,20 @@ git push -u origin feat/matching-engine
 
 ### `vercel.json`
 - `regions: ["icn1"]` — 서울 리전. 심사장에서 접속하므로 지연시간을 줄인다.
-- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Gemini 리포트 생성은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다.
+- `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Claude 리포트 생성은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다.
 
 ### `.github/workflows/ci.yml`
 - push(main) / PR 마다 `typecheck` + `build` 실행
-- 빌드에 더미 `GEMINI_API_KEY` 를 주입한다. **Gemini 클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `getGemini()` 를 호출할 것 (`lib/gemini.ts` 가 그렇게 되어 있음)
+- 빌드에 더미 `ANTHROPIC_API_KEY` 를 주입한다. **Claude 클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `getClaude()` 를 호출할 것 (`lib/claude.ts` 가 그렇게 되어 있음)
 
 ---
 
 ## 4. 발표 당일 체크리스트
 
 - [ ] 프로덕션 URL이 열리는가 (**휴대폰 데이터로도** 한 번 확인 — 현장 와이파이가 막혀 있는 경우가 있다)
-- [ ] Vercel 환경변수에 `GEMINI_API_KEY` 가 실제로 들어가 있는가 (로컬만 되고 배포는 안 되는 사고가 가장 흔하다)
+- [ ] Vercel 환경변수에 `ANTHROPIC_API_KEY` 가 실제로 들어가 있는가 (로컬만 되고 배포는 안 되는 사고가 가장 흔하다)
 - [ ] 최신 커밋이 프로덕션에 반영됐는가 (Deployments 목록 최상단 = `main` 최신 해시)
-- [ ] Gemini API 일일 할당량이 남아 있는가
+- [ ] Claude API 일일 할당량이 남아 있는가
 - [ ] **발표 30분 전부터는 main에 push 금지** (배포 중 상태로 시연하는 사고 방지)
 - [ ] 최후의 보루: `npm run dev` 로컬 구동본을 띄워두고 백업 시연 준비
 

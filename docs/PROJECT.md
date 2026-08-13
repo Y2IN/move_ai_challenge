@@ -34,7 +34,7 @@
 [2. 사회·환경 편익 환산 모듈]   ──▶ 탄소·대기오염·사고·혼잡 비용 KRW 환산
                 │
                 ▼
-[3. ESG 스토리텔링 에이전트]     ──▶ K-ESG 공시 리포트 초안 자동 작성 (Gemini)
+[3. ESG 스토리텔링 에이전트]     ──▶ K-ESG 공시 리포트 초안 자동 작성 (Claude)
                 │
                 ▼
 [4. 대시보드 & 리포트 출력]      ──▶ 시각화 UI · 운송 예약 · PDF 인증서
@@ -56,7 +56,7 @@
 ### 4.3 KRW 환산 대시보드
 > "이번 분기 합적을 통한 철도 전환으로 확보한 **사회적 편익 환산 가치 총 OOO원**(운송비 절감 OOO원 포함). 대형 트럭 OO대의 도심 진입을 막은 효과."
 
-### 4.4 K-ESG 공시 리포트 자동 생성 (Gemini)
+### 4.4 K-ESG 공시 리포트 자동 생성 (Claude)
 - 산출된 정량 데이터를 근거로 K-ESG 가이드라인(E 영역: 기후변화 대응, 대기오염) 및 GRI 305 / ISSB IFRS S2 Scope 3 Cat.4 에 부합하는 본문 단락 생성
 - 문구 선택 → 복사 또는 PDF 다운로드
 
@@ -103,7 +103,7 @@ CO2 감축량(kg)    = (도로tonKm × 도로배출계수 − 철도tonKm × 철
 |---|---|---|
 | 1 | 3개 중소기업이 소량 화물을 엑셀/자연어로 등록 | "동일 노선 소량 화물 3건 감지 → 화차 1편성 배정, 운송비 18% 절감 예상" |
 | 2 | 도로 vs 철도 비교 대시보드 렌더링 | 탄소 74% 감소 그래프, KRW 환산 카드, "소나무 4만 그루 / 트럭 45대" 시각화 |
-| 3 | 'ESG 보고서 초안 생성' 클릭 | Gemini가 K-ESG 문맥 본문 단락 작성 → 수정 → PDF |
+| 3 | 'ESG 보고서 초안 생성' 클릭 | Claude가 K-ESG 문맥 본문 단락 작성 → 수정 → PDF |
 | 4 | '코레일 공차 수송 확정' 클릭 | 예약 완료 + K-ESG 성과 자산 인증서 발행 |
 
 ## 6. 심사 기준 대응
@@ -122,7 +122,7 @@ CO2 감축량(kg)    = (도로tonKm × 도로배출계수 − 철도tonKm × 철
 | 프론트 | **React (Next.js 15 App Router)** | 대시보드 UI |
 | 백엔드 | **Next.js Route Handlers (Node/TypeScript)** | 별도 서버 없이 `app/api/*`로 처리. Java Spring·FastAPI는 이번 MVP(CRUD 거의 없음, 계산+LLM 호출 위주)에서 계층 구성 비용만 큼. 서버 2개 → CORS·배포 2번 문제도 회피 |
 | 타입 공유 | `lib/types.ts` | 프론트·백엔드가 동일 타입 사용. 시연 중 스펙 변경 시 수정 지점 절반 |
-| 생성형 AI | **Gemini API** (`@google/genai`) | 리포트 문장 생성, 자연어 파싱 |
+| 생성형 AI | **Claude API** (`@anthropic-ai/sdk`) | 리포트 문장 생성, 자연어 파싱 |
 | 데이터 | **인메모리 시드 (`lib/seed.ts`)** | 시연에 DB 불필요. 나중에 붙일 수 있게 데이터 접근부만 분리 |
 | 스타일 | Tailwind CSS v4 | 대시보드 속도 |
 | 배포 | Vercel | `git push` 한 번 |
@@ -135,9 +135,9 @@ CO2 감축량(kg)    = (도로tonKm × 도로배출계수 − 철도tonKm × 철
 app/
   page.tsx              // 랜딩
   api/
-    parse/route.ts      // 자연어 → 구조화 화물 데이터 (Gemini)
+    parse/route.ts      // 자연어 → 구조화 화물 데이터 (Claude)
     match/route.ts      // 합적 매칭 + 편익 산출
-    report/route.ts     // K-ESG 리포트 초안 생성 (Gemini)
+    report/route.ts     // K-ESG 리포트 초안 생성 (Claude)
 lib/
   types.ts              // 공용 도메인 타입
   constants.ts          // ⚠️ 모든 계수는 여기에만
@@ -145,7 +145,7 @@ lib/
   seed.ts               // 시연용 화물·공차 데이터
   matching.ts           // 합적 + 공차 매칭 알고리즘
   benefit.ts            // 4대 편익 계산
-  gemini.ts             // Gemini 클라이언트 (세팅 완료)
+  claude.ts             // Claude 클라이언트 (세팅 완료)
 docs/
   PROJECT.md            // 이 문서
 ```
@@ -156,7 +156,7 @@ docs/
 2. `benefit.ts` — 계산이 맞아야 화면이 의미 있음. 숫자 손검산 1회 필수
 3. `matching.ts` — 그리디(First-Fit Decreasing)로 충분. 최적화 알고리즘 과투자 금지
 4. `/api/match` + 대시보드 화면 — **여기까지가 시연의 핵심**
-5. `/api/report` + Gemini 리포트 화면
+5. `/api/report` + Claude 리포트 화면
 6. `/api/parse` 자연어 입력, PDF 출력, 예약 확정 애니메이션
 
-> AI 키가 없거나 네트워크가 끊겨도 시연이 죽지 않도록 **Gemini 호출부에는 반드시 규칙기반 폴백**을 둔다. 해커톤 현장 와이파이는 믿을 수 없다.
+> AI 키가 없거나 네트워크가 끊겨도 시연이 죽지 않도록 **Claude 호출부에는 반드시 규칙기반 폴백**을 둔다. 해커톤 현장 와이파이는 믿을 수 없다.

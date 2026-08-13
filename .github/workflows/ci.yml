@@ -33,5 +33,5 @@ jobs:
         run: npm run build
         env:
           # 빌드 시점에 실제 키가 필요하면 안 된다.
-          # Gemini 클라이언트는 요청 시점에만 초기화되므로 여기서는 더미로 충분.
-          GEMINI_API_KEY: dummy-key-for-build
+          # Claude 클라이언트는 요청 시점에만 초기화되므로 여기서는 더미로 충분.
+          ANTHROPIC_API_KEY: dummy-key-for-build

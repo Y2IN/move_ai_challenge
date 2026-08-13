@@ -9,18 +9,18 @@
 
 ```bash
 npm install
-cp .env.example .env.local   # GEMINI_API_KEY 입력
+cp .env.example .env.local   # ANTHROPIC_API_KEY 입력
 npm run dev                  # http://localhost:3000
 ```
 
-Gemini API 키 발급: https://aistudio.google.com/apikey
+Claude API 키 발급: https://platform.claude.com → Settings → API keys
 
 ## 스택
 
 - **Next.js 15 (App Router) + React 19 + TypeScript** — 프론트와 백엔드를 한 레포에서 처리
 - **백엔드는 별도 서버 없이 `app/api/*` Route Handlers** — 이번 MVP는 계산 + LLM 호출 위주라 Spring/FastAPI 계층이 오버헤드
 - **Tailwind CSS v4**
-- **Gemini API** (`@google/genai`) — `lib/gemini.ts`에 클라이언트 배선 완료
+- **Claude API** (`@anthropic-ai/sdk`) — `lib/claude.ts`에 클라이언트 배선 완료
 
 ## 현재 상태
 
