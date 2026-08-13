@@ -1,6 +1,8 @@
 # 배포 가이드
 
-배포 대상: **Vercel** (Next.js 프론트 + `app/api/*` 서버리스 함수가 한 번에 올라감. 별도 서버·인프라 없음)
+배포 대상: **Vercel** (Next.js 프론트 + `FE/app/api/*` 서버리스 함수가 한 번에 올라감. 별도 서버·인프라 없음)
+
+레포는 `FE`(Next.js) / `BE`(도메인 로직) 두 npm workspace로 나뉘어 있지만, **배포는 Vercel 프로젝트 1개**다. BE는 독립 서버가 아니라 FE가 소스째 import 하는 패키지이므로 배포 대상이 아니다.
 
 ```
 git push origin main
@@ -26,7 +28,7 @@ CI와 Vercel 배포는 **병렬로 독립 실행**된다. CI가 깨져도 Vercel
 4. 설정 화면에서 확인만 하고 그대로 둔다
    - Framework Preset: `Next.js` (자동 감지)
    - Build Command / Output Directory: **건드리지 말 것** (자동)
-   - Root Directory: `./`
+   - Root Directory: **`FE`** ⚠️ 여기만 손으로 바꾼다. 기본값 `./` 이면 루트에 Next 앱이 없어 빌드가 실패한다. (`FE` 로 지정하면 Vercel이 npm workspaces를 인식해 루트에서 설치하고 BE도 함께 올린다)
 5. **Environment Variables** 에 아래 2개 추가 (2번 절 참고)
 6. **Deploy** 클릭
 
@@ -43,7 +45,7 @@ Vercel 대시보드 → **Settings → Environment Variables**
 
 - 키 발급: https://platform.claude.com → Settings → API keys
 - **환경변수를 추가·수정한 뒤에는 재배포해야 반영된다.** (Deployments → 최신 항목 → ⋯ → Redeploy)
-- 로컬은 `.env.local` 을 쓴다. 이 파일은 `.gitignore` 처리되어 있으니 **절대 커밋하지 말 것.**
+- 로컬은 `FE/.env.local` 을 쓴다 (dev 서버가 FE 에서 돌아가므로 루트에 두면 읽히지 않는다). 이 파일은 `.gitignore` 처리되어 있으니 **절대 커밋하지 말 것.**
 
 ### 1-3. 발표용 URL 확보
 
@@ -68,13 +70,15 @@ git push -u origin feat/matching-engine
 
 ## 3. 설정 파일
 
-### `vercel.json`
+### `FE/vercel.json`
+Root Directory 가 `FE` 이므로 이 파일도 FE 안에 있어야 인식된다. 경로 패턴도 FE 기준이다.
+
 - `regions: ["icn1"]` — 서울 리전. 심사장에서 접속하므로 지연시간을 줄인다.
 - `functions."app/api/**/*.ts".maxDuration: 60` — **중요.** Claude 호출(조율안 탐색·리포트 생성)은 10초를 넘길 수 있는데 기본 제한이 짧아 타임아웃이 난다. 특히 `/api/negotiate` 는 화주 수만큼 메시지를 생성하므로 가장 오래 걸린다.
 
 ### `.github/workflows/ci.yml`
-- push(main) / PR 마다 `typecheck` + `build` 실행
-- 빌드에 더미 `ANTHROPIC_API_KEY` 를 주입한다. **Claude 클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `getClaude()` 를 호출할 것 (`lib/claude.ts` 가 그렇게 되어 있음)
+- push(main) / PR 마다 `typecheck` + `build` 실행. 루트 스크립트가 워크스페이스로 위임하므로(`typecheck --workspaces`, `build -w FE`) CI 파일은 폴더 분리 후에도 그대로다
+- 빌드에 더미 `ANTHROPIC_API_KEY` 를 주입한다. **Claude 클라이언트를 모듈 최상단에서 초기화하면 빌드가 깨지므로**, 반드시 요청 처리 함수 "안에서" `getClaude()` 를 호출할 것 (`BE/src/claude.ts` 가 그렇게 되어 있음)
 
 ---
 

@@ -1,0 +1,19 @@
+{
+  "name": "@railhub/be",
+  "version": "0.1.0",
+  "private": true,
+  "//": "빌드 스텝 없음 — FE가 TS 소스를 그대로 transpile 한다 (next.config.ts transpilePackages)",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.0"
+  }
+}
