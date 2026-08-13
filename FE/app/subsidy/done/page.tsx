@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchEsgIndicators,
   generateEsgReport,
@@ -32,7 +33,10 @@ import { ApplyDoneScreen } from "@/src/screens/ApplyDoneScreen";
  *   새로 만듭니다. #31 은 문단 6개를 LLM 으로 쓰기 때문에 재진입마다 부르면 안 됩니다.
  * - K-ESG 탭: #40(지표표)은 즉시, #41(문단)은 LLM 호출이라 뒤늦게 채워집니다.
  */
-export default function SubsidyDone() {
+function SubsidyDoneInner() {
+  // 06b 가 넘겨준 초안 id. 있으면 그걸 쓰고, 없을 때만 최근 초안을 찾는다.
+  const requestedId = useSearchParams().get("id");
+
   const [indicators, setIndicators] = useState<EsgIndicatorsResponse | null>(null);
   const [indicatorsError, setIndicatorsError] = useState<string | null>(null);
   const [report, setReport] = useState<EsgReport | null>(null);
@@ -55,15 +59,30 @@ export default function SubsidyDone() {
     setApplication(null);
     setDocError(null);
     setKeptUserEdits([]);
-    fetchLatestApplication()
-      .then((latest) =>
-        latest.exists && latest.applicationId
-          ? fetchApplication(latest.applicationId)
-          : createApplication(),
-      )
-      .then(setApplication)
+
+    // 06b 에서 넘어온 경우: 그 초안을 그대로 연다. 스트림이 이미 문단을 채워 뒀다.
+    const resolve = requestedId
+      ? fetchApplication(requestedId)
+      : fetchLatestApplication().then((latest) =>
+          latest.exists && latest.applicationId
+            ? fetchApplication(latest.applicationId)
+            : createApplication(),
+        );
+
+    resolve
+      .then((app) => {
+        setApplication(app);
+        // 06b 를 건너뛰고 들어와 문단이 비어 있으면(pending) 여기서 채운다.
+        // 06b 를 정상으로 거쳤다면 이 경로는 타지 않는다.
+        const empty = Object.values(app.document.paragraphs).every(
+          (para) => !para || para.source === "pending" || !para.text,
+        );
+        if (empty) regenerateAll(app.applicationId).then((r) =>
+          setApplication((prev) => (prev ? { ...prev, document: r.document } : prev)),
+        ).catch(() => { /* 실패해도 빈 서식은 이미 떠 있다 */ });
+      })
       .catch((error: Error) => setDocError(error.message));
-  }, []);
+  }, [requestedId]);
 
   /** #36 문단 하나만 재생성(↻). 응답 문단만 갈아 끼웁니다. */
   const regenerateDocParagraph = useCallback(
@@ -303,5 +322,14 @@ export default function SubsidyDone() {
       onRetryIndicators={loadIndicators}
       onExportScope3={exportScope3}
     />
+  );
+}
+
+export default function SubsidyDone() {
+  // useSearchParams 는 Suspense 경계가 필요하다 (없으면 빌드가 정적 생성에서 막힌다).
+  return (
+    <Suspense fallback={null}>
+      <SubsidyDoneInner />
+    </Suspense>
   );
 }

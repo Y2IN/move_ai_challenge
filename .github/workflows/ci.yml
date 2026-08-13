@@ -85,34 +85,32 @@ jobs:
         if: steps.guard.outputs.ready == 'true'
         run: npm i -g vercel@latest
 
-      # 대상 환경을 한 번만 정하고 이후 단계가 공유한다.
       # main 이면 production, 그 외에는 preview.
       - name: 대상 환경 결정
         if: steps.guard.outputs.ready == 'true'
         id: target
         run: |
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            echo "env=production" >>"$GITHUB_OUTPUT"
             echo "flag=--prod" >>"$GITHUB_OUTPUT"
           else
-            echo "env=preview" >>"$GITHUB_OUTPUT"
             echo "flag=" >>"$GITHUB_OUTPUT"
           fi
 
-      # 프로젝트 설정(Root Directory=FE 포함)과 환경변수를 내려받는다.
-      - name: Vercel 프로젝트 설정 내려받기
-        if: steps.guard.outputs.ready == 'true'
-        run: vercel pull --yes --environment=${{ steps.target.outputs.env }} --token="$VERCEL_TOKEN"
-
-      - name: Vercel 빌드
-        if: steps.guard.outputs.ready == 'true'
-        run: vercel build ${{ steps.target.outputs.flag }} --token="$VERCEL_TOKEN"
-
+      # 소스를 올려 **Vercel 쪽에서** 빌드한다. `vercel pull` + `vercel build --prebuilt`
+      # 조합을 쓰지 않는 이유가 두 가지 있다.
+      #
+      #  1. 프로젝트 한정 토큰(project-only)은 `vercel pull` 로 프로젝트 설정을 읽지 못한다
+      #     ("Could not retrieve Project Settings"). 계정 전체 권한 토큰을 만들면 풀리지만,
+      #     배포 전용 자격증명의 권한을 넓히는 건 방향이 반대다.
+      #  2. 이 저장소는 npm workspaces 모노레포라 Root Directory 가 `FE` 다. 서버 빌드는
+      #     프로젝트 설정을 그대로 쓰므로 러너에서 그걸 재현할 필요가 없다.
+      #
+      # 빌드가 깨진 커밋은 위 `build` 잡이 이미 막는다 (needs: build).
       - name: 배포
         if: steps.guard.outputs.ready == 'true'
         id: deploy
         run: |
-          url=$(vercel deploy --prebuilt ${{ steps.target.outputs.flag }} --token="$VERCEL_TOKEN")
+          url=$(vercel deploy --yes ${{ steps.target.outputs.flag }} --token="$VERCEL_TOKEN")
           echo "url=$url" >>"$GITHUB_OUTPUT"
           echo "### 배포 완료 → $url" >>"$GITHUB_STEP_SUMMARY"
 

@@ -5,7 +5,7 @@ import {
   generateParagraphs,
   isLlmConfigured,
 } from "@railhub/be/report/generate";
-import { find, replaceParagraph } from "@railhub/be/report/store";
+import { find, replaceParagraph, saveDiagnostics } from "@railhub/be/report/store";
 
 /**
  * api_list #32 — 사업계획서 생성 진행률 (06b 화면, SSE).
@@ -109,16 +109,20 @@ export async function GET(
         send("step", { step: 5, label: "서술 문단 작성", status: "done" });
 
         const at = new Date().toISOString();
+        // ⚠️ 위에서 잡아 둔 `app` 은 DB 모드에서 교체 결과를 못 본다 (find 가 매번
+        //    새 객체를 준다). 반환값을 이어받아야 done 이 방금 쓴 문단을 싣는다.
+        let latest = app;
         for (const key of PARAGRAPH_KEYS) {
-          await replaceParagraph(id, key, result.paragraphs[key], "generate", at);
+          latest =
+            (await replaceParagraph(id, key, result.paragraphs[key], "generate", at)) ?? latest;
         }
-        app.diagnostics = result.diagnostics;
+        await saveDiagnostics(id, result.diagnostics);
 
         send("done", {
-          applicationId: app.id,
+          applicationId: latest.id,
           progress: 100,
           fallbackCount: result.diagnostics.filter((d) => d.source === "fallback").length,
-          document: app.document,
+          document: latest.document,
         });
       } catch (e) {
         send("error", { message: e instanceof Error ? e.message : String(e) });

@@ -1,11 +1,10 @@
-import { TONE_LABEL, type MatchTone } from '../mocks/home';
+import { TONE_LABEL, type MatchTone } from '../lib/dashboard';
 
+/** 톤은 BE 의 편성 상태(done · group · wait)와 1:1 입니다. */
 const TONE_CLASS: Record<MatchTone, string> = {
   done: 'bg-[#E8F3FF] text-[#1B64DA]',
   group: 'bg-[#FFF4E0] text-[#C77700]',
   wait: 'bg-[#F2F4F6] text-[#6B7684]',
-  nego: 'bg-[#3182F6] text-white',
-  queue: 'bg-[#F2F4F6] text-[#6B7684]',
 };
 
 export function StatusBadge({

@@ -1,16 +1,49 @@
+'use client';
+
+import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
+import { AsyncSection, CardSkeleton } from '../components/AsyncSection';
 import { Banner, Card, CardTitle, InfoCell } from '../components/Card';
-import { agentNote, candidates, unmatched, wagon } from '../mocks/negotiation';
+import { getShipment } from '../lib/demo-session';
+import { formatNumber, formatPct } from '../lib/format';
+import { requestMatching, type MatchResult } from '../lib/freight';
+import { useAsync } from '../lib/use-async';
+import { agentNote } from '../mocks/negotiation';
 
 interface UnmatchedScreenProps {
   onNavigate?: (to: string) => void;
 }
 
-/** 04c — 매칭 미성립. 조율 에이전트 발동 지점 */
+/**
+ * 04c — 매칭 미성립. 조율 에이전트 발동 지점.
+ *
+ * #16 을 다시 부릅니다 — 04a 에서 넘어온 화물(세션)로 같은 편성을 재현합니다.
+ * LLM 을 타지 않는 계산이라 재호출이 쌉니다. 여기서 조율(#22)을 미리 돌리지
+ * **않습니다**: 그건 "조율 에이전트 실행" 버튼이 하는 일이고, 미리 돌리면
+ * 화면을 열어만 봐도 LLM 값을 지불하게 됩니다.
+ */
 export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
+  const match = useAsync<MatchResult>(useCallback(() => requestMatching(getShipment()), []));
+
   return (
     <AppLayout active="matching">
-      <Banner tone="warn">{unmatched.headline}</Banner>
+      <AsyncSection state={match.state} onRetry={match.reload} skeleton={<CardSkeleton height={420} />}>
+        {(m) => <UnmatchedBody match={m} onNavigate={onNavigate} />}
+      </AsyncSection>
+    </AppLayout>
+  );
+}
+
+function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigate?: (to: string) => void }) {
+  const loadRate = Math.round(m.loadFactor * 100);
+  const minRate = m.wagon ? Math.round(m.wagon.minLoadRate * 100) : 60;
+  const minTon = m.wagon ? m.wagon.capacityTon * m.wagon.minLoadRate : 0;
+  const solo = m.members.map((x) => `${x.shipperName} ${formatNumber(x.weightTon, 1)}t`).join(' · ');
+
+  return (
+    <>
+      {/* 배너 문구는 서버 판정 그대로. 화면이 다시 쓰면 판정과 어긋납니다 */}
+      <Banner tone="warn">{m.message}</Banner>
 
       <section className="grid grid-cols-[1fr_380px] items-start gap-4">
         <div className="flex flex-col gap-4">
@@ -23,28 +56,31 @@ export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
             </div>
 
             <div className="mt-[18px] grid grid-cols-4 gap-4">
-              <InfoCell label="구간" value={wagon.route} />
-              <InfoCell label="출발 예정" value={wagon.departAt} />
-              <InfoCell label="정원" value={wagon.capacityTons} />
-              <InfoCell label="최소 적재 기준" value={wagon.minLoadRate} />
+              <InfoCell label="구간" value={m.wagon ? m.wagon.label : '배정 가능한 공차 없음'} />
+              <InfoCell
+                label="출발 예정"
+                value={m.wagon ? `${m.wagon.departure.date} ${m.wagon.departure.time}` : '—'}
+              />
+              <InfoCell label="정원" value={`${formatNumber(m.capacityTon, 1)}t`} />
+              <InfoCell label="최소 적재 기준" value={`${minRate}%`} />
             </div>
 
             <div className="mt-[22px] flex items-baseline justify-between">
               <span className="text-[15px] font-semibold text-[#6B7684]">현재 적재율</span>
               <span className="text-[26px] font-extrabold tabular-nums tracking-[-0.03em] text-[#B45309]">
-                {unmatched.loadRate}%
+                {loadRate}%
               </span>
             </div>
             <span className="mt-2.5 block h-2.5 overflow-hidden rounded-full bg-[#F2F4F6]">
               <span
-                className="block h-2.5 rounded-full bg-[#F59E0B]"
-                style={{ width: `${unmatched.loadRate}%` }}
+                className="block h-2.5 rounded-full bg-[#F59E0B] transition-[width] duration-500"
+                style={{ width: `${Math.min(loadRate, 100)}%` }}
               />
             </span>
             <div className="mt-2 flex justify-between text-[13px] text-[#B0B8C1]">
-              <span>{unmatched.soloShipper}</span>
+              <span>{solo || '등록된 화물 없음'}</span>
               <span>
-                최소 기준 {wagon.minLoadRate} · {wagon.minLoadTons}
+                최소 기준 {minRate}% · {formatNumber(minTon, 1)}t · 부족 {formatNumber(m.shortfallTon, 1)}t
               </span>
             </div>
           </Card>
@@ -52,35 +88,38 @@ export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
           <Card>
             <CardTitle>조율 여지</CardTitle>
             <p className="mt-2 text-[15px] text-[#6B7684]">
-              같은 노선에 조건이 어긋난 화주 3곳이 있습니다. 조정 가능한 제약을 찾아 편성을 다시 구성합니다.
+              {m.negotiationCandidates.length
+                ? `같은 노선에 조건이 어긋난 화주 ${m.negotiationCandidates.length}곳이 있습니다. 조정 가능한 제약을 찾아 편성을 다시 구성합니다.`
+                : '지금 이 노선에는 조율로 끌어올 수 있는 화물이 없습니다. 다음 공차 일정을 기다립니다.'}
             </p>
 
-            <div className="mt-[18px] flex flex-col">
-              <div className="grid grid-cols-[150px_90px_1fr_150px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5 text-[13px] font-bold text-[#B0B8C1]">
-                <span>화주</span>
-                <span>물량</span>
-                <span>어긋난 조건</span>
-                <span>조율 여지</span>
-              </div>
-
-              {candidates.map((c) => (
-                <div
-                  key={c.name}
-                  className="grid grid-cols-[150px_90px_1fr_150px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5"
-                >
-                  <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">{c.name}</span>
-                  <span className="text-[15px] tabular-nums text-[#4E5968]">{c.tons}</span>
-                  <span className="text-[15px] text-[#6B7684]">{c.conflict}</span>
-                  <span
-                    className={`justify-self-start rounded-lg px-[11px] py-1.5 text-[13px] font-bold ${
-                      c.adjustable ? 'bg-[#E8F3FF] text-[#1B64DA]' : 'bg-[#F2F4F6] text-[#6B7684]'
-                    }`}
-                  >
-                    {c.kind}
-                  </span>
+            {m.negotiationCandidates.length > 0 && (
+              <div className="mt-[18px] flex flex-col">
+                <div className="grid grid-cols-[150px_90px_1fr_120px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5 text-[13px] font-bold text-[#B0B8C1]">
+                  <span>화주</span>
+                  <span>물량</span>
+                  <span>어긋난 조건</span>
+                  <span>품목</span>
                 </div>
-              ))}
-            </div>
+
+                {m.negotiationCandidates.map((c) => (
+                  <div
+                    key={c.shipmentId}
+                    className="grid grid-cols-[150px_90px_1fr_120px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5"
+                  >
+                    <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">{c.shipperName}</span>
+                    <span className="text-[15px] tabular-nums text-[#4E5968]">
+                      {formatNumber(c.weightTon, 1)}t
+                    </span>
+                    {/* 왜 지금은 못 타는지 — 서버가 판정해 문장으로 담아 보냅니다 */}
+                    <span className="text-[15px] text-[#6B7684]">{c.requiresNegotiation ?? c.description}</span>
+                    <span className="justify-self-start rounded-lg bg-[#F2F4F6] px-[11px] py-1.5 text-[13px] font-bold text-[#6B7684]">
+                      {c.category}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
 
@@ -97,20 +136,25 @@ export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
           <div className="flex flex-col gap-2.5 rounded-[20px] bg-white p-6">
             <button
               type="button"
+              disabled={!m.negotiationCandidates.length}
               onClick={() => onNavigate?.('/matching/negotiation')}
-              className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+              className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA] disabled:bg-[#B0B8C1]"
             >
               조율 에이전트 실행
             </button>
             <button
               type="button"
+              onClick={() => onNavigate?.('/home')}
               className="h-[52px] rounded-[14px] bg-[#F2F4F6] text-base font-bold text-[#333D4B] transition-colors hover:bg-[#E5E8EB]"
             >
               다음 공차 일정 대기
             </button>
+            <span className="text-[13px] leading-relaxed text-[#8B95A1]">
+              적재율 {formatPct(m.loadFactor)} · 마감까지 {Math.max(0, Math.round(m.hoursToCutoff))}시간
+            </span>
           </div>
         </div>
       </section>
-    </AppLayout>
+    </>
   );
 }

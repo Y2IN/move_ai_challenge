@@ -1,7 +1,13 @@
+'use client';
+
+import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
+import { AsyncSection, SkeletonGrid } from '../components/AsyncSection';
 import { StatCard } from '../components/StatCard';
 import { TrendChart } from '../components/TrendChart';
-import { accounts, korailStats } from '../mocks/home';
+import { fetchDashboard, toStatCards, type StatData } from '../lib/dashboard';
+import { useAsync } from '../lib/use-async';
+import { accounts } from '../mocks/home';
 import { header, perfHistory, perfReport, revenueTrend, trendNotes } from '../mocks/performance';
 import { wagonTrend } from '../mocks/wagons';
 
@@ -12,8 +18,17 @@ interface PerformanceScreenProps {
   onOpenLast?: () => void;
 }
 
-/** 코레일 — 수송 실적. 공차 운영 성과와 리포트 발행 */
+/**
+ * 코레일 — 수송 실적. 공차 운영 성과와 리포트 발행.
+ *
+ * 상단 KPI 4장만 실데이터(#7)다. 분기별 추이·차트는 아직 시계열 API 가 없어
+ * 큐레이션 값을 쓴다 (mocks/performance, mocks/wagons).
+ */
 export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenProps) {
+  const stats = useAsync<StatData[]>(
+    useCallback(() => fetchDashboard('korail').then((d) => toStatCards(d.kpis)), []),
+  );
+
   return (
     <AppLayout active="performance" role="korail" account={accounts.korail}>
       <header className="flex flex-col gap-2">
@@ -21,10 +36,20 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
         <p className="text-base text-[#6B7684]">{header.lead}</p>
       </header>
 
-      <section className="grid grid-cols-4 gap-4">
-        {korailStats.map((s) => (
-          <StatCard key={s.label} stat={s} />
-        ))}
+      <section>
+        <AsyncSection
+          state={stats.state}
+          onRetry={stats.reload}
+          skeleton={<SkeletonGrid count={4} height={118} />}
+        >
+          {(cards) => (
+            <div className="grid grid-cols-4 gap-4">
+              {cards.map((c) => (
+                <StatCard key={c.label} stat={c} />
+              ))}
+            </div>
+          )}
+        </AsyncSection>
       </section>
 
       <section className="grid grid-cols-2 gap-4">

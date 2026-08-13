@@ -21,7 +21,7 @@
  *    심사위원이 2주간 화물을 아무리 쌓아도 시나리오가 흔들리지 않는 이유다.
  */
 
-import { nextSeq } from "./db/client";
+import { isDbEnabled, nextSeq } from "./db/client";
 import {
   cancelNegotiationRow,
   clearAll as clearDb,
@@ -106,18 +106,41 @@ const registered = state.registered;
 const confirmations = state.confirmations;
 const negotiations = state.negotiations;
 
+/** 발급된 번호와, 그 번호가 DB 밖에서 만들어진 것인지. */
+interface IssuedSeq {
+  n: number;
+  /**
+   * true 면 **DB 에 쓰면 안 된다.** DB 는 살아 있는데 번호만 못 받은 상태라,
+   * 인메모리 카운터가 낸 번호는 DB 에 이미 있는 id 와 겹친다.
+   */
+  localOnly: boolean;
+}
+
 /**
  * 일련번호 발급 — DB 시퀀스가 우선, 안 되면 인메모리 카운터.
  *
- * DB 가 살아 있으면 인스턴스가 갈려도 번호가 이어진다. 폴백 카운터는 인스턴스마다
- * 0 부터 시작하므로 id 가 겹칠 수 있는데, 폴백은 애초에 그 인스턴스 안에서만
- * 보이는 임시 상태라 충돌하지 않는다.
+ * ⚠️ **"DB 가 꺼짐" 과 "DB 는 살아 있는데 시퀀스 호출만 실패" 를 구분해야 한다.**
+ *
+ * 후자를 똑같이 취급하면 이런 사고가 난다: DB 모드에서는 `state.seq` 가 한 번도
+ * 오르지 않으므로 0 인 채인데, RPC 만 실패(스키마 캐시 미갱신·권한 누락·타임아웃)하면
+ * 폴백 카운터가 1 을 내고 `SHM-USER-001` 이 다시 발급된다. 그 id 로 DB 에 insert 하면
+ * PK 충돌로 조용히 무시되고(tryDb 가 삼킨다), 이후 그 id 로 들어온 수정·삭제가
+ * **먼저 등록한 다른 화주의 행을 건드린다.**
+ *
+ * 그래서 이 경우엔 `localOnly` 를 세워 DB 쓰기를 아예 건너뛴다. 화면은 계속 동작하고
+ * (그 인스턴스 메모리에는 남는다), 남의 데이터는 손대지 않는다.
  */
 async function issueSeq(
   kind: "shipment" | "confirm" | "negotiation",
   bump: () => number,
-): Promise<number> {
-  return (await nextSeq(kind)) ?? bump();
+): Promise<IssuedSeq> {
+  const fromDb = await nextSeq(kind);
+  if (fromDb !== null) {
+    // 폴백이 나중에 걸리더라도 이 인스턴스가 본 최댓값 위에서 시작하도록 맞춰 둔다.
+    if (fromDb > state.seq) state.seq = fromDb;
+    return { n: fromDb, localOnly: false };
+  }
+  return { n: bump(), localOnly: isDbEnabled() };
 }
 
 /** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
@@ -137,11 +160,12 @@ export async function registerShipment(
   input: ShipmentInput,
   data: SeedData = seed,
 ): Promise<Shipment> {
-  const n = await issueSeq("shipment", () => (state.seq += 1));
+  const { n, localOnly } = await issueSeq("shipment", () => (state.seq += 1));
   const shipment = buildShipment(input, n, data);
   const record: StoredShipment = { input, shipment, seq: n };
 
-  await insertShipment(record);
+  // localOnly 면 DB 에 쓰지 않는다 — 남의 행을 덮어쓸 수 있다(issueSeq 주석 참고).
+  if (!localOnly) await insertShipment(record);
   registered.push(record); // 미러 — DB 가 죽어도 이 인스턴스에서는 계속 보인다
   return shipment;
 }
@@ -255,7 +279,7 @@ export async function confirmMatch(
     return { status: "notMatched", match: result };
   }
 
-  const n = await issueSeq("confirm", () => (state.confirmSeq += 1));
+  const { n, localOnly } = await issueSeq("confirm", () => (state.confirmSeq += 1));
   const confirmation: Confirmation = {
     groupId: `GRP-${String(n).padStart(3, "0")}`,
     status: "confirmed",
@@ -268,7 +292,7 @@ export async function confirmMatch(
     calc: result.calc,
   };
 
-  await insertConfirmation(confirmation, n);
+  if (!localOnly) await insertConfirmation(confirmation, n);
   confirmations.push(confirmation);
   return { status: "confirmed", confirmation };
 }
@@ -286,7 +310,7 @@ export interface StoredNegotiation {
 export async function saveNegotiation(
   result: NegotiationResult,
 ): Promise<StoredNegotiation> {
-  const n = await issueSeq("negotiation", () => (state.negSeq += 1));
+  const { n, localOnly } = await issueSeq("negotiation", () => (state.negSeq += 1));
   const record: StoredNegotiation = {
     id: `NEG-${String(n).padStart(3, "0")}`,
     status: "open",
@@ -294,7 +318,7 @@ export async function saveNegotiation(
     createdAt: new Date().toISOString(),
   };
 
-  await insertNegotiation(record, n);
+  if (!localOnly) await insertNegotiation(record, n);
   negotiations.push(record);
   return record;
 }

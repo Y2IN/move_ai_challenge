@@ -68,10 +68,14 @@ export async function POST(req: Request) {
         label: wagon.label,
         wagonType: wagon.wagonType,
         capacityTon: wagon.capacityTon,
+        // 이미 확보된 물량. 코레일 화면이 "얼마나 비었는지"를 그리는 값이다.
+        reservedTon: wagon.reservedTon,
         departure: wagon.departure,
         arrival: wagon.arrival,
         cutoffAt: wagon.cutoffAt,
         minLoadRate: wagon.minLoadRate,
+        // 왜 비어 있는지 — 공차 관리 화면에서 담당자가 가장 먼저 보는 맥락이다.
+        emptyReason: wagon.emptyReason,
       },
       route: lane
         ? `${seed.stations.find((s) => s.id === lane.originStationId)?.name} → ${seed.stations.find((s) => s.id === lane.destStationId)?.name}`

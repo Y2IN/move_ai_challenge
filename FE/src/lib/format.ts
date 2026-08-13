@@ -64,3 +64,17 @@ export function formatDateTime(iso: string): string {
 
 /** "2026-04-01" → "2026. 04. 01." — 서식 문서 표기 */
 export const formatDocDate = (ymd: string) => `${ymd.replaceAll('-', '. ')}.`;
+
+/**
+ * "2026Q2" → "2026년 2분기" · "2026-05" → "2026년 5월" · "2026" → "2026년"
+ *
+ * BE 는 기간을 id 로 돌려줍니다(#7 dashboard). K-ESG 쪽(#40)은 `period.label` 을
+ * 함께 주므로 그쪽에서는 이 함수가 필요 없습니다 — 서버 라벨이 있으면 그걸 쓰세요.
+ */
+export function formatPeriodLabel(id: string): string {
+  const quarter = /^(\d{4})Q([1-4])$/.exec(id);
+  if (quarter) return `${quarter[1]}년 ${quarter[2]}분기`;
+  const month = /^(\d{4})-(\d{2})$/.exec(id);
+  if (month) return `${month[1]}년 ${Number(month[2])}월`;
+  return /^\d{4}$/.test(id) ? `${id}년` : id;
+}

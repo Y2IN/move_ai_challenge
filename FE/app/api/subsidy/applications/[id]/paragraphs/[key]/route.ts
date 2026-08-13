@@ -12,7 +12,8 @@ import { verifyParagraph } from "@railhub/be/report/verify";
  * 숫자는 근거가 있어야 한다. 다만 사람 편집은 막지 않고 경고만 실어 보낸다.
  */
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+// 최악 경로는 25초 타임아웃 × 2회(환각 재시도)라 30초로는 모자란다.
+export const maxDuration = 60;
 
 function parseKey(raw: string): ParagraphKey | null {
   return (PARAGRAPH_KEYS as string[]).includes(raw) ? (raw as ParagraphKey) : null;
