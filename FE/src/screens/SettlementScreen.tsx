@@ -1,5 +1,6 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { AppLayout } from '../components/AppLayout';
+import { DemoDataBadge } from '../components/AsyncSection';
 import {
   achievement,
   contract,
@@ -497,7 +498,11 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
             <PeriodSelect />
             <span className="text-sm text-[#6B7684]">{header.subtitle}</span>
           </div>
-          <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">전환교통 협약 정산</h1>
+          {/* 정산 API 가 아직 없습니다. 이 화면 수치는 전부 큐레이션 값입니다. */}
+          <span className="flex items-center gap-2.5">
+            <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">전환교통 협약 정산</h1>
+            <DemoDataBadge api="정산 API" />
+          </span>
           <p className="text-base text-[#6B7684]">
             협약물량을 채운 만큼만 보조금이 지급됩니다. 실적 기준으로 계속 재계산됩니다.
           </p>

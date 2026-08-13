@@ -1,3 +1,4 @@
+import { DemoDataBadge } from './AsyncSection';
 import type { TrendPoint } from '../mocks/wagons';
 
 interface TrendChartProps {
@@ -6,16 +7,21 @@ interface TrendChartProps {
   data: TrendPoint[];
   /** 값 뒤에 붙는 단위. '%' 또는 '만원' */
   suffix: string;
+  /** 값의 출처가 API 가 아닐 때 붙일 표시 */
+  demoApi?: string;
 }
 
 /** 분기 추이 막대 차트. 마지막(현재) 분기만 파란 강조 */
-export function TrendChart({ title, note, data, suffix }: TrendChartProps) {
+export function TrendChart({ title, note, data, suffix, demoApi }: TrendChartProps) {
   const max = Math.max(...data.map((d) => d.rate));
 
   return (
     <div className="flex h-full flex-col justify-between rounded-[20px] bg-white p-[26px]">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">{title}</span>
+        <span className="flex items-center gap-2.5">
+          <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">{title}</span>
+          {demoApi && <DemoDataBadge api={demoApi} />}
+        </span>
         <span className="text-[13px] text-[#8B95A1]">{note}</span>
       </div>
 

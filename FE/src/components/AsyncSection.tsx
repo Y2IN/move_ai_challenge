@@ -43,6 +43,23 @@ export function CardSkeleton({ height = 220 }: { height?: number }) {
   return <div className="animate-pulse rounded-[20px] bg-white" style={{ height }} />;
 }
 
+/**
+ * 아직 API 가 없어 큐레이션 값으로 그리는 구간에 답니다.
+ *
+ * 화면에 안 적으면 심사·시연에서 실데이터와 구분이 안 됩니다. 붙일 엔드포인트가
+ * 정해져 있으면 `api` 로 함께 적어 두세요 — 그게 다음 작업 목록이 됩니다.
+ */
+export function DemoDataBadge({ api }: { api?: string }) {
+  return (
+    <span
+      title={api ? `${api} 가 생기면 실데이터로 교체됩니다` : undefined}
+      className="inline-flex whitespace-nowrap rounded-lg bg-[#FFF4E0] px-2.5 py-[5px] text-[13px] font-bold text-[#C77700]"
+    >
+      데모 데이터{api ? ` · ${api} 미구현` : ''}
+    </span>
+  );
+}
+
 export function SkeletonGrid({ count = 4, height = 118 }: { count?: number; height?: number }) {
   return (
     <div className="grid grid-cols-2 gap-4">

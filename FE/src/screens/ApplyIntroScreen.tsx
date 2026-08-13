@@ -1,5 +1,19 @@
+'use client';
+
+import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { applyMeta, breadcrumb, checklist, criteria } from '../mocks/apply';
+import { fetchEsgIndicators, type EsgIndicatorsResponse } from '../lib/esg';
+import { formatDocDate, formatTon, formatTrips } from '../lib/format';
+import { useAsync } from '../lib/use-async';
+import { accounts } from '../mocks/home';
+import { applyMeta, breadcrumb, checklist, type ChecklistItem } from '../mocks/apply';
+
+/** 체크리스트 상태 문구 — 값이 있는 항목만 집계에서 채웁니다. */
+function statusOf(item: ChecklistItem, res: EsgIndicatorsResponse | null): string {
+  if (!res || !item.statusFrom) return item.status;
+  if (item.statusFrom === 'trips') return `운송 실적 ${formatTrips(res.summary.tripCount)} 연동됨`;
+  return `계수 ${res.coefficientVersion} 적용`;
+}
 
 interface ApplyIntroScreenProps {
   /** 초안 발급 중. 연타로 초안이 여러 개 생기는 걸 막는다 */
@@ -19,6 +33,24 @@ export function ApplyIntroScreen({
   onNavigate,
   onBack,
 }: ApplyIntroScreenProps) {
+  /** 이 화면의 수치는 전부 #40 집계입니다. LLM 을 타지 않아 재진입이 쌉니다. */
+  const indicators = useAsync<EsgIndicatorsResponse>(useCallback(() => fetchEsgIndicators(), []));
+  const res = indicators.state.status === 'ready' ? indicators.state.data : null;
+
+  const criteria = [
+    {
+      label: '대상 기간',
+      value: res ? `${formatDocDate(res.period.from)} ~ ${formatDocDate(res.period.to)}` : '집계 중…',
+    },
+    {
+      label: '전환 운송 실적',
+      value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : '집계 중…',
+    },
+    // 인증(#1~#5)이 MVP 범위 밖이라 `/api/me` 가 없습니다. 신청 주체는 계정 표시값입니다.
+    { label: '신청 주체', value: res?.shipperName ?? accounts.corp.company },
+    { label: '예상 소요', value: '약 10초' },
+  ];
+
   return (
     <AppLayout active="subsidy">
       <header className="flex flex-col gap-2">
@@ -34,7 +66,9 @@ export function ApplyIntroScreen({
           ))}
         </div>
 
-        <span className="text-sm font-bold text-[#3182F6]">{applyMeta.periodLabel}</span>
+        <span className="text-sm font-bold text-[#3182F6]">
+          {res ? `${res.period.label} 실적 기준` : '실적을 집계하는 중…'}
+        </span>
         <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">{applyMeta.title}</h1>
         <p className="text-base text-[#6B7684]">{applyMeta.legalBasis}</p>
       </header>
@@ -65,7 +99,7 @@ export function ApplyIntroScreen({
                 </div>
 
                 <span className={`text-sm font-semibold ${c.ai ? 'text-[#3182F6]' : 'text-[#4E5968]'}`}>
-                  {c.status}
+                  {statusOf(c, res)}
                 </span>
               </div>
             ))}

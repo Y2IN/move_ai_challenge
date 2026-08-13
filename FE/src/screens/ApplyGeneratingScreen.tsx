@@ -37,7 +37,13 @@ export function ApplyGeneratingScreen({
   return (
     <AppLayout active="subsidy">
       <header className="flex flex-col gap-2">
-        <span className="text-sm font-bold text-[#3182F6]">{applyMeta.periodLabel}</span>
+        {/*
+          기간 라벨을 상수로 박지 않습니다 — 이 화면은 조회를 하지 않으므로 스스로
+          알 수 없는 값입니다. 대신 1단계(운송 실적 집계)가 실어 보낸 실적을 그대로 씁니다.
+        */}
+        <span className="text-sm font-bold text-[#3182F6]">
+          {steps[0]?.result ? `운송 실적 ${steps[0].result}` : '실적을 집계하는 중…'}
+        </span>
         <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">
           {error
             ? '사업계획서 작성을 마치지 못했습니다'

@@ -1,8 +1,12 @@
+'use client';
+
 import type { ReactNode } from 'react';
-import { brand, landingStats } from '../mocks/marketing';
+import { cumulativeLines, usePublicStats } from '../lib/landing';
+import { brand } from '../mocks/marketing';
 
 /** 02 로그인 · 회원가입 좌측 브랜드 패널 */
 export function AuthBrandPanel() {
+  const stats = usePublicStats();
   return (
     // 랜딩('/') 다크 히어로와 같은 팔레트
     <div className="flex flex-col justify-between bg-[#0B1220] px-10 py-11">
@@ -21,11 +25,16 @@ export function AuthBrandPanel() {
       </div>
 
       <div className="flex flex-col gap-2.5 text-[15px] text-[#8B95A1]">
-        {landingStats.map((s) => (
-          <span key={s.label}>
-            {s.label} <b className="text-white">{s.value}</b>
-          </span>
-        ))}
+        {stats.status === 'ready' ? (
+          cumulativeLines(stats.data).map((s) => (
+            <span key={s.label}>
+              {s.label} <b className="text-white">{s.value}</b>
+            </span>
+          ))
+        ) : (
+          // 값이 없을 때 옛 상수를 대신 띄우지 않습니다 — 자리만 지킵니다
+          <span className="h-[46px]" aria-hidden="true" />
+        )}
       </div>
     </div>
   );

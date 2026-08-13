@@ -46,9 +46,12 @@ export async function GET(_req: Request, ctx: Ctx) {
         });
         await wait(700);
 
-        // 수락 반영 → 적재율 상승
+        // 수락 반영 → 적재율 상승.
+        // ⚠️ 정원을 넘겨 싣지 않는다. 그냥 더하면 마지막 제안에서 17+4=21톤/18톤 =
+        //    117% 같은, 이 시스템에 존재할 수 없는 적재율이 화면을 스쳐 지나간다
+        //    (매처가 낸 최종값은 100%다). 재생값은 최종값과 같은 규칙을 따라야 한다.
         const from = load;
-        ton += p.weightTon;
+        ton = capacity ? Math.min(ton + p.weightTon, capacity) : ton + p.weightTon;
         load = capacity ? ton / capacity : load;
         send("loadRate", { from: round2(from), to: round2(load), step: i + 1 });
         send("proposal", { step: i + 1, shipper: p.shipperName, status: "ACCEPTED", savingKrw: p.savingKrw });
