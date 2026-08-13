@@ -34,8 +34,16 @@ import { ApiError, GoogleGenAI } from "@google/genai";
  *
  * flash 계열만 무료 티어에서 쓸 수 있습니다 (`gemini-2.5-pro` 는 유료 전용).
  * 우리 용도는 짧은 한국어 서술 문단 생성이라 flash 로 충분합니다.
+ *
+ * ⚠️ **`gemini-3.6-flash` 를 기본값으로 두지 마십시오.** 무료 티어에서 이 모델의
+ *    일일 할당량이 제일 먼저 마릅니다. 실제로 시연 준비 중 전 문단이 429 로 떨어져
+ *    폴백 초안만 나왔습니다. `-lite` 계열은 할당량이 따로·넉넉하게 잡혀 있어
+ *    같은 키로도 계속 응답합니다. 문단이 짧아 품질 차이도 드러나지 않습니다.
+ *
+ *    `gemini-2.5-flash` 도 쓰면 안 됩니다 — 신규 사용자에게는 404 입니다.
+ *    (모델 목록 API 에는 여전히 보이므로 목록만 보고 고르면 걸립니다)
  */
-export const LLM_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+export const LLM_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
 export type LlmAuthMode = "apiKey" | "none";
 
@@ -98,6 +106,13 @@ export interface GenerateOptions {
   /** 이 시간을 넘기면 중단하고 throw — 호출부는 폴백으로 갑니다. */
   timeoutMs?: number;
   /**
+   * 주면 모델이 이 스키마에 맞는 JSON 만 뱉습니다 (`response_format`).
+   *
+   * 문단 여러 개를 **한 번의 호출로** 받을 때 씁니다. 무료 티어는 분당 요청 수로
+   * 한도를 재므로, 6개를 따로 부르면 1회 생성에 6요청을 씁니다.
+   */
+  jsonSchema?: Record<string, unknown>;
+  /**
    * SDK 자체 재시도 횟수. **기본 0이고, 올리지 마세요.**
    *
    * SDK 의 재시도 경로는 이미 소비된 요청 바디를 다시 쓰려다
@@ -131,6 +146,15 @@ export async function generateText(o: GenerateOptions): Promise<string> {
         max_output_tokens: o.maxTokens,
         ...(o.thinking ? { thinking_level: o.thinking } : {}),
       },
+      ...(o.jsonSchema
+        ? {
+            response_format: {
+              type: "text",
+              mime_type: "application/json",
+              schema: o.jsonSchema,
+            },
+          }
+        : {}),
     },
     {
       ...(o.timeoutMs ? { timeout: o.timeoutMs } : {}),
