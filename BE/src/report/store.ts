@@ -14,10 +14,11 @@ import {
   clearApplications,
   findApplication,
   findLatestApplication,
+  updateDiagnostics,
   updateDocument,
   upsertApplication,
 } from "../db/reports";
-import { nextSeq } from "../db/client";
+import { isDbEnabled, nextSeq } from "../db/client";
 import type {
   Paragraph,
   ParagraphKey,
@@ -79,22 +80,37 @@ const state: ReportStoreState = (globalRef.__railhubReportStore ??= {
 
 const store = state.apps;
 
-/** 이번 초안에 쓸 번호. DB 시퀀스가 우선, 안 되면 인메모리 카운터. */
-let lastSeq = 0;
+/**
+ * 발급한 id 별로 번호와 "DB 에 써도 되는지" 를 기억해 둔다.
+ *
+ * 모듈 변수 하나(`lastSeq`)로 들고 있으면 동시 요청 두 건이 서로의 번호를 덮어쓴다.
+ * id 로 키를 잡으면 발급과 저장이 짝을 잃지 않는다.
+ */
+const issued = new Map<string, { seq: number; localOnly: boolean }>();
 
 /**
  * APP-NNNN 발급. id 문자열 규칙은 여기 한 곳에만 둔다 (SQL 은 번호만 준다).
  *
- * 발급한 번호를 `lastSeq` 에 남겨 뒤이은 `save()` 가 같은 값을 쓰게 한다.
- * 라우트는 항상 발급 직후에 저장하므로 이 정도로 충분하다.
+ * ⚠️ store.ts 의 `issueSeq` 와 같은 이유로 **"DB 꺼짐" 과 "시퀀스만 실패" 를 구분한다.**
+ *    후자에서 인메모리 카운터가 낸 번호는 DB 에 이미 있는 APP-0001 과 겹치고,
+ *    upsert 는 `onConflict: "id"` 라 **남의 초안을 통째로 덮어쓴다.**
  */
 export async function nextApplicationId(): Promise<string> {
-  lastSeq = (await nextSeq("application")) ?? (state.seq += 1);
-  return `APP-${String(lastSeq).padStart(4, "0")}`;
+  const fromDb = await nextSeq("application");
+  const seq = fromDb ?? (state.seq += 1);
+  if (fromDb !== null && fromDb > state.seq) state.seq = fromDb;
+
+  const id = `APP-${String(seq).padStart(4, "0")}`;
+  issued.set(id, { seq, localOnly: fromDb === null && isDbEnabled() });
+  return id;
 }
 
 export async function save(app: StoredApplication): Promise<StoredApplication> {
-  await upsertApplication(app, lastSeq || state.seq || 1);
+  const meta = issued.get(app.id);
+  issued.delete(app.id); // 한 번 쓰면 버린다 (재저장은 updateDocument 가 맡는다)
+
+  // localOnly 면 DB 에 쓰지 않는다 — 남의 초안을 덮어쓸 수 있다.
+  if (!meta?.localOnly) await upsertApplication(app, meta?.seq ?? state.seq ?? 1);
   store.set(app.id, app);
   return app;
 }
@@ -147,10 +163,26 @@ export async function replaceParagraph(
   return app;
 }
 
+/**
+ * 진단 결과(어느 문단이 왜 폴백으로 떨어졌는지)를 저장한다.
+ *
+ * `app.diagnostics = ...` 로 객체에 직접 대입하면 안 된다. DB 모드에서 `find()` 는
+ * 매 호출마다 행을 새로 매핑한 **별개 객체**를 돌려주므로, 그 대입은 곧 버려지는
+ * 사본에만 남고 DB 에도 미러에도 반영되지 않는다.
+ */
+export async function saveDiagnostics(
+  id: string,
+  diagnostics: ParagraphDiagnostic[],
+): Promise<void> {
+  await updateDiagnostics(id, diagnostics);
+  const mirror = store.get(id);
+  if (mirror) mirror.diagnostics = diagnostics;
+}
+
 /** 테스트·시연 리셋용 */
 export async function clear(): Promise<void> {
   await clearApplications();
   store.clear();
+  issued.clear();
   state.seq = 0;
-  lastSeq = 0;
 }

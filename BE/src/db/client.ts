@@ -53,7 +53,10 @@ export function getDb(): SupabaseClient | null {
     return (cached = null);
   }
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(url)) {
-    reason = `SUPABASE_URL 형식이 올바르지 않습니다: ${url}`;
+    // ⚠️ 값을 그대로 싣지 않는다. 이 문구는 /api/health 가 **무인증으로** 노출하고,
+    //    keepalive 워크플로가 그 응답을 CI 로그에 평문으로 남긴다.
+    //    키를 URL 칸에 잘못 붙여 넣은 흔한 실수가 그대로 공개돼 버린다.
+    reason = "SUPABASE_URL 형식이 올바르지 않습니다 (https://<project-ref>.supabase.co)";
     return (cached = null);
   }
 

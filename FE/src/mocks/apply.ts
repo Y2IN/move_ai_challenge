@@ -59,6 +59,15 @@ export const criteria: { label: string; value: string }[] = [
 
 /* ── 06b 생성 중 ─────────────────────────────────────── */
 
+/**
+ * 06b 한 줄의 표시 모양.
+ *
+ * ⚠️ 예전엔 여기 `generateSteps` / `generateProgress` 고정 상수가 있었고 화면이
+ *    그걸 그대로 그렸다. "6개 문단 중 4번째" 가 영원히 4번째에 멈춰 있는 가짜
+ *    진행률이었다. 지금은 `app/subsidy/generating/page.tsx` 가 SSE
+ *    (`/api/subsidy/applications/{id}/stream`)로 받은 실제 단계를 내려준다.
+ *    **여기에 다시 고정값을 두지 말 것.**
+ */
 export interface GenerateStep {
   label: string;
   result: string;
@@ -66,25 +75,6 @@ export interface GenerateStep {
   /** 진행 중인 AI 단계 */
   ai?: boolean;
 }
-
-export const generateSteps: GenerateStep[] = [
-  { label: "운송 실적 집계", result: "12건 · 총 4,280톤", done: true },
-  { label: "환경부 배출계수 적용", result: "탄소 감축 182 tCO₂eq", done: true },
-  {
-    label: "사회환경적 편익 산출",
-    result: "절감비용 11억 4,000만 원",
-    done: true,
-  },
-  { label: "보조금 산정식 적용", result: "상한액 3억 4,200만 원", done: true },
-  {
-    label: "서술 문단 작성 중",
-    result: "6개 문단 중 4번째",
-    done: false,
-    ai: true,
-  },
-];
-
-export const generateProgress = { current: 4, total: 5, percent: 82 };
 
 /* ── 06c 완료 · 문서 ─────────────────────────────────── */
 

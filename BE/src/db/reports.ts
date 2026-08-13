@@ -121,6 +121,19 @@ export async function updateDocument(
   });
 }
 
+/** 진단 결과만 갱신한다. updateDocument 는 document·updated_at 만 건드린다. */
+export async function updateDiagnostics(
+  id: string,
+  diagnostics: ParagraphDiagnostic[],
+): Promise<void> {
+  await tryDb("updateDiagnostics", async (db) => {
+    unwrap(
+      await db.from("subsidy_applications").update({ diagnostics }).eq("id", id),
+    );
+    return true;
+  });
+}
+
 export async function appendRevision(id: string, rev: Revision): Promise<void> {
   await tryDb("appendRevision", async (db) => {
     unwrap(

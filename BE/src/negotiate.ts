@@ -247,6 +247,9 @@ export async function generateProposals(
           // 짧은 설득 문장이라 깊은 추론이 필요 없다. 화주 수만큼 병렬로 나가므로
           // 여기서 지연을 줄이는 게 전체 응답 시간에 그대로 반영된다.
           thinking: "low",
+          // 타임아웃이 없으면 한 화주의 호출이 늘어질 때 Promise.all 이 통째로 걸려
+          // Vercel 함수 한도(60s)를 넘고 504 가 난다 — 폴백 문장조차 못 싣는다.
+          timeoutMs: 20_000,
         });
         return { ...o, message: text, source: "ai" };
       } catch {

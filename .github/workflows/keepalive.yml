@@ -28,7 +28,8 @@ jobs:
           for attempt in 1 2 3; do
             echo "── 시도 $attempt ──"
             if BODY=$(curl -fsS --max-time 30 "$URL"); then
-              echo "$BODY"
+              # 본문을 통째로 찍지 않는다 — 공개 CI 로그에 남는다. 판정에 쓰는 값만.
+              echo "$BODY" | tr ',' '\n' | grep -E '"(ok|ready|reachable|seeded)"' || true
 
               # ok:true 라도 DB 가 안 붙었으면 조용히 폴백으로 도는 것이므로 실패로 본다.
               if echo "$BODY" | grep -q '"reachable":true'; then
