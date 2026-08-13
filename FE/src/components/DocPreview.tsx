@@ -1,4 +1,6 @@
 import { AiChip, MiniAiParagraph, MiniFormula, MiniSheet, MiniSheetHeader } from './LandingSection';
+import { formatKrwExact, formatNumber } from '../lib/format';
+import type { PublicStats } from '../lib/public';
 import { esgDocPreview, planDocPreview } from '../mocks/marketing';
 
 const BENEFIT_COLS = '1.1fr 1fr 1fr';
@@ -73,9 +75,16 @@ function PreviewHead({ title, formats }: { title: string; formats: string }) {
   );
 }
 
-/** 01 랜딩 — 보조금 사업계획서 미리보기 */
-export function PlanDocPreview() {
+/**
+ * 01 랜딩 — 보조금 사업계획서 미리보기.
+ *
+ * **표 안의 금액은 실제 집계(#6)입니다.** 예시 숫자를 박아 두면, 심사위원이 이
+ * 미리보기와 실제 신청서(06c)를 나란히 열었을 때 두 문서의 금액이 다릅니다.
+ * 수치가 오기 전에는 표를 흐리게 두고 값 자리를 비웁니다.
+ */
+export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
   const d = planDocPreview;
+  const total = stats ? stats.breakdown.reduce((sum, b) => sum + b.amountKrw, 0) : 0;
   return (
     <div className="flex flex-col gap-3.5">
       <PreviewHead title={d.title} formats={d.formats} />
@@ -95,12 +104,12 @@ export function PlanDocPreview() {
               </Cell>
             </Row>
 
-            {d.benefitRows.map((r) => (
+            {d.benefitRows.map((r, i) => (
               <Row key={r.label} cols={BENEFIT_COLS}>
-                <Cell>{r.label}</Cell>
+                <Cell>{stats ? stats.breakdown[i]?.label ?? r.label : r.label}</Cell>
                 <Cell muted>{r.source}</Cell>
                 <Cell right last>
-                  {r.amount}
+                  {stats ? formatKrwExact(stats.breakdown[i]?.amountKrw ?? 0) : '—'}
                 </Cell>
               </Row>
             ))}
@@ -109,7 +118,7 @@ export function PlanDocPreview() {
               <Cell>편익 계</Cell>
               <Cell />
               <Cell right last>
-                {d.benefitTotal}
+                {stats ? formatKrwExact(total) : '—'}
               </Cell>
             </Row>
           </div>
@@ -118,17 +127,26 @@ export function PlanDocPreview() {
         <div>
           <div className="text-[13px] font-extrabold text-[#191F28]">5. 보조금 산정 결과</div>
           <div className="mt-2 border border-[#B0B8C1] text-[11px]">
-            {d.subsidyRows.map((r) => (
-              <Row key={r.label} cols={SUBSIDY_COLS}>
-                <Cell head>{r.label}</Cell>
-                <Cell>
-                  <MiniFormula>{r.formula}</MiniFormula>
-                </Cell>
-                <Cell right last>
-                  {r.amount}
-                </Cell>
-              </Row>
-            ))}
+            <Row cols={SUBSIDY_COLS}>
+              <Cell head>추가비용 (A)</Cell>
+              <Cell>
+                <MiniFormula>3. 추가비용 합계</MiniFormula>
+              </Cell>
+              <Cell right last>
+                {/* A 는 신청서에서만 산출됩니다. 미리보기에 없는 값을 지어내지 않습니다 */}
+                <span className="text-[#B0B8C1]">신청서에서 산출</span>
+              </Cell>
+            </Row>
+
+            <Row cols={SUBSIDY_COLS}>
+              <Cell head>편익 × 30% (B)</Cell>
+              <Cell>
+                <MiniFormula>{stats ? `${formatNumber(total)} × 0.3` : '편익 계 × 0.3'}</MiniFormula>
+              </Cell>
+              <Cell right last>
+                {stats ? formatKrwExact(stats.quarterSubsidy.amount) : '—'}
+              </Cell>
+            </Row>
 
             <Row cols={SUBSIDY_COLS} accent last>
               <Cell>{d.subsidyResult.label}</Cell>
@@ -136,7 +154,9 @@ export function PlanDocPreview() {
                 <span className="font-semibold text-[#1B64DA]">{d.subsidyResult.formula}</span>
               </Cell>
               <Cell right last>
-                <span className="text-xs">{d.subsidyResult.amount}</span>
+                <span className="text-xs">
+                  {stats ? formatKrwExact(stats.quarterSubsidy.amount) : '—'}
+                </span>
               </Cell>
             </Row>
           </div>
@@ -148,8 +168,12 @@ export function PlanDocPreview() {
   );
 }
 
-/** 01 랜딩 — K-ESG 지표표 미리보기 */
-export function EsgDocPreview() {
+/**
+ * 01 랜딩 — K-ESG 지표표 미리보기.
+ *
+ * 항목번호·항목명·근거는 지표표 서식이라 고정입니다. 산출값만 #6 에서 옵니다.
+ */
+export function EsgDocPreview({ stats }: { stats: PublicStats | null }) {
   const d = esgDocPreview;
   return (
     <div className="flex flex-col gap-3.5">
@@ -176,7 +200,7 @@ export function EsgDocPreview() {
               </Cell>
               <Cell>{r.name}</Cell>
               <Cell>
-                <MiniFormula>{r.value}</MiniFormula>
+                <MiniFormula>{esgValue(r.code, r.value, stats)}</MiniFormula>
               </Cell>
               <Cell last muted>
                 {r.source}
@@ -237,4 +261,11 @@ export function AgentFlowCard({
       </div>
     </div>
   );
+}
+
+/** E-3-2(온실가스)만 집계에서 채웁니다. 나머지 두 줄은 서식 문구입니다. */
+function esgValue(code: string, fallback: string, stats: PublicStats | null): string {
+  if (code !== 'E-3-2' || !stats) return fallback;
+  const ghg = stats.breakdown.find((b) => b.key === 'ghg');
+  return ghg ? `${ghg.quantity} 감축` : fallback;
 }

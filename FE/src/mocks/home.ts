@@ -6,34 +6,11 @@
  * 범위 밖이라 서버에서 받을 수 없는 계정 표시값뿐입니다.
  */
 
-import type { Persona } from '../lib/dashboard';
-
-export type { Persona };
-
-export interface Account {
-  /** 사이드바에 소속으로 찍히는 값. 기업은 회사명, 코레일은 소속 본부 */
-  company: string;
-  name: string;
-  /** 아바타 원형에 들어가는 성 한 글자 */
-  initial: string;
-}
-
-/**
- * 페르소나별 로그인 계정.
- *
- * ⚠️ 고정값입니다 — 인증(#1~#5)은 MVP 제외라 `/api/me` 가 없습니다. 인증이 붙으면
- *    이 상수는 세션 응답으로 교체됩니다.
- *
- * 홈에서 뷰를 토글하면 수치뿐 아니라 **보는 사람도 바뀐다.** 기업 담당자 화면에
- * 코레일 소속이 찍히거나 그 반대면 시연 중 바로 눈에 걸린다.
+/*
+ * 계정 표시값(회사명·담당자)은 **#4 `/api/me`** 에서 옵니다 — `lib/account.ts`.
+ * 인증(#1~#5)이 MVP 밖이라 서버가 시드 값을 돌려주지만, 화면에 상수로 두지는
+ * 않습니다. 인증이 붙는 날 그 상수를 찾아 지우는 일부터 하게 되기 때문입니다.
  */
-export const accounts: Record<Persona, Account> = {
-  corp: { company: 'embark', name: '최현지', initial: '최' },
-  korail: { company: '코레일 물류사업본부', name: '박예은', initial: '박' },
-};
-
-/** 페르소나 토글이 없는 화면(정산·보조금 등)의 기본 계정. */
-export const account = accounts.corp;
 
 /** 편익 산정 근거 — 계수 출처 문구. 값이 아니라 산식의 출처라 화면 카피입니다. */
 export const basisNote = '환경부 배출계수 · 한국교통연구원 사회적 비용 산식 기준';

@@ -16,6 +16,8 @@ export function getPublicStats(data: SeedData = seed): PublicStats {
       key: b.key,
       label: b.label,
       value: formatKrwShort(b.amountKrw),
+      amountKrw: b.amountKrw,
+      quantity: b.quantity,
     })),
     cumulative: d.cumulative,
     equivalents: d.equivalents,

@@ -18,10 +18,11 @@ import {
 } from '../lib/dashboard';
 import { formatCompact, formatKrw, formatNumber, formatPeriodLabel, formatWonSign } from '../lib/format';
 import { getRole, setRole } from '../lib/role';
+import { useAccount } from '../lib/account';
 import { fetchLatestApplication, type LatestApplication } from '../lib/subsidy';
 import { useAsync } from '../lib/use-async';
 import { fetchVacancies, type Vacancy } from '../lib/wagons';
-import { accounts, basisNote, homeCopy, reportCard } from '../mocks/home';
+import { basisNote, homeCopy, reportCard } from '../mocks/home';
 
 const PERSONAS: { key: Persona; label: string }[] = [
   { key: 'corp', label: '기업 물류 담당자' },
@@ -78,7 +79,8 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     ),
   );
 
-  const account = accounts[persona];
+  // 회사명·담당자는 #4 가 준다. 화면에 상수로 박지 않는다.
+  const account = useAccount(persona);
   const copy = homeCopy[persona];
   const card = reportCard[persona];
 
@@ -117,7 +119,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">
-            {account.name}님, 이번 분기 성과입니다
+            {account ? `${account.name}님, ` : ''}이번 분기 성과입니다
           </h1>
           <p className="mt-2 text-base text-[#6B7684]">{periodLine}</p>
         </div>

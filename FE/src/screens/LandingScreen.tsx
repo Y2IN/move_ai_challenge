@@ -144,8 +144,9 @@ function HeroPlaceholder() {
 /** 01 — 로그인 전 서비스 소개 랜딩 */
 export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
   const { active, onJump } = useActiveSection();
-  // 히어로 수치는 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
+  // 히어로 수치·문서 미리보기 금액은 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
   const stats = usePublicStats();
+  const statsData = stats.status === 'ready' ? stats.data : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -297,8 +298,8 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             <SectionHeader badge={esgSection.badge} title={esgSection.title} lead={esgSection.lead} />
 
             <div className="grid grid-cols-2 items-start gap-5">
-              <PlanDocPreview />
-              <EsgDocPreview />
+              <PlanDocPreview stats={statsData} />
+              <EsgDocPreview stats={statsData} />
             </div>
 
             <div className="flex items-center justify-center gap-7 rounded-2xl bg-[#F9FAFB] px-6 py-5">

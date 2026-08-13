@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { accounts, type Account } from '../mocks/home';
+import { useAccount, type Account } from '../lib/account';
 import type { Role } from '../mocks/marketing';
 import { getRole } from '../lib/role';
 
@@ -54,8 +54,11 @@ interface AppLayoutProps {
   /** 명시하면 그 역할 메뉴. 없으면 로그인 시 저장된 역할을 읽는다 */
   role?: Role;
   onNavigate?: (key: NavKey) => void;
-  /** 페르소나를 토글하는 화면만 넘긴다. 나머지는 기업 계정 고정 */
-  account?: Account;
+  /**
+   * 이미 계정을 받아 둔 화면(홈)만 넘긴다. 없으면 이 컴포넌트가 역할에 맞는
+   * 계정을 #4 로 직접 받는다 — 회사명·담당자를 상수로 박아 두지 않기 위한 것.
+   */
+  account?: Account | null;
 }
 
 /** 로그인 후 공통 셸. 사이드바 240px + 콘텐츠 1200px 중앙 정렬 */
@@ -64,13 +67,17 @@ export function AppLayout({
   children,
   role: roleProp,
   onNavigate,
-  account = accounts.corp,
+  account: accountProp,
 }: AppLayoutProps) {
   const router = useRouter();
   const [storedRole, setStoredRole] = useState<Role>('corp');
   useEffect(() => setStoredRole(getRole()), []);
   const role = roleProp ?? storedRole;
   const navKeys = NAV_BY_ROLE[role];
+
+  // 위에서 내려준 계정이 있으면 그걸 쓴다 (같은 값을 두 번 받지 않는다).
+  const fetched = useAccount(role);
+  const account = accountProp ?? fetched;
   const go = onNavigate ?? ((key: NavKey) => router.push(NAV_PATH[key]!));
 
   return (
@@ -121,11 +128,12 @@ export function AppLayout({
           </button>
           <div className="flex items-center gap-[9px] rounded-xl bg-white/[0.07] p-2">
             {/* 아바타는 다크 배경에 묻히지 않게 브랜드 블루로 */}
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#3182F6] text-[13px] font-bold text-white">
-              {account.initial}
+            <span className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#3182F6] text-[13px] font-bold text-white">
+              {account?.initial ?? ''}
             </span>
+            {/* 계정이 오기 전엔 자리만 지킨다 — 임시 이름을 띄우면 잠깐 다른 사람이 찍힌다 */}
             <span className="text-sm font-semibold text-[#D1D6DB]">
-              {account.company} · {account.name}
+              {account ? `${account.org} · ${account.name}` : <span className="inline-block h-4 w-28 animate-pulse rounded bg-white/10" />}
             </span>
           </div>
         </div>

@@ -17,9 +17,9 @@ import {
 } from '../lib/dashboard';
 import { formatNumber, formatPct } from '../lib/format';
 import { requestMatching, type MatchResult } from '../lib/freight';
+import { useAccount } from '../lib/account';
 import { useAsync } from '../lib/use-async';
 import { fetchVacancies, type Vacancy } from '../lib/wagons';
-import { accounts } from '../mocks/home';
 
 // 각 열을 내용이 안 접히는 폭으로 고정하고, 부족하면 카드 안에서 가로 스크롤
 // 구간만 남는 폭을 흡수(최소 260px), 나머지는 고정
@@ -61,6 +61,7 @@ interface WagonScreenProps {
  */
 export function WagonScreen({ onNavigate }: WagonScreenProps) {
   const [openRow, setOpenRow] = useState<string | null>(null);
+  const account = useAccount('korail');
 
   const stats = useAsync<StatData[]>(
     useCallback(() => fetchDashboard('korail').then((d) => toStatCards(d.kpis)), []),
@@ -115,7 +116,7 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
   };
 
   return (
-    <AppLayout active="wagons" role="korail" account={accounts.korail}>
+    <AppLayout active="wagons" role="korail" account={account}>
       <header className="flex flex-col gap-2">
         <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">공차 관리</h1>
         <p className="text-base text-[#6B7684]">
