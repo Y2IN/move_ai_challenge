@@ -9,13 +9,22 @@
 
 ```bash
 npm install                        # 루트에서 1회 (FE·BE 워크스페이스 동시 설치)
-cp FE/.env.example FE/.env.local   # ANTHROPIC_API_KEY 입력
+cp FE/.env.example FE/.env.local
+npm run session-token              # 로그인된 Claude 계정 세션을 .env.local 에 주입
 npm run dev                        # http://localhost:3000
 ```
 
 배선 확인: http://localhost:3000/api/health → `{"ok":true,...}`
 
-Claude API 키 발급: https://platform.claude.com → Settings → API keys
+### Claude 인증 — 둘 중 하나만 있으면 됩니다
+
+| 방식 | 넣는 값 | 비고 |
+| --- | --- | --- |
+| **계정 세션** (권장) | `ANTHROPIC_AUTH_TOKEN` | `npm run session-token` 이 자동으로 채웁니다. 키 발급이 필요 없습니다. **몇 시간이면 만료**되므로 401 이 뜨면 다시 실행하세요 |
+| 콘솔 API 키 | `ANTHROPIC_API_KEY` | https://platform.claude.com → Settings → API keys |
+
+인증이 아예 없어도 서버는 뜹니다. LLM 문단은 템플릿 문장으로 대체되고 응답에
+`source: "fallback"` 배지가 붙습니다 — 시연이 인증 때문에 멈추지 않게 하려는 설계입니다.
 
 ## 폴더 구조
 

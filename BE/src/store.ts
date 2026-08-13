@@ -10,8 +10,9 @@
  *    이 스토어의 누적 화물은 매칭 풀에 섞지 않고, 목록(#13) 표시용으로만 씁니다.
  */
 
-import { applyNegotiation, match, normalizeInput } from "./matching";
+import { match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
+import { accept } from "./negotiate";
 import { seed } from "./seed";
 import type {
   CalcResult,
@@ -148,8 +149,9 @@ export function confirmMatch(
   acceptedShipmentIds: string[] = [],
   data: SeedData = seed,
 ): ConfirmResult {
+  // 조율 수락분이 있으면 negotiate.accept() 로 재매칭 (예정 물량 당김), 없으면 그대로 매칭.
   const result = acceptedShipmentIds.length
-    ? applyNegotiation(data, input, acceptedShipmentIds)
+    ? accept(data, input, acceptedShipmentIds).result
     : match(data, input);
 
   if (result.status !== "matched" || !result.wagon) {

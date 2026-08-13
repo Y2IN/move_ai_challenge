@@ -2,30 +2,42 @@ import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/h
 import { match } from "@railhub/be/matching";
 import { seed } from "@railhub/be/seed";
 import { validateShipmentInput } from "@railhub/be/store";
-
-// AI 합적 매칭 요청 (#16). 매칭 엔진(match)은 이미 BE 에 있으므로 라우트는 얇게:
-// 입력 검증 → match() → MatchResult 그대로 반환.
-export const dynamic = "force-dynamic";
+import type { ShipmentInput } from "@railhub/be/types";
 
 /**
- * POST /api/matching/request
- * - 본문이 없거나 빈 객체({})면 시드 단독으로 매칭 → 시연 실패 시나리오(14/18톤).
- * - 본문에 화물 입력이 있으면 검증 후 그 화물을 포함해 재매칭.
- * - 본문이 깨진 JSON 이면 400 (빈 본문과 구분).
- * 응답: MatchResult (status matched/shortfall/noWagon, members, wagon, calc, negotiationCandidates ...)
+ * api_list #16 — AI 합적 매칭 요청 (04a "AI 합적 매칭 요청" 버튼).
+ *
+ * 시드 화물 풀 + 사용자가 방금 등록한 화물을 합쳐 편성을 만든다.
+ * 정원 미달이면 `status: "shortfall"` 로 돌려주고 조율 에이전트(#22)로 넘긴다.
+ *
+ * body: { shipment?: ShipmentInput, now?: string }
+ *  - shipment 가 있으면 검증 후 포함, 없으면 시드 단독(시연 실패 시나리오).
+ *  - now 는 마감시한 기준 상태(phase)를 시연에서 고정하기 위한 시각.
+ *  - 본문이 깨진 JSON 이면 400 (빈 본문과 구분).
  */
-export async function POST(req: Request) {
-  const body = await readBody(req);
-  if (body.kind === "invalid") return badJson();
-  const raw = body.kind === "json" ? body.value : {};
+export const dynamic = "force-dynamic";
 
-  // 빈 본문/빈 객체 = "지금 접수된 화물 풀 그대로 매칭" (시드 단독).
-  if (isEmptyObject(raw)) {
-    return Response.json(match(seed, null));
+export async function POST(req: Request) {
+  const parsed = await readBody(req);
+  if (parsed.kind === "invalid") return badJson();
+  const body = (
+    parsed.kind === "json" && parsed.value && typeof parsed.value === "object" && !Array.isArray(parsed.value)
+      ? parsed.value
+      : {}
+  ) as { shipment?: unknown; now?: string };
+
+  const now = body.now ? new Date(body.now) : new Date();
+  if (Number.isNaN(now.getTime())) {
+    return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
-  const { ok, errors, value } = validateShipmentInput(raw, seed);
-  if (!ok || !value) return validationError(errors);
+  // 화물 입력이 있으면 검증, 없으면 시드 단독
+  let shipment: ShipmentInput | null = null;
+  if (!isEmptyObject(body.shipment)) {
+    const v = validateShipmentInput(body.shipment, seed);
+    if (!v.ok || !v.value) return validationError(v.errors);
+    shipment = v.value;
+  }
 
-  return Response.json(match(seed, value));
+  return Response.json(match(seed, shipment, now));
 }

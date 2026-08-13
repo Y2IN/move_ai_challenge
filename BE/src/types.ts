@@ -82,11 +82,23 @@ export type FallbackHints = Omit<ParsedConstraints, "hard" | "soft"> & {
 export interface Shipment {
   id: string;
   shipperId: string;
+  /** 시드 화주 목록에 없는 경우(사용자 직접 입력)의 표시용 이름 */
+  shipperName?: string;
   status: ShipmentStatus;
   pullForwardEligible?: boolean;
   cargo: Cargo;
-  origin: { name: string; address: string; stationId: string; shuttleKm: number };
-  destination: { name: string; address: string; stationId: string; shuttleKm: number };
+  origin: {
+    name: string;
+    address: string;
+    stationId: string;
+    shuttleKm: number;
+  };
+  destination: {
+    name: string;
+    address: string;
+    stationId: string;
+    shuttleKm: number;
+  };
   schedule: { requestedDepartureDate: string; requiredArrivalBy: string };
   currentMode: "road" | "rail";
   /** 위탁 / 자차 운송 형태 (화물 등록 시 입력) */
@@ -106,8 +118,25 @@ export interface EmptyWagon {
   capacityTon: number;
   capacityCbm: number;
   capacityBasis: string;
+  /** 모집 마감시한(출발 D-2). 이 시점에 정원을 판정한다. */
+  cutoffAt: string;
+  /**
+   * 편성이 성립하는 최소 적재율. 미만이면 취소하고 다음 화차로 이월한다.
+   *
+   * ⚠️ 코레일 정책이 아니다. 최저톤수 제도상 코레일은 이미 100% 를 부과한다.
+   *    이 값은 **상한 보장 손실을 어디까지 감수할지**를 정하는 우리 손익분기선이다.
+   *    발표에서 "코레일 기준"이라고 말하면 틀린 말이 된다.
+   */
+  minLoadRate: number;
+  /** 현재까지 확보된 물량 (톤) */
+  reservedTon: number;
   laneId: string;
-  departure: { stationId: string; date: string; dayOfWeek: string; time: string };
+  departure: {
+    stationId: string;
+    date: string;
+    dayOfWeek: string;
+    time: string;
+  };
   arrival: { stationId: string; date: string; dayOfWeek: string; time: string };
   emptyReason: string;
   handling: string[];
@@ -193,7 +222,11 @@ export interface CostResult {
   railSoloKrw: number;
   /** 합적 후 철도 (간선 + 상하역 + 셔틀) */
   railPooledKrw: number;
-  breakdown: { railLineHaulKrw: number; handlingKrw: number; shuttleKrw: number };
+  breakdown: {
+    railLineHaulKrw: number;
+    handlingKrw: number;
+    shuttleKrw: number;
+  };
   /** 합적 효과 = railSolo − railPooled. 화면의 "합적 단가 N% 인하"가 이것입니다. */
   poolingSavingKrw: number;
   poolingSavingRate: number;
@@ -202,8 +235,14 @@ export interface CostResult {
 export interface SubsidyResult {
   /** A = 철도 합적 비용 − 도로 직행 비용. 음수면 보조금 대상이 아닙니다. */
   additionalCostKrw: number;
-  /** B = 사회환경적 편익 × 30% (고시 상한) */
+  /** B = 사회·환경적 **절감액** × 30% (협회 공고 상한). 편익 총액이 아님 */
   benefitCapKrw: number;
+  /** D − F. 공식 원단위로 산정한 사회·환경적 절감액 */
+  socialSavingKrw: number;
+  /** D = 도로 운송 시 사회·환경 비용 */
+  roadSocialKrw: number;
+  /** F = 철도 운송 시 사회·환경 비용 (셔틀은 도로 원단위로 가산) */
+  railSocialKrw: number;
   /** min(A, B). A ≤ 0 이면 0 */
   subsidyKrw: number;
   adopted: "additionalCost" | "benefitCap" | "none";
@@ -215,10 +254,40 @@ export interface SubsidyResult {
   note: string;
 }
 
+/**
+ * 화주별 분담액.
+ *
+ * 간선운임은 화차 1량 고정비라 **톤수 비례**로 나눈다. 인원수로 나누면
+ * 6톤 화주와 3톤 화주가 같은 돈을 내게 된다.
+ * 셔틀비는 공장 위치가 화주마다 달라 **개별 거리**로 계산한다.
+ */
+export interface MemberShare {
+  shipmentId: string;
+  shipperName: string;
+  weightTon: number;
+  /** 편성 내 톤수 비중 — 간선운임 분담률 */
+  shareRate: number;
+  railLineHaulKrw: number;
+  handlingKrw: number;
+  shuttleKrw: number;
+  /** 분담액 합계 (상한 적용 전) */
+  totalKrw: number;
+  /** 이 화주가 지금 내고 있는 도로 운임 — 상한 보장의 기준선 */
+  roadFareKrw: number;
+  /** 실제 청구액 = min(totalKrw, roadFareKrw). 도로보다 비싸게 받지 않는다 */
+  billedKrw: number;
+  /** 상한에 걸려 플랫폼이 흡수하는 금액 */
+  absorbedKrw: number;
+  savingKrw: number;
+  savingRate: number;
+}
+
 export interface CalcResult {
   benefit: BenefitResult;
   cost: CostResult;
   subsidy: SubsidyResult;
+  /** 화주별 분담. CalcInput.members 를 넘겼을 때만 채워진다 */
+  shares: MemberShare[];
 }
 
 // ── 대시보드 (STEP 03) ─────────────────────────────────────────
