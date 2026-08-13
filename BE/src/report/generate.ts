@@ -1,16 +1,21 @@
 /**
- * 문단 생성 — 생성 AI 호출 · 병렬 · 환각 검증 · 폴백.
+ * 문단 생성 — 통합 호출 1회 · 문단별 환각 검증 · 폴백.
  *
- * 06b 화면이 "약 10초"라고 명시한다. 문단 6개를 순차로 호출하면 서버리스
- * 실행 제한을 넘길 위험이 있어 **전부 병렬로 호출**한다.
+ * 흐름:
+ *   1. 문단 6개를 **한 번의 호출로** 받는다 (JSON 스키마 응답)
+ *   2. 숫자 환각 검증 (verify.ts) — **문단별로** 돈다
+ *   3. 환각이 난 문단만 모아 **한 번 더** 부른다
+ *   4. 그래도 남거나 호출 자체가 실패하면 그 문단만 규칙기반 폴백 문장
  *
- * 각 문단은 다음 순서를 거친다.
- *   1. 생성 AI 호출
- *   2. 숫자 환각 검증 (verify.ts)
- *   3. 환각이 있으면 **한 번만** 재시도 (무엇이 문제였는지 알려주고)
- *   4. 그래도 실패하거나 호출 자체가 실패하면 규칙기반 폴백 문장
+ * ⚠️ 왜 통합인가: 무료 티어는 분당 **요청 수**로 한도를 잰다(모델당 20 RPM).
+ *    문단마다 따로 부르면 사업계획서 1회 생성이 6요청이라 분당 3회면 한도다.
+ *    통합하면 같은 한도에서 20회까지 생성할 수 있다.
  *
- * 폴백이 있어야 현장 네트워크가 끊겨도 문서 생성이 통째로 죽지 않는다.
+ * ⚠️ 다만 **[산출 수치]는 문단별로 분리해서** 프롬프트에 넣는다. 6개 문단의 수치를
+ *    한 덩어리로 합치면 허용 집합이 그만큼 넓어져, 개요 문단이 보조금 산정액을
+ *    인용해도 검증을 통과해 버린다 (buildCombinedPrompt 참고).
+ *
+ * 폴백이 있어야 현장 네트워크가 끊겨도, 한도에 걸려도 문서 생성이 통째로 죽지 않는다.
  */
 
 import { generateText, isLlmConfigured } from "../llm";
@@ -20,7 +25,13 @@ import {
   type ParagraphKey,
   type ReportInput,
 } from "./contract";
-import { PARAGRAPH_SPECS, SYSTEM_PROMPT, buildPrompt } from "./paragraphs";
+import {
+  PARAGRAPH_SPECS,
+  SYSTEM_PROMPT,
+  buildCombinedPrompt,
+  buildPrompt,
+  combinedSchema,
+} from "./paragraphs";
 import { collectAllowedNumbers, findHallucinatedNumbers } from "./verify";
 
 const MAX_TOKENS = 1024;
@@ -127,11 +138,44 @@ export async function generateParagraph(
   return done(toParagraph(key, spec.fallback(input), "fallback"));
 }
 
+/** 통합 호출 1회. JSON 을 파싱해 키별 문자열로 돌려준다. 실패하면 throw. */
+async function callCombined(
+  keys: ParagraphKey[],
+  input: ReportInput,
+  extraNote = "",
+): Promise<Partial<Record<ParagraphKey, string>>> {
+  const raw = await generateText({
+    system: SYSTEM_PROMPT,
+    prompt: buildCombinedPrompt(keys, input) + extraNote,
+    // 문단 6개가 한 응답에 들어오므로 단건(1024)의 여러 배가 필요하다.
+    maxTokens: MAX_TOKENS * keys.length,
+    thinking: "low",
+    jsonSchema: combinedSchema(keys),
+    // 응답이 길어진 만큼 넉넉히. 그래도 함수 한도(60s) 안쪽이다.
+    timeoutMs: 40_000,
+  });
+
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const out: Partial<Record<ParagraphKey, string>> = {};
+  for (const key of keys) {
+    const v = parsed[key];
+    if (typeof v === "string" && v.trim()) out[key] = v.trim();
+  }
+  return out;
+}
+
 /**
- * 문단 6개를 병렬로 생성한다.
+ * 문단 6개를 **한 번의 호출로** 생성한다.
  *
- * `onProgress` 는 문단이 하나 끝날 때마다 호출된다. 06b SSE 진행률에 쓴다.
- * 병렬이라 완료 순서는 문단 순서와 다르다.
+ * ⚠️ 예전엔 문단마다 따로 불러 6요청을 썼다. 무료 티어는 분당 "요청 수" 로 한도를
+ *    재므로(모델당 20 RPM) 사업계획서 1회 생성이 6요청이면 **분당 3회면 한도**다.
+ *    심사위원 몇 명이 동시에 누르면 그 자리에서 429 로 떨어졌다.
+ *    하나로 묶어 분당 20회까지 늘렸다.
+ *
+ * 검증은 **여전히 문단별**이다. 환각이 있는 문단만 모아 한 번 더 부르고,
+ * 그래도 남으면 그 문단만 폴백으로 떨어뜨린다 (최대 2요청).
+ *
+ * `onProgress` 는 문단 하나가 검증을 통과할 때마다 호출된다. 06b SSE 진행률에 쓴다.
  */
 export async function generateParagraphs(
   input: ReportInput,
@@ -139,21 +183,77 @@ export async function generateParagraphs(
 ): Promise<GenerateResult> {
   const startedAt = Date.now();
   const total = PARAGRAPH_KEYS.length;
-  let completed = 0;
-
-  const settled = await Promise.all(
-    PARAGRAPH_KEYS.map(async (key) => {
-      const r = await generateParagraph(key, input, startedAt);
-      completed++;
-      onProgress?.(completed, total, key);
-      return r;
-    }),
-  );
+  const allowed = collectAllowedNumbers(input);
 
   const paragraphs = {} as Record<ParagraphKey, Paragraph>;
-  for (const s of settled) paragraphs[s.paragraph.key] = s.paragraph;
+  const diag = new Map<ParagraphKey, ParagraphDiagnostic>();
+  let completed = 0;
 
-  return { paragraphs, diagnostics: settled.map((s) => s.diagnostic) };
+  const settle = (key: ParagraphKey, p: Paragraph, d: Omit<ParagraphDiagnostic, "key" | "elapsedMs">) => {
+    paragraphs[key] = p;
+    diag.set(key, { key, elapsedMs: Date.now() - startedAt, ...d });
+    completed++;
+    onProgress?.(completed, total, key);
+  };
+
+  let pending: ParagraphKey[] = [...PARAGRAPH_KEYS];
+  const hallucinated = new Map<ParagraphKey, string[][]>();
+  let lastError: string | undefined;
+
+  // 1차 통합 호출 → 환각 문단만 2차로 한 번 더. 그 이상은 시간만 쓴다.
+  for (let attempt = 1; attempt <= 2 && pending.length; attempt++) {
+    let got: Partial<Record<ParagraphKey, string>>;
+    try {
+      const note =
+        attempt === 1
+          ? ""
+          : "\n\n[재작성 요청] 직전 응답의 아래 문단에 [산출 수치]에 없는 숫자가 있었다. " +
+            "해당 숫자를 빼고 주어진 수치만 써서 다시 작성하라. 확신이 없으면 숫자를 아예 쓰지 마라.\n" +
+            pending.map((k) => `  - ${k}: ${(hallucinated.get(k)?.at(-1) ?? []).join(", ")}`).join("\n");
+      got = await callCombined(pending, input, note);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      break; // 호출 자체가 실패하면 재시도해도 대개 같다 — 남은 문단은 폴백
+    }
+
+    const stillBad: ParagraphKey[] = [];
+    for (const key of pending) {
+      const text = got[key];
+      if (!text) {
+        stillBad.push(key);
+        continue;
+      }
+      const report = findHallucinatedNumbers(text, allowed);
+      if (report.clean) {
+        settle(key, toParagraph(key, text, "ai"), {
+          source: "ai",
+          attempts: attempt,
+          hallucinations: hallucinated.get(key) ?? [],
+        });
+        continue;
+      }
+      hallucinated.set(key, [...(hallucinated.get(key) ?? []), report.offenders]);
+      lastError = report.message;
+      stillBad.push(key);
+    }
+    pending = stillBad;
+  }
+
+  // 두 번 시도하고도 남은 문단은 규칙기반 문장으로 채운다.
+  for (const key of pending) {
+    settle(key, toParagraph(key, PARAGRAPH_SPECS[key].fallback(input), "fallback"), {
+      source: "fallback",
+      attempts: 2,
+      hallucinations: hallucinated.get(key) ?? [],
+      error: lastError,
+    });
+  }
+
+  return {
+    paragraphs,
+    // 진단은 문단 순서로 (완료 순서가 아니라) — 화면 표가 서식 순서를 따른다.
+    diagnostics: PARAGRAPH_KEYS.map((k) => diag.get(k)!),
+  };
 }
 
 /** 전부 폴백으로만 채운다. 인증이 없을 때 화면을 살리는 경로. */

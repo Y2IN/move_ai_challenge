@@ -145,6 +145,52 @@ export const PARAGRAPH_SPECS: Record<ParagraphKey, ParagraphSpec> = {
 };
 
 /** 문단 하나에 대한 사용자 프롬프트를 만든다. */
+/**
+ * 문단 여러 개를 **한 번의 호출로** 받기 위한 프롬프트.
+ *
+ * 무료 티어는 분당 "요청 수" 로 한도를 재기 때문에(모델당 20 RPM), 문단 6개를
+ * 따로 부르면 사업계획서 1회 생성에 6요청을 씁니다 — 분당 3회면 한도입니다.
+ * 하나로 묶으면 20회까지 늘어납니다.
+ *
+ * ⚠️ **문단별 [산출 수치]는 그대로 분리해서 넣습니다.** 6개 문단의 수치를 한 덩어리로
+ *    합치면 허용 집합이 그만큼 넓어져, 개요 문단이 보조금 산정액을 인용해도
+ *    환각 검증을 통과해 버립니다. 검증은 여전히 문단별로 돕니다.
+ */
+export function buildCombinedPrompt(keys: ParagraphKey[], input: ReportInput): string {
+  const blocks = keys.map((key) => {
+    const spec = PARAGRAPH_SPECS[key];
+    const [min, max] = spec.sentences;
+    return [
+      `### ${key}`,
+      `[문단 위치] ${spec.location}`,
+      `[분량] ${min}~${max}문장`,
+      "[산출 수치] — **이 문단은 아래 값만** 인용할 수 있다. 다른 문단의 수치도 쓰면 안 된다.",
+      ...spec.facts(input).map((f) => `  - ${f}`),
+      "[작성 지시]",
+      spec.instruction(input),
+    ].join("\n");
+  });
+
+  return [
+    `아래 ${keys.length}개 문단을 각각 작성하라.`,
+    "",
+    "출력은 JSON 객체 하나다. 키는 문단 id(### 뒤의 값), 값은 그 문단의 본문 문자열이다.",
+    "본문에는 제목·번호·머리말을 붙이지 마라.",
+    "",
+    ...blocks,
+  ].join("\n\n");
+}
+
+/** 통합 호출의 응답 스키마. 요청한 키만 필수로 건다. */
+export function combinedSchema(keys: ParagraphKey[]): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: Object.fromEntries(keys.map((k) => [k, { type: "string" }])),
+    required: [...keys],
+    additionalProperties: false,
+  };
+}
+
 export function buildPrompt(key: ParagraphKey, input: ReportInput): string {
   const spec = PARAGRAPH_SPECS[key];
   const [min, max] = spec.sentences;
