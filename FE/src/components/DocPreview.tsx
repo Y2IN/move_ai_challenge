@@ -139,7 +139,13 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
             </Row>
 
             <Row cols={SUBSIDY_COLS}>
-              <Cell head>편익 × 30% (B)</Cell>
+              {/*
+                고시상 B 가 아니라 **위 편익 계에 상한 비율을 적용해 본 참고치**입니다.
+                고시 B 는 협회 공고의 통합 원단위로 따로 산정하므로 값이 다릅니다
+                (`MODAL_SHIFT_UNIT_COST` — 4항목 분해 합계와 일치하지 않습니다).
+                "(B)" 라고 적으면 신청서의 B 와 같은 값으로 읽힙니다.
+              */}
+              <Cell head>편익의 30% (참고)</Cell>
               <Cell>
                 <MiniFormula>{stats ? `${formatNumber(total)} × 0.3` : '편익 계 × 0.3'}</MiniFormula>
               </Cell>
@@ -154,9 +160,13 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
                 <span className="font-semibold text-[#1B64DA]">{d.subsidyResult.formula}</span>
               </Cell>
               <Cell right last>
-                <span className="text-xs">
-                  {stats ? formatKrwExact(Math.round(total * 0.3)) : '—'}
-                </span>
+                {/*
+                  신청액은 min(A, B) 라 **A 없이는 구할 수 없습니다.** 위 참고치를
+                  그대로 신청액으로 실으면 안 됩니다 — 실제로 시드 기준 추가비용은
+                  음수(철도가 더 쌈)라 산정 결과가 "대상 아님 · 0원" 이고,
+                  랜딩에서 금액을 띄우면 로그인 후 신청서와 정반대가 됩니다.
+                */}
+                <span className="text-xs text-[#B0B8C1]">신청서에서 산출</span>
               </Cell>
             </Row>
           </div>

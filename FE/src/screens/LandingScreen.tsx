@@ -80,7 +80,7 @@ function useActiveSection() {
 /**
  * 히어로 숫자 — 이번 분기 사회환경적 편익 환산액과 편익 항목들.
  *
- * `label`("206만")은 서버가 만든 표시 문자열입니다. 화면에서 다시 축약하면
+ * `label`("3억 4,200만")은 서버가 만든 표시 문자열입니다. 화면에서 다시 축약하면
  * 홈 대시보드와 반올림 자리가 어긋납니다.
  *
  * 보조금 예상액이 아닙니다 — 시드 기준으로 전환 추가비용이 음수라 보조금 산정
@@ -255,7 +255,14 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
                 className="flex-none rounded-2xl bg-white/60 p-3"
               />
               <div className="flex flex-col gap-1.5">
-                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#0F7A5A]">4만 그루</span>
+                {/*
+                  히어로 금액과 같은 집계(#6)의 환산값입니다. 여기에 상수를 박아 두면
+                  바로 위 편익 금액과 자릿수가 어긋납니다. 서버 값이 없으면 비웁니다.
+                  ※ 화면에서 다시 축약하지 않습니다 — 홈 대시보드와 반올림이 갈립니다.
+                */}
+                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#0F7A5A]">
+                  {statsData ? `${formatNumber(statsData.equivalents.pineTrees)}그루` : '—'}
+                </span>
                 <span className="text-base font-semibold text-[#12A87A]">소나무를 심은 것과 같은 감축량</span>
               </div>
             </div>
@@ -269,7 +276,9 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
                 className="flex-none rounded-2xl bg-white/70 p-3"
               />
               <div className="flex flex-col gap-1.5">
-                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#1B64DA]">45대</span>
+                <span className="text-[34px] font-extrabold tracking-[-0.03em] text-[#1B64DA]">
+                  {statsData ? `${formatNumber(statsData.equivalents.trucksBlocked)}대` : '—'}
+                </span>
                 <span className="text-base font-semibold text-[#3182F6]">도심 진입을 막은 대형 트럭</span>
               </div>
             </div>

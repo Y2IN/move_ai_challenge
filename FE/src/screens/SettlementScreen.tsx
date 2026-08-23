@@ -495,10 +495,15 @@ function Trips({
   summary: { legCount: number; tripCount: number; totalTon: number };
 }) {
   // 명세가 길어서 화면에는 앞쪽만 펴고 나머지는 합계로 접습니다.
+  //
+  // 접힌 줄은 **서버가 준 전체 합계에서 빼서** 구합니다. `trips` 는 서버가 앞쪽만
+  // 잘라 보내므로(협약 한 건이 수천 건입니다) 배열 길이로 세면 "외 12건" 처럼
+  // 실제보다 한참 적게 나옵니다.
   const SHOWN = 8;
   const shown = trips.slice(0, SHOWN);
-  const rest = trips.slice(SHOWN);
-  const restTon = rest.reduce((sum, t) => sum + t.weightTon, 0);
+  const shownTon = shown.reduce((sum, t) => sum + t.weightTon, 0);
+  const restCount = Math.max(0, summary.legCount - shown.length);
+  const restTon = Math.max(0, Math.round((summary.totalTon - shownTon) * 10) / 10);
 
   return (
     <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
@@ -542,9 +547,9 @@ function Trips({
         </div>
       ))}
 
-      {rest.length > 0 && (
+      {restCount > 0 && (
         <div className="flex items-center justify-between gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]">
-          <span className="text-[15px] text-[#6B7684]">외 {rest.length}건</span>
+          <span className="text-[15px] text-[#6B7684]">외 {formatNumber(restCount)}건</span>
           <span className="text-[15px] font-semibold tabular-nums text-[#191F28]">{ton(restTon)}</span>
         </div>
       )}

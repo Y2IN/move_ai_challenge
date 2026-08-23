@@ -19,6 +19,10 @@ import { seed } from "./seed";
 import type { SeedData, SettlementDocument, TransportContract } from "./types";
 
 const DAY_MS = 86_400_000;
+
+/** 응답에 싣는 실적 명세 행 수 상한. 화면이 펴는 행 수(8)보다 넉넉히 둡니다. */
+const TRIP_ROWS_LIMIT = 20;
+
 const round = (n: number) => Math.round(n);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -97,10 +101,13 @@ export interface SettlementResponse {
   contract: TransportContract & { status: string };
   achievement: AchievementView;
   recalc: RecalcView;
+  /** 앞쪽 일부만 담깁니다 (최대 `TRIP_ROWS_LIMIT` 행). 전체 규모는 `tripSummary` 를 보십시오. */
   trips: TripRow[];
   /**
    * 명세는 **화주 단위**(편성 × 화주)입니다 — 운송장이 화주별로 발행되므로
    * 증빙도 그 단위입니다. 편성 수와 다르니 둘 다 실어 보냅니다.
+   *
+   * `trips` 는 잘려 있으므로 접힌 줄("외 N건")의 건수·물량은 **여기서** 빼서 씁니다.
    */
   tripSummary: { legCount: number; tripCount: number; totalTon: number };
   history: ContractPerformance[];
@@ -236,9 +243,17 @@ export function getSettlement(
   };
 
   // ── 실적 명세 ───────────────────────────────────────────────
+  //
+  // **앞쪽 일부만 보냅니다.** 협약 한 건의 실적은 수천 건이고 화면은 그중 8행만
+  // 펴고 나머지는 "외 N건 · 합계"로 접습니다. 전건을 실어 보내면 화면에 안 그릴
+  // 수백 KB를 매번 내려보내게 됩니다. 접힌 줄에 필요한 건수·물량은 `tripSummary`
+  // 가 이미 전건 기준으로 담고 있으므로 화면은 그걸로 계산합니다.
+  //
+  // 전건 명세가 필요한 곳은 증빙 제출이고, 그건 Scope 3 내보내기(#42)의 몫입니다.
   const trips: TripRow[] = agg.rows
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, TRIP_ROWS_LIMIT)
     .map((row, i) => ({
       no: i + 1,
       tripId: row.tripId,
@@ -276,7 +291,8 @@ export function getSettlement(
       formulaNote: `${SUBSIDY.legalBasis} · min(A, B)`,
     },
     trips,
-    tripSummary: { legCount: trips.length, tripCount: agg.tripCount, totalTon: agg.totalTon },
+    // `trips.length` 가 아니라 집계의 전건 수입니다 — trips 는 잘려 있습니다.
+    tripSummary: { legCount: agg.legCount, tripCount: agg.tripCount, totalTon: agg.totalTon },
     history: contracts.map((c) => performanceOf(c, now)),
     documents,
     // 서류명 뒤에 조사를 붙이지 않습니다 — 받침에 따라 을/를이 갈리는데,

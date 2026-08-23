@@ -105,6 +105,9 @@ const ledger = ledgerRaw as unknown as { trips: Trip[] };
 
 // ── 유틸 ───────────────────────────────────────────────────────
 
+/** upsert 한 번에 보내는 행 수. */
+const CHUNK = 500;
+
 /** upsert 한 벌. 실패하면 즉시 죽는다 (부분 투입 상태로 성공을 보고하지 않기 위해). */
 async function push(
   table: string,
@@ -115,14 +118,19 @@ async function push(
     console.log(`  · ${table.padEnd(22)} 0건 (건너뜀)`);
     return;
   }
-  const { error } = await db.from(table).upsert(rows, { onConflict });
-  if (error) {
-    console.error(`\n✖ ${table} 투입 실패: ${error.message}`);
-    if (/does not exist|schema cache/i.test(error.message)) {
-      console.error("  → schema.sql 을 아직 적용하지 않은 것 같습니다.");
-      console.error("     Supabase 대시보드 → SQL Editor 에 BE/src/db/schema.sql 을 붙여넣고 Run 하세요.\n");
+
+  // 실적 원장은 로트가 수천 건입니다. 한 요청에 전부 실으면 본문이 MB 단위가 되어
+  // PostgREST 가 거절하거나 타임아웃으로 끊깁니다. 나눠 보냅니다.
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await db.from(table).upsert(rows.slice(i, i + CHUNK), { onConflict });
+    if (error) {
+      console.error(`\n✖ ${table} 투입 실패 (${i + 1}~${Math.min(i + CHUNK, rows.length)}행): ${error.message}`);
+      if (/does not exist|schema cache/i.test(error.message)) {
+        console.error("  → schema.sql 을 아직 적용하지 않은 것 같습니다.");
+        console.error("     Supabase 대시보드 → SQL Editor 에 BE/src/db/schema.sql 을 붙여넣고 Run 하세요.\n");
+      }
+      process.exit(1);
     }
-    process.exit(1);
   }
   console.log(`  ✓ ${table.padEnd(22)} ${rows.length}건`);
 }

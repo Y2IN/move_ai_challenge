@@ -9,6 +9,8 @@
  * 심사자가 랜딩의 숫자를 보고 한 번 클릭하면 자릿수가 다른 값을 본다.
  *
  * 그래서 여기도 같은 집계(`resolveAggregate`)에서 뽑는다. 값이 한 곳에서만 나온다.
+ * (반대 방향도 맞춰 뒀다 — 홈 대시보드가 읽는 `seed.dashboard` 는 이제 큐레이션
+ * 상수가 아니라 같은 집계의 사본이다. 자세한 건 `dashboard.ts` 머리말.)
  *
  * ## 왜 보조금이 아니라 편익인가
  *
@@ -106,7 +108,7 @@ export function getPublicStats(): PublicStats {
   };
 }
 
-/** 158000000 → "1억 5,800만" · 2064641 → "206만" (억·만 단위, 0인 자리는 생략) */
+/** 342004280 → "3억 4,200만" · 2064641 → "206만" (억·만 단위, 0인 자리는 생략) */
 function formatKrwShort(n: number): string {
   const eok = Math.floor(n / 100_000_000);
   const man = Math.floor((n % 100_000_000) / 10_000);

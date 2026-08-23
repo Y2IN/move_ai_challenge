@@ -67,7 +67,7 @@
         "no": "KLARU-2026-0412-A",
         "periodFrom": "2026-04-01",
         "periodTo": "2026-09-30",
-        "contractTon": 90.0,
+        "contractTon": 12800,
         "renewalDueDate": "2026-09-30"
       }
     },
@@ -86,7 +86,7 @@
         "no": "KLARU-2026-0412-B",
         "periodFrom": "2026-04-01",
         "periodTo": "2026-09-30",
-        "contractTon": 75.0,
+        "contractTon": 12600,
         "renewalDueDate": "2026-10-31"
       }
     },
@@ -105,7 +105,7 @@
         "no": "KLARU-2026-0412-C",
         "periodFrom": "2026-04-01",
         "periodTo": "2026-09-30",
-        "contractTon": 45.0,
+        "contractTon": 8900,
         "renewalDueDate": "2026-12-15"
       }
     }
@@ -386,47 +386,54 @@
   "dashboard": {
     "period": "2026Q2",
     "subsidyEstimate": {
-      "amount": 342000000,
-      "label": "3억 4,200만",
+      "amount": 102601284,
+      "label": "1억 260만",
       "deltaPct": 38
     },
     "equivalents": {
-      "pineTrees": 40000,
-      "trucksBlocked": 45
+      "pineTrees": 121977,
+      "trucksBlocked": 739
     },
     "cumulative": {
       "shippers": 128,
-      "filledWagons": 1043
+      "filledWagons": 1297
     },
     "benefit": {
-      "totalBenefitKrw": 1140000000,
+      "totalBenefitKrw": 342004280,
       "breakdown": [
         {
           "key": "ghg",
           "label": "온실가스 감축",
-          "quantity": "182 tCO₂eq",
-          "amountKrw": 158000000,
+          "quantity": "805.0 tCO₂eq",
+          "amountKrw": 40252492,
           "source": "환경부 배출계수"
         },
         {
           "key": "airPollution",
           "label": "대기오염 저감",
           "quantity": "NOx·SOx·PM2.5",
-          "amountKrw": 64000000,
+          "amountKrw": 33743129,
           "source": "KOTI 사회적비용"
         },
         {
           "key": "accident",
           "label": "교통사고 예방",
-          "quantity": "대형화물차 45대 감소",
-          "amountKrw": 53000000,
+          "quantity": "대형화물차 739대 감소",
+          "amountKrw": 65440471,
           "source": "KOTI 산식"
         },
         {
           "key": "congestion",
           "label": "도로혼잡 완화",
           "quantity": "차량·km 감소분",
-          "amountKrw": 865000000,
+          "amountKrw": 172616667,
+          "source": "KOTI 산식"
+        },
+        {
+          "key": "roadWear",
+          "label": "도로유지비 절감",
+          "quantity": "포장 손상 감소",
+          "amountKrw": 29951521,
           "source": "KOTI 산식"
         }
       ]
@@ -437,8 +444,8 @@
           {
             "key": "co2Reduction",
             "label": "탄소 감축",
-            "value": "182 tCO₂eq",
-            "deltaPct": 74
+            "value": "805.0 tCO₂eq",
+            "deltaPct": 38
           },
           {
             "key": "costSaving",
@@ -450,8 +457,8 @@
           {
             "key": "benefit",
             "label": "사회·환경 편익",
-            "value": "11억 4,000만",
-            "amountKrw": 1140000000,
+            "value": "3억 4,200만",
+            "amountKrw": 342004280,
             "deltaPct": 38
           },
           {
@@ -473,9 +480,9 @@
           {
             "key": "filledWagons",
             "label": "채운 화차",
-            "value": "1,043량",
-            "count": 1043,
-            "deltaPct": 22
+            "value": "546량",
+            "count": 546,
+            "deltaPct": 38
           },
           {
             "key": "extraRevenue",
@@ -604,16 +611,16 @@
       "name": "2026 1차 협약",
       "periodFrom": "2026-01-01",
       "periodTo": "2026-03-31",
-      "contractTon": 60.0,
-      "subsidyKrw": 412000
+      "contractTon": 14800,
+      "subsidyKrw": 101600000
     },
     {
       "no": "KLARU-2026-0412",
       "name": "2026 2차 협약",
       "periodFrom": "2026-04-01",
       "periodTo": "2026-09-30",
-      "contractTon": 240.0,
-      "subsidyKrw": 1647000
+      "contractTon": 44000,
+      "subsidyKrw": 280000000
     }
   ],
   "settlementDocuments": [

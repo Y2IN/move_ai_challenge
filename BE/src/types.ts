@@ -441,7 +441,7 @@ export interface PublicStatsBreakdownItem {
 /** 랜딩 히어로에 띄우는 이번 분기 사회환경적 편익 환산액 */
 export interface PublicBenefitTotal {
   amount: number;
-  /** 서버가 만든 표시 문자열 (예: "206만"). 화면에서 다시 축약하지 마십시오 */
+  /** 서버가 만든 표시 문자열 (예: "3억 4,200만"). 화면에서 다시 축약하지 마십시오 */
   label: string;
   /** 전 분기 대비 증감률. **비교할 실적이 없으면 생략됩니다** — 0을 넣지 않습니다 */
   deltaPct?: number;
