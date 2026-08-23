@@ -86,8 +86,22 @@ function SubsidyGeneratingInner() {
         .catch((e: Error) => setError(e.message));
     }
 
+    // 서버가 아무 이벤트도 안 보내면 화면은 "1/5 · 0%" 빈 카드에 영원히 머문다.
+    // 15초 안에 첫 이벤트가 없으면 에러로 전환해 사용자가 다시 시도할 수 있게 한다.
+    const watchdog = setTimeout(() => {
+      if (cancelled) return;
+      setSteps((prev) => {
+        if (prev.length === 0) {
+          setError("생성 진행 상황이 오지 않습니다. 다시 시도해 주세요.");
+          stop?.();
+        }
+        return prev;
+      });
+    }, 15_000);
+
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
       stop?.();
     };
   }, [idFromQuery, router]);

@@ -15,6 +15,7 @@ import type {
   ParagraphKey,
   SubsidyExportFormat,
 } from "../lib/subsidy";
+import type { Revision } from "../lib/subsidy";
 import type { ApplyDocView } from "../lib/subsidy-view";
 
 type DocTab = "doc" | "esg";
@@ -66,6 +67,75 @@ interface ApplyDoneScreenProps {
   onRegenerateAllEsg: () => void;
   onRetryIndicators: () => void;
   onExportScope3: (format: Scope3Format) => void;
+  /** #38 변경 이력 — 없으면 버튼이 비활성됩니다 */
+  onOpenRevisions?: () => void;
+  /** null 이면 아직 안 열었음, [] 면 불러오는 중 */
+  revisions?: Revision[] | null;
+  revisionsError?: string | null;
+  onCloseRevisions?: () => void;
+}
+
+/** #38 — AI 초안이 사람 손을 어떻게 거쳤는지. 심사에서 가장 먼저 묻는 자리입니다. */
+function RevisionPanel({
+  revisions,
+  error,
+  onClose,
+}: {
+  revisions: Revision[];
+  error: string | null;
+  onClose: () => void;
+}) {
+  const ACTION_LABEL: Record<Revision["action"], string> = {
+    generate: "최초 생성",
+    regenerate: "재생성",
+    edit: "사람 편집",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+      <aside
+        className="flex h-full w-[520px] max-w-full flex-col gap-4 overflow-y-auto bg-white p-7"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-extrabold tracking-[-0.03em] text-[#191F28]">변경 이력</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-lg border border-[#E5E8EB] px-3 text-sm font-bold text-[#4E5968] hover:bg-[#F9FAFB]"
+          >
+            닫기
+          </button>
+        </div>
+
+        {error && <p className="text-sm text-[#D22030]">이력을 불러오지 못했습니다 — {error}</p>}
+        {!error && revisions.length === 0 && (
+          <p className="text-sm text-[#8B95A1]">아직 기록된 변경이 없습니다.</p>
+        )}
+
+        {revisions.map((r, i) => (
+          <div key={`${r.at}-${r.key}-${i}`} className="flex flex-col gap-1.5 rounded-xl border border-[#F2F4F6] p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[15px] font-bold text-[#191F28]">{r.key}</span>
+              <span className="text-xs tabular-nums text-[#8B95A1]">{r.at.slice(0, 16).replace("T", " ")}</span>
+            </div>
+            <div className="flex gap-1.5">
+              <span className="rounded bg-[#F2F4F6] px-2 py-0.5 text-xs font-bold text-[#4E5968]">
+                {ACTION_LABEL[r.action]}
+              </span>
+              <span className="rounded bg-[#E8F3FF] px-2 py-0.5 text-xs font-bold text-[#1B64DA]">
+                {r.source}
+              </span>
+            </div>
+            {r.before && (
+              <p className="text-[13px] leading-relaxed text-[#8B95A1] line-through">{r.before}</p>
+            )}
+            <p className="text-[13px] leading-relaxed text-[#333D4B]">{r.after}</p>
+          </div>
+        ))}
+      </aside>
+    </div>
+  );
 }
 
 function DocTab({
@@ -251,6 +321,10 @@ export function ApplyDoneScreen({
   onRegenerateAllEsg,
   onRetryIndicators,
   onExportScope3,
+  onOpenRevisions,
+  revisions = null,
+  revisionsError = null,
+  onCloseRevisions,
 }: ApplyDoneScreenProps) {
   const [tab, setTab] = useState<DocTab>("doc");
   const esgActive = tab === "esg";
@@ -270,6 +344,9 @@ export function ApplyDoneScreen({
 
   return (
     <AppLayout active="subsidy">
+      {revisions !== null && onCloseRevisions && (
+        <RevisionPanel revisions={revisions} error={revisionsError} onClose={onCloseRevisions} />
+      )}
       <header className="flex items-end justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2.5">
@@ -296,12 +373,12 @@ export function ApplyDoneScreen({
             className="rounded-[10px] bg-white px-3.5 py-2.5 text-[15px] font-bold text-[#4E5968] disabled:text-[#B0B8C1]">
             전체 재생성
           </button>
-          {/* #38 라우트는 있지만 이력 화면이 아직 없습니다. 눌리는 척하지 않게 잠가 둡니다. */}
+          {/* #38 — AI 초안이 사람 편집으로 어떻게 바뀌었는지가 심사 방어 포인트입니다. */}
           <button
             type="button"
-            disabled
-            title="준비 중 — 변경 이력 화면 연동 예정"
-            className="rounded-[10px] bg-white px-3.5 py-2.5 text-[15px] font-bold text-[#B0B8C1]">
+            onClick={onOpenRevisions}
+            disabled={!onOpenRevisions}
+            className="rounded-[10px] bg-white px-3.5 py-2.5 text-[15px] font-bold text-[#4E5968] disabled:text-[#B0B8C1]">
             변경 이력
           </button>
         </div>

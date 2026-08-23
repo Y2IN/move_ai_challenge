@@ -148,7 +148,7 @@ function HeroPlaceholder() {
 export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
   const { active, onJump } = useActiveSection();
   // 히어로 수치·문서 미리보기 금액은 홈 대시보드와 **같은 집계**(#6 ← #7)에서 옵니다.
-  const stats = usePublicStats();
+  const { state: stats, reload: reloadStats } = usePublicStats();
   const statsData = stats.status === 'ready' ? stats.data : null;
 
   return (
@@ -204,7 +204,25 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             {stats.status === 'ready' ? `${stats.data.periodLabel} ${heroCaption}` : heroCaption}
           </div>
 
-          {stats.status === 'ready' ? <HeroFigures stats={stats.data} /> : <HeroPlaceholder />}
+          {stats.status === 'ready' ? (
+            <HeroFigures stats={stats.data} />
+          ) : stats.status === 'error' ? (
+            /* 실패를 스켈레톤으로 두면 영원히 로딩처럼 보입니다. 사실대로 적고 재시도를 붙입니다. */
+            <div className="mt-[18px] flex flex-col items-start gap-2">
+              <span className="text-base font-semibold text-[#D22030]">
+                실적 집계를 불러오지 못했습니다.
+              </span>
+              <button
+                type="button"
+                onClick={reloadStats}
+                className="rounded-lg border border-[#E5E8EB] bg-white px-4 py-2 text-sm font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <HeroPlaceholder />
+          )}
 
           <div className="mt-[30px] flex gap-2.5">
             <button

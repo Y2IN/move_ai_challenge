@@ -140,7 +140,10 @@ export const esgDocPreview = {
   formNo: '[공시 증빙용]',
   docTitle: '「K-ESG 지표표」',
   rows: [
-    { code: 'E-3-2', name: '온실가스 배출량 (Scope 3)', value: '182 tCO₂eq 감축', source: '환경부 배출계수 2026' },
+    // ⚠️ 값은 비워 둡니다. 여기에 숫자를 적으면 집계가 실패했을 때 **낡은 수치**가
+    //    랜딩에 그대로 노출됩니다 (실제로 182 tCO₂eq 가 그렇게 남아 있었습니다).
+    //    실제 값은 /api/public/stats 집계에서 채웁니다 (DocPreview 의 esgValue).
+    { code: 'E-3-2', name: '온실가스 배출량 (Scope 3)', value: '', source: '환경부 배출계수 2026' },
     { code: 'E-7-1', name: '대기오염물질 배출량', value: 'NOx·SOx·PM2.5 저감', source: '환경부 사회적비용 단가' },
     { code: 'E-3-3', name: '온실가스 배출량 검증', value: '산식·계수 출처 명시', source: '공공 데이터 기반' },
   ],

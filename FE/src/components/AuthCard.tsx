@@ -6,7 +6,7 @@ import { brand } from '../mocks/marketing';
 
 /** 02 로그인 · 회원가입 좌측 브랜드 패널 */
 export function AuthBrandPanel() {
-  const stats = usePublicStats();
+  const { state: stats } = usePublicStats();
   return (
     // 랜딩('/') 다크 히어로와 같은 팔레트
     <div className="flex flex-col justify-between bg-[#0B1220] px-10 py-11">

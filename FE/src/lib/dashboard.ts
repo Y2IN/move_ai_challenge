@@ -100,6 +100,8 @@ export interface MatchRowData {
   /** 운송비 표시값. 기업 뷰는 절감률, 코레일 뷰는 추가 수익 */
   saving: string;
   tone: MatchTone;
+  /** 출발 예정 시각 — 목록(#8)에 함께 옵니다 (펼치기 전에도 열이 채워집니다) */
+  departAt: string;
   /** #9 로 받아 온 상세. 아직 안 받았으면 null (펼칠 때 채웁니다) */
   detail: MatchDetail[] | null;
 }
@@ -120,6 +122,7 @@ export function toMatchRowData(m: MatchSummary, persona: Persona): MatchRowData 
     load: Math.round(m.loadRate * 100),
     saving: persona === 'corp' ? `-${m.savingPct}%` : `+${formatKrw(m.savingKrw)}`,
     tone: m.status,
+    departAt: m.departAt,
     detail: null,
   };
 }

@@ -15,8 +15,9 @@ import { useAsync, type AsyncState } from './use-async';
  * 같은 집계에서 나온 값이고, 못 불러왔을 때 옛날 상수를 대신 띄우면 화면끼리
  * 숫자가 어긋납니다. 값 자리를 비우고 그 사실을 적는 쪽이 낫습니다.
  */
-export function usePublicStats(): AsyncState<PublicStats> {
-  return useAsync<PublicStats>(useCallback(() => fetchPublicStats(), [])).state;
+export function usePublicStats(): { state: AsyncState<PublicStats>; reload: () => void } {
+  const { state, reload } = useAsync<PublicStats>(useCallback(() => fetchPublicStats(), []));
+  return { state, reload };
 }
 
 /** 누적 실적 두 줄 — 랜딩 하단과 로그인 좌측 패널이 같은 문구를 씁니다. */

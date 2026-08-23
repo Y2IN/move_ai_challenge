@@ -59,15 +59,17 @@ export function ApplyIntroScreen({
     }
   }, []);
   const res = indicators.state.status === 'ready' ? indicators.state.data : null;
+  /** 로딩과 실패는 다른 상태입니다. 실패를 "집계 중…" 으로 두면 영원히 기다리게 됩니다. */
+  const pending = indicators.state.status === 'error' ? '집계에 실패했습니다' : '집계 중…';
 
   const criteria = [
     {
       label: '대상 기간',
-      value: res ? `${formatDocDate(res.period.from)} ~ ${formatDocDate(res.period.to)}` : '집계 중…',
+      value: res ? `${formatDocDate(res.period.from)} ~ ${formatDocDate(res.period.to)}` : pending,
     },
     {
       label: '전환 운송 실적',
-      value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : '집계 중…',
+      value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : pending,
     },
     // 인증(#1~#5)이 MVP 범위 밖이라 `/api/me` 가 없습니다. 신청 주체는 계정 표시값입니다.
     { label: '신청 주체', value: res?.shipperName ?? account?.org ?? '확인 중…' },
@@ -121,7 +123,11 @@ export function ApplyIntroScreen({
         </div>
 
         <span className="text-sm font-bold text-[#3182F6]">
-          {res ? `${res.period.label} 실적 기준` : '실적을 집계하는 중…'}
+          {res
+            ? `${res.period.label} 실적 기준`
+            : indicators.state.status === 'error'
+              ? '실적을 집계하지 못했습니다'
+              : '실적을 집계하는 중…'}
         </span>
         <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">{applyMeta.title}</h1>
         <p className="text-base text-[#6B7684]">{applyMeta.legalBasis}</p>
@@ -193,6 +199,18 @@ export function ApplyIntroScreen({
             {error && (
               <p className="mt-1.5 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
                 초안을 시작하지 못했습니다 — {error}
+              </p>
+            )}
+            {indicators.state.status === 'error' && (
+              <p className="mt-1.5 flex items-center gap-2 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
+                실적 집계를 불러오지 못했습니다.
+                <button
+                  type="button"
+                  onClick={indicators.reload}
+                  className="font-bold underline underline-offset-2"
+                >
+                  다시 시도
+                </button>
               </p>
             )}
             {previewError && (

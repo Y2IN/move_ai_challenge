@@ -62,17 +62,27 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
   /** 역 마스터와 예시 문장은 화면 진입 때 한 번만 받습니다. */
   const masters = useAsync<Masters>(
     useCallback(
-      () =>
-        Promise.all([fetchStations(), fetchParseCases()]).then(([s, p]) => ({
-          stations: s.items,
-          cases: p.cases,
-          notice: p.notice,
-        })),
+      async () => {
+        // 예시 문장(#10 GET)이 실패해도 역 목록은 살아 있어야 합니다. 예전에는
+        // Promise.all 로 묶여 있어 한쪽만 실패해도 출발역·도착역이 통째로 잠겼습니다.
+        const [s, p] = await Promise.all([
+          fetchStations(),
+          fetchParseCases().catch(() => ({ cases: [], notice: '' })),
+        ]);
+        return { stations: s.items, cases: p.cases, notice: p.notice };
+      },
       [],
     ),
   );
   const stations = masters.state.status === 'ready' ? masters.state.data.stations : [];
   const stationOptions = stations.map((s) => ({ value: s.id, label: `${s.name} (${s.region})` }));
+  /** 실패를 "불러오는 중"으로 위장하지 않습니다 — 에러면 에러라고 적습니다. */
+  const placeholderOf = (ready: string) =>
+    stationOptions.length
+      ? ready
+      : masters.state.status === 'error'
+        ? '역 목록을 불러오지 못했습니다'
+        : '역 목록을 불러오는 중…';
 
   /** 값이 바뀐 필드는 AI 배지를 뗀다 */
   const setField = <K extends FreightField>(key: K, value: FreightForm[K]) => {
@@ -214,7 +224,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                   value={form.originStationId}
                   options={stationOptions}
                   disabled={!stationOptions.length}
-                  placeholder={stationOptions.length ? '출발역 선택' : '역 목록을 불러오는 중…'}
+                  placeholder={placeholderOf('출발역 선택')}
                   onChange={(v) => setField('originStationId', v)}
                 />
               </Field>
@@ -224,7 +234,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                   value={form.destStationId}
                   options={stationOptions}
                   disabled={!stationOptions.length}
-                  placeholder={stationOptions.length ? '도착역 선택' : '역 목록을 불러오는 중…'}
+                  placeholder={placeholderOf('도착역 선택')}
                   onChange={(v) => setField('destStationId', v)}
                 />
               </Field>

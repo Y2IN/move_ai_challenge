@@ -273,9 +273,14 @@ export function AgentFlowCard({
   );
 }
 
-/** E-3-2(온실가스)만 집계에서 채웁니다. 나머지 두 줄은 서식 문구입니다. */
+/**
+ * E-3-2(온실가스)만 집계에서 채웁니다. 나머지 두 줄은 서식 문구입니다.
+ *
+ * 집계를 못 받았으면 **'—'** 로 둡니다. 예전에는 목업 상수("182 tCO₂eq 감축")로
+ * 떨어져서, 실패했다는 사실이 낡은 숫자 뒤에 숨었습니다.
+ */
 function esgValue(code: string, fallback: string, stats: PublicStats | null): string {
-  if (code !== 'E-3-2' || !stats) return fallback;
-  const ghg = stats.breakdown.find((b) => b.key === 'ghg');
-  return ghg ? `${ghg.quantity} 감축` : fallback;
+  if (code !== 'E-3-2') return fallback;
+  const ghg = stats?.breakdown.find((b) => b.key === 'ghg');
+  return ghg ? `${ghg.quantity} 감축` : fallback || '—';
 }
