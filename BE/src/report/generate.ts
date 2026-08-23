@@ -3,8 +3,10 @@
  *
  * 흐름:
  *   1. 문단 6개를 **한 번의 호출로** 받는다 (JSON 스키마 응답)
- *   2. 숫자 환각 검증 (verify.ts) — **문단별로** 돈다
- *   3. 환각이 난 문단만 모아 **한 번 더** 부른다
+ *   2. 출력 검사 (guard.ts) — **문단별로** 돈다
+ *        · 숫자: 입력에 없는 숫자가 있는가 (verify.ts)
+ *        · 표현: 검증받은 척·홍보 수식어·서식 누출이 있는가
+ *   3. 검사에 걸린 문단만 모아 **한 번 더** 부른다 (두 사유를 한 번에 알려준다)
  *   4. 그래도 남거나 호출 자체가 실패하면 그 문단만 규칙기반 폴백 문장
  *
  * ⚠️ 왜 통합인가: 무료 티어는 분당 **요청 수**로 한도를 잰다(모델당 20 RPM).
@@ -32,7 +34,8 @@ import {
   buildPrompt,
   combinedSchema,
 } from "./paragraphs";
-import { collectAllowedNumbers, findHallucinatedNumbers } from "./verify";
+import { inspectOutput } from "./guard";
+import { collectAllowedNumbers } from "./verify";
 
 const MAX_TOKENS = 1024;
 /** 환각이 나오면 한 번만 다시 시킨다. 두 번 이상은 시간만 쓴다. */
@@ -52,6 +55,8 @@ export interface ParagraphDiagnostic {
   attempts: number;
   /** 시도별로 검출된 환각 숫자 */
   hallucinations: string[][];
+  /** 시도별로 검출된 표현 규칙 위반 (guard.ts). 예전 레코드에는 없어 optional */
+  violations?: string[][];
   error?: string;
   elapsedMs: number;
 }
@@ -73,6 +78,7 @@ export async function generateParagraph(
   const spec = PARAGRAPH_SPECS[key];
   const allowed = collectAllowedNumbers(input);
   const hallucinations: string[][] = [];
+  const violations: string[][] = [];
   let attempts = 0;
   let lastError: string | undefined;
 
@@ -83,6 +89,7 @@ export async function generateParagraph(
       source: p.source,
       attempts,
       hallucinations,
+      violations,
       error: lastError,
       elapsedMs: Date.now() - startedAt,
     },
@@ -119,19 +126,20 @@ export async function generateParagraph(
       continue;
     }
 
-    const report = findHallucinatedNumbers(text, allowed);
+    const report = inspectOutput(text, allowed);
     if (report.clean) return done(toParagraph(key, text, "ai"));
 
-    hallucinations.push(report.offenders);
+    if (report.offenders.length) hallucinations.push(report.offenders);
+    if (report.violations.length) violations.push(report.violations.map((v) => v.matched));
     lastError = report.message;
 
-    // 무엇이 문제였는지 알려주고 다시 시킨다
+    // 무엇이 문제였는지 알려주고 다시 시킨다. 숫자·표현을 **한 번에** 넘긴다 —
+    // 사유마다 따로 재시도하면 문단 하나에 요청을 두 배로 쓴다.
     prompt = [
       buildPrompt(key, input),
       "",
-      "[재작성 요청]",
-      `직전 응답에 [산출 수치]에 없는 숫자가 있었다: ${report.offenders.join(", ")}`,
-      "해당 숫자를 빼고, 주어진 수치만 써서 다시 작성하라. 확신이 없으면 숫자를 아예 쓰지 마라.",
+      "[재작성 요청] 직전 응답에 아래 문제가 있었다.",
+      report.retryNote,
     ].join("\n");
   }
 
@@ -198,18 +206,22 @@ export async function generateParagraphs(
 
   let pending: ParagraphKey[] = [...PARAGRAPH_KEYS];
   const hallucinated = new Map<ParagraphKey, string[][]>();
+  const violated = new Map<ParagraphKey, string[][]>();
+  /** 2차 재작성 지시문 — 문단별로 "무엇이 왜 틀렸는지"를 그대로 넘긴다 */
+  const retryNotes = new Map<ParagraphKey, string>();
   let lastError: string | undefined;
 
-  // 1차 통합 호출 → 환각 문단만 2차로 한 번 더. 그 이상은 시간만 쓴다.
+  // 1차 통합 호출 → 검사에 걸린 문단만 2차로 한 번 더. 그 이상은 시간만 쓴다.
   for (let attempt = 1; attempt <= 2 && pending.length; attempt++) {
     let got: Partial<Record<ParagraphKey, string>>;
     try {
       const note =
         attempt === 1
           ? ""
-          : "\n\n[재작성 요청] 직전 응답의 아래 문단에 [산출 수치]에 없는 숫자가 있었다. " +
-            "해당 숫자를 빼고 주어진 수치만 써서 다시 작성하라. 확신이 없으면 숫자를 아예 쓰지 마라.\n" +
-            pending.map((k) => `  - ${k}: ${(hallucinated.get(k)?.at(-1) ?? []).join(", ")}`).join("\n");
+          : "\n\n[재작성 요청] 직전 응답의 아래 문단이 검사에 걸렸다. 지적된 것만 고쳐 다시 작성하라.\n" +
+            pending
+              .map((k) => `### ${k}\n${retryNotes.get(k) ?? "- 응답이 비어 있었다."}`)
+              .join("\n");
       got = await callCombined(pending, input, note);
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
@@ -223,16 +235,24 @@ export async function generateParagraphs(
         stillBad.push(key);
         continue;
       }
-      const report = findHallucinatedNumbers(text, allowed);
+      const report = inspectOutput(text, allowed);
       if (report.clean) {
         settle(key, toParagraph(key, text, "ai"), {
           source: "ai",
           attempts: attempt,
           hallucinations: hallucinated.get(key) ?? [],
+          violations: violated.get(key) ?? [],
         });
         continue;
       }
-      hallucinated.set(key, [...(hallucinated.get(key) ?? []), report.offenders]);
+      if (report.offenders.length) {
+        hallucinated.set(key, [...(hallucinated.get(key) ?? []), report.offenders]);
+      }
+      if (report.violations.length) {
+        const matched = report.violations.map((v) => v.matched);
+        violated.set(key, [...(violated.get(key) ?? []), matched]);
+      }
+      retryNotes.set(key, report.retryNote);
       lastError = report.message;
       stillBad.push(key);
     }
@@ -245,6 +265,7 @@ export async function generateParagraphs(
       source: "fallback",
       attempts: 2,
       hallucinations: hallucinated.get(key) ?? [],
+      violations: violated.get(key) ?? [],
       error: lastError,
     });
   }

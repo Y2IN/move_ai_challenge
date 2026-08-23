@@ -24,8 +24,14 @@ export interface NegotiationRun extends NegotiationResult {
 }
 
 /** LLM 을 타므로 수 초 걸립니다. 화면은 이 호출을 **한 번만** 해야 합니다. */
-export function runNegotiation(shipment: ShipmentInput | null): Promise<NegotiationRun> {
-  return postJson<NegotiationRun>('/api/negotiation/run', shipment ? { shipment } : {});
+export function runNegotiation(
+  shipment: ShipmentInput | null,
+  registeredId?: string | null,
+): Promise<NegotiationRun> {
+  return postJson<NegotiationRun>('/api/negotiation/run', {
+    ...(shipment ? { shipment } : {}),
+    ...(registeredId ? { registeredId } : {}),
+  });
 }
 
 /** #25 GET /api/negotiation/{id} — 재진입 시 LLM 재호출 없이 결과만 가져옵니다. */
@@ -162,11 +168,28 @@ export interface Confirmation {
 export function confirmMatching(
   shipment: ShipmentInput | null,
   acceptedShipmentIds: string[],
+  opts: { registeredId?: string | null; clientKey?: string | null } = {},
 ): Promise<{ confirmation: Confirmation }> {
   return postJson('/api/matching/confirm', {
     ...(shipment ? { input: shipment } : {}),
     acceptedShipmentIds,
+    ...(opts.registeredId ? { registeredId: opts.registeredId } : {}),
+    // 같은 키로 다시 보내면 서버가 기존 편성을 돌려준다 (편성 중복 발급 방지)
+    ...(opts.clientKey ? { clientKey: opts.clientKey } : {}),
   });
+}
+
+/** 확정 편성 조회 — 화면 재진입·새로고침 때 쓰기 없이 같은 편성을 다시 그린다. */
+export function fetchConfirmation(groupId: string): Promise<{ confirmation: Confirmation }> {
+  return getJson(`/api/matching/confirmations/${encodeURIComponent(groupId)}`);
+}
+
+/** 가장 최근 확정 편성. 세션에 번호가 없을 때의 폴백. */
+export function fetchLatestConfirmation(): Promise<{
+  exists: boolean;
+  confirmation: Confirmation | null;
+}> {
+  return getJson('/api/matching/confirmations/latest');
 }
 
 export interface BenefitCalcResponse {
@@ -181,9 +204,11 @@ export interface BenefitCalcResponse {
 export function calculateBenefits(
   shipment: ShipmentInput | null,
   acceptedShipmentIds: string[] = [],
+  registeredId?: string | null,
 ): Promise<BenefitCalcResponse> {
   return postJson('/api/benefits/calculate', {
     ...(shipment ? { shipment } : {}),
     acceptedShipmentIds,
+    ...(registeredId ? { registeredId } : {}),
   });
 }

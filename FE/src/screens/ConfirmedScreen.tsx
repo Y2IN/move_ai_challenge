@@ -4,10 +4,11 @@ import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AsyncSection, CardSkeleton } from '../components/AsyncSection';
 import { Banner, Card, CardTitle, WagonRouteCard } from '../components/Card';
-import { getNegotiationId, getShipment } from '../lib/demo-session';
+import { getConfirmationId, getNegotiationId, setConfirmationId } from '../lib/demo-session';
 import { formatCo2, formatKrw, formatNumber, formatPct } from '../lib/format';
 import {
-  confirmMatching,
+  fetchConfirmation,
+  fetchLatestConfirmation,
   fetchNegotiation,
   type ConcessionOption,
   type Confirmation,
@@ -28,7 +29,8 @@ function MergeLines() {
 }
 
 interface ConfirmedData {
-  confirmation: Confirmation;
+  /** 아직 확정한 편성이 없으면 null — 빈 상태 안내를 그린다 */
+  confirmation: Confirmation | null;
   /** 조율에서 제외된 화주 — 왜 이 편성에 없는지 설명하는 자리 */
   excluded: ConcessionOption[];
 }
@@ -40,35 +42,92 @@ interface ConfirmedScreenProps {
 /**
  * 04e — 편성 확정.
  *
- * 조율 세션이 있으면 **수락된 제안의 화물을 끌어와** 재매칭한 뒤 확정합니다(#19).
- * 어떤 화물을 끌어올지는 화면이 고르는 게 아니라 조율 결과(#25)가 정합니다 —
- * 화면이 임의로 목록을 만들면 서버가 계산한 편성과 어긋납니다.
+ * **이 화면은 조회 전용입니다.** 확정(GRP-NNN 발급)은 조율 화면(04d)의
+ * "편성 확정하기" 버튼이 합니다. 예전에는 이 화면이 마운트될 때마다 확정 API 를
+ * 불러서, 새로고침·뒤로가기·재시도마다 편성이 하나씩 더 생겼습니다.
+ *
+ * 세션에 편성 번호가 있으면 그걸로 조회하고, 없으면 마지막 확정을 보여줍니다.
+ * 둘 다 없으면 "확정된 편성이 없습니다" 안내와 함께 조율 화면으로 돌려보냅니다.
  */
 export function ConfirmedScreen({ onNavigate }: ConfirmedScreenProps) {
   const confirmed = useAsync<ConfirmedData>(
     useCallback(async () => {
-      const shipment = getShipment();
       const negotiationId = getNegotiationId();
+      const groupId = getConfirmationId();
 
-      const session = negotiationId ? await fetchNegotiation(negotiationId).catch(() => null) : null;
-      const accepted = session?.result.proposals.map((p) => p.shipmentId) ?? [];
+      // 조율 세션 조회 실패를 조용히 삼키지 않습니다. 예전에는 catch 로 뭉개서
+      // 제외 화주 목록이 빈 채로 그려졌고, 왜 비었는지 알 방법이 없었습니다.
+      const session = negotiationId ? await fetchNegotiation(negotiationId) : null;
 
-      const { confirmation } = await confirmMatching(shipment, accepted);
-      return { confirmation, excluded: session?.result.rejected ?? [] };
+      if (groupId) {
+        const { confirmation } = await fetchConfirmation(groupId);
+        return { confirmation, excluded: session?.result.rejected ?? [] };
+      }
+
+      const latest = await fetchLatestConfirmation();
+      if (latest.confirmation) {
+        setConfirmationId(latest.confirmation.groupId);
+        return { confirmation: latest.confirmation, excluded: session?.result.rejected ?? [] };
+      }
+      return { confirmation: null, excluded: session?.result.rejected ?? [] };
     }, []),
-    true, // 확정은 GRP-NNN 을 발급하는 쓰기 호출 — 두 번 부르면 편성이 두 개 생깁니다
+    true,
   );
 
   return (
     <AppLayout active="matching">
       <AsyncSection state={confirmed.state} onRetry={confirmed.reload} skeleton={<CardSkeleton height={420} />}>
-        {(data) => <ConfirmedBody data={data} onNavigate={onNavigate} />}
+        {(data) =>
+          data.confirmation ? (
+            <ConfirmedBody
+              data={{ confirmation: data.confirmation, excluded: data.excluded }}
+              onNavigate={onNavigate}
+            />
+          ) : (
+            <EmptyConfirmation onNavigate={onNavigate} />
+          )
+        }
       </AsyncSection>
     </AppLayout>
   );
 }
 
-function ConfirmedBody({ data, onNavigate }: { data: ConfirmedData; onNavigate?: (to: string) => void }) {
+/** 확정된 편성이 아직 없을 때 — 막다른 길을 만들지 않고 조율 화면으로 돌려보냅니다. */
+function EmptyConfirmation({ onNavigate }: { onNavigate?: (to: string) => void }) {
+  return (
+    <Card>
+      <CardTitle>확정된 편성이 없습니다</CardTitle>
+      <p className="mt-3 text-[15px] leading-relaxed text-[#4E5968]">
+        편성은 조율 화면에서 <b>편성 확정하기</b>를 눌러야 발급됩니다. 아직 확정한 편성이 없거나,
+        브라우저 세션이 초기화된 상태입니다.
+      </p>
+      <div className="mt-5 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onNavigate?.('/matching/negotiation')}
+          className="rounded-xl bg-[#3182F6] px-5 py-3 text-[15px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+        >
+          조율 화면으로
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate?.('/freight/new')}
+          className="rounded-xl border border-[#E5E8EB] px-5 py-3 text-[15px] font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+        >
+          화물 등록하기
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function ConfirmedBody({
+  data,
+  onNavigate,
+}: {
+  data: ConfirmedData & { confirmation: Confirmation };
+  onNavigate?: (to: string) => void;
+}) {
   const { confirmation: c, excluded } = data;
   const calc = c.calc;
   const loadRate = Math.round(c.loadFactor * 100);

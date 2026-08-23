@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { ErrorNotice } from '../components/AsyncSection';
 import { ChoiceField, Field, SelectField, TextField } from '../components/Field';
-import { setShipment } from '../lib/demo-session';
+import { setConfirmationId, setRegisteredId, setShipment } from '../lib/demo-session';
 import {
   CORP_TYPES,
   FLEX_CHOICES,
@@ -26,6 +26,7 @@ import {
   type StationOption,
   type TransportMode,
 } from '../lib/freight';
+import { confirmMatching } from '../lib/negotiation';
 import { useAsync } from '../lib/use-async';
 import type { ItemCategory } from '@railhub/be/types';
 
@@ -121,19 +122,31 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
     setSubmitError(null);
     const input = toShipmentInput(form, 'embark');
 
-    registerFreight(input)
-      .then(() => {
-        // 다음 화면들이 같은 화물로 이어지도록 들고 갑니다 (인증이 없어 서버가 못 찾습니다).
-        setShipment(input);
-        return requestMatching(input);
-      })
-      .then((result) => {
-        onNavigate?.(result.status === 'matched' ? '/matching/confirmed' : '/matching/unmatched');
-      })
-      .catch((error: Error) => {
-        setSubmitError(error.message);
-        setSubmitting(false);
+    (async () => {
+      const { shipment } = await registerFreight(input);
+      // 다음 화면들이 같은 화물로 이어지도록 들고 갑니다 (인증이 없어 서버가 못 찾습니다).
+      setShipment(input);
+      // 서버가 발급한 id — 매칭 풀에서 이 건을 빼 이중 계상을 막습니다.
+      setRegisteredId(shipment.id);
+
+      const result = await requestMatching(input, shipment.id);
+      if (result.status !== 'matched') {
+        onNavigate?.('/matching/unmatched');
+        return;
+      }
+
+      // 바로 성립한 경우엔 여기서 확정까지 합니다. 확정 화면은 조회 전용이라
+      // 거기서 편성이 만들어지지 않습니다 (예전엔 그 화면이 매번 새로 발급했습니다).
+      const { confirmation } = await confirmMatching(input, [], {
+        registeredId: shipment.id,
+        clientKey: `reg:${shipment.id}`,
       });
+      setConfirmationId(confirmation.groupId);
+      onNavigate?.('/matching/confirmed');
+    })().catch((error: Error) => {
+      setSubmitError(error.message);
+      setSubmitting(false);
+    });
   };
 
   return (

@@ -16,6 +16,8 @@
  */
 
 import { generateText, isLlmConfigured } from "./llm";
+import { PERSUASION_RULES, inspectOutput } from "./report/guard";
+import { collectAllowedNumbers } from "./report/verify";
 import { STORAGE_COST_KRW_PER_TON_DAY } from "./constants";
 import {
   buildCalc,
@@ -59,6 +61,13 @@ export interface Proposal extends ConcessionOption {
   /** 화주에게 보낼 설득 메시지 */
   message: string;
   source: "ai" | "fallback";
+  /**
+   * 폴백으로 내려간 사유. `source: "ai"` 면 비어 있습니다.
+   *
+   * 화면에 그대로 띄울 수 있어야 합니다 — 검사기가 AI 문장을 걷어냈다는 사실은
+   * 숨길 게 아니라 이 기능의 방어선이 작동했다는 증거입니다.
+   */
+  note?: string;
 }
 
 export interface NegotiationResult {
@@ -200,25 +209,17 @@ const SYSTEM_PROMPT = `너는 화물 합적 플랫폼의 조율 담당자다. �
 2. 그 화주에게 돌아가는 이득을 근거로 설득한다. 다른 화주의 이득을 말하지 마라.
 3. 요청하는 양보를 **구체적으로** 적는다. 두루뭉술하게 쓰지 마라.
 4. 2~3문장. 존댓말. 과장·읍소·압박 금지.
-5. 메시지 본문만 출력한다. 제목·인사말·서명을 붙이지 마라.`;
+5. 메시지 본문만 출력한다. 제목·인사말·서명을 붙이지 마라.
 
-function buildPrompt(o: ConcessionOption): string {
-  const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
-  return [
-    `[받는 화주] ${o.shipperName}`,
-    `[요청할 양보] ${o.ask}`,
-    `[현재 걸림돌] ${o.conflict}`,
-    "",
-    "[이 화주에게 돌아가는 숫자]",
-    `  - 물량: ${o.weightTon}톤`,
-    `  - 합류 시 절감액: ${won(o.savingKrw)}`,
-    `  - 양보에 드는 비용(보관·출하 조정): ${won(o.concessionCostKrw)}`,
-    `  - 순이득: ${won(o.netGainKrw)}`,
-    "",
-    "[작성 지시]",
-    "위 양보를 요청하는 메시지를 써라. 순이득이 남는다는 점이 드러나야 한다.",
-  ].join("\n");
-}
+예시 — 이렇게 쓰지 마라:
+"지금이 마지막 기회입니다! 부디 협조 부탁드립니다. 약 200만원 정도 절감이 예상됩니다."
+(압박·읍소 + "약/정도" 로 뭉갠 숫자 + 주어진 값이 아닌 어림수)
+
+예시 — 이렇게 써라:
+"8월 22일 예정 물량 4톤을 8월 19일 편성으로 3일 당겨 주실 수 있는지 문의드립니다. 합류하시면 운송비 2,180,000원을 절감하실 수 있고, 출하 조정 비용 620,000원을 제하면 1,560,000원이 남습니다."
+(요청이 구체적 + 주어진 숫자를 그대로 인용 + 그 화주 몫만 언급)
+
+**위 예시에 나온 숫자는 문체를 보여주기 위한 것이다. 실제 메시지에 절대 옮겨 쓰지 마라.**`;
 
 function fallbackMessage(o: ConcessionOption): string {
   const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
@@ -229,34 +230,172 @@ function fallbackMessage(o: ConcessionOption): string {
   );
 }
 
-/** 게이트를 통과한 후보에 대해서만 설득 메시지를 만든다. 병렬 호출. */
+/**
+ * 이 제안 문장이 인용해도 되는 숫자.
+ *
+ * ⚠️ **제안 하나 분량으로 좁혀서 만듭니다.** 후보 전체를 한 집합으로 합치면 A사에게
+ *    보내는 메시지가 B사의 절감액을 인용해도 검사를 통과합니다. 그건 영업비밀 유출이자
+ *    "다른 화주의 이득으로 설득하지 않는다"는 규칙이 깨지는 지점입니다.
+ */
+function allowedFor(o: ConcessionOption) {
+  return collectAllowedNumbers({
+    ask: o.ask,
+    conflict: o.conflict,
+    weightTon: o.weightTon,
+    savingKrw: o.savingKrw,
+    concessionCostKrw: o.concessionCostKrw,
+    netGainKrw: o.netGainKrw,
+  });
+}
+
+/** 통합 호출의 응답 스키마 — 키가 shipmentId 다. */
+function proposalSchema(ids: string[]): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: Object.fromEntries(ids.map((id) => [id, { type: "string" }])),
+    required: [...ids],
+    additionalProperties: false,
+  };
+}
+
+/**
+ * 후보 여러 건을 **한 번의 호출로** 받기 위한 프롬프트.
+ *
+ * 화주별 수치 블록은 그대로 분리해 둡니다. 합치면 모델이 남의 숫자를 끌어다 씁니다.
+ */
+function buildCombinedPrompt(options: ConcessionOption[], notes: Map<string, string>): string {
+  const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+
+  const blocks = options.map((o) =>
+    [
+      `### ${o.shipmentId}`,
+      `[받는 화주] ${o.shipperName}`,
+      `[요청할 양보] ${o.ask}`,
+      `[현재 걸림돌] ${o.conflict}`,
+      `[이 화주에게 돌아가는 숫자] — **이 블록의 값만** 인용할 수 있다`,
+      `  - 물량: ${o.weightTon}톤`,
+      `  - 합류 시 절감액: ${won(o.savingKrw)}`,
+      `  - 양보에 드는 비용(보관·출하 조정): ${won(o.concessionCostKrw)}`,
+      `  - 순이득: ${won(o.netGainKrw)}`,
+      notes.get(o.shipmentId) ? `[재작성 지시]\n${notes.get(o.shipmentId)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+
+  return [
+    `아래 ${options.length}명의 화주에게 각각 보낼 메시지를 작성하라.`,
+    "",
+    "출력은 JSON 객체 하나다. 키는 화주 블록 id(### 뒤의 값), 값은 그 화주에게 보낼 메시지 본문이다.",
+    "**다른 화주의 숫자를 절대 인용하지 마라.** 각 메시지는 자기 블록의 값만 쓴다.",
+    "",
+    ...blocks,
+  ].join("\n\n");
+}
+
+/** 통합 호출 1회. 실패하면 throw — 호출부가 폴백으로 간다. */
+async function callCombined(
+  options: ConcessionOption[],
+  notes: Map<string, string>,
+): Promise<Record<string, string>> {
+  const raw = await generateText({
+    system: SYSTEM_PROMPT,
+    prompt: buildCombinedPrompt(options, notes),
+    // 메시지 하나가 2~3문장이라 512면 충분하다. 인원수만큼 곱한다.
+    maxTokens: 512 * options.length,
+    // 짧은 설득 문장이라 깊은 추론이 필요 없다. 지연이 그대로 응답 시간이 된다.
+    thinking: "low",
+    jsonSchema: proposalSchema(options.map((o) => o.shipmentId)),
+    // 응답이 길어진 만큼 넉넉히. 그래도 함수 한도(60s) 안쪽이라 폴백 실을 시간이 남는다.
+    timeoutMs: 30_000,
+  });
+
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const o of options) {
+    const v = parsed[o.shipmentId];
+    if (typeof v === "string" && v.trim()) out[o.shipmentId] = v.trim();
+  }
+  return out;
+}
+
+/**
+ * 게이트를 통과한 후보에 대해서만 설득 메시지를 만든다.
+ *
+ * ## 왜 통합 호출인가
+ *
+ * 예전에는 화주 수만큼 `Promise.all` 로 병렬 호출했다. 3사 조율이면 3요청이다.
+ * 무료 티어는 분당 **요청 수**로 한도를 재므로(모델당 20 RPM), 시연 중 조율을
+ * 몇 번 돌리면 그 자리에서 429 가 난다. 한 번으로 묶으면 인원수와 무관하게 1요청이다.
+ *
+ * ## 왜 검사하는가
+ *
+ * 이 메시지는 **화주에게 그대로 나가는 상업적 제안**이다. 여기 적힌 절감액을 보고
+ * 화주가 출하 일정을 바꾼다. 숫자가 하나라도 지어내진 값이면 계산이 맞는지와 무관하게
+ * 잘못된 정보로 의사결정을 시킨 것이 된다. 그래서 서식 문단과 **같은 검사기**를 건다.
+ *   · 숫자 — 그 화주 블록에 있는 값만 (`allowedFor`)
+ *   · 표현 — 압박·읍소·과장 (`PERSUASION_RULES`)
+ *
+ * 걸린 건만 사유를 붙여 한 번 더 부르고(최대 2요청), 그래도 남으면 그 건만 템플릿 문장.
+ */
 export async function generateProposals(
   options: ConcessionOption[],
 ): Promise<Proposal[]> {
   const worthwhile = options.filter((o) => o.worthwhile);
-  const configured = isLlmConfigured();
+  if (!worthwhile.length) return [];
 
-  return Promise.all(
-    worthwhile.map(async (o): Promise<Proposal> => {
-      if (!configured) return { ...o, message: fallbackMessage(o), source: "fallback" };
-      try {
-        const text = await generateText({
-          system: SYSTEM_PROMPT,
-          prompt: buildPrompt(o),
-          maxTokens: 512,
-          // 짧은 설득 문장이라 깊은 추론이 필요 없다. 화주 수만큼 병렬로 나가므로
-          // 여기서 지연을 줄이는 게 전체 응답 시간에 그대로 반영된다.
-          thinking: "low",
-          // 타임아웃이 없으면 한 화주의 호출이 늘어질 때 Promise.all 이 통째로 걸려
-          // Vercel 함수 한도(60s)를 넘고 504 가 난다 — 폴백 문장조차 못 싣는다.
-          timeoutMs: 20_000,
-        });
-        return { ...o, message: text, source: "ai" };
-      } catch {
-        return { ...o, message: fallbackMessage(o), source: "fallback" };
+  const fallbackOf = (o: ConcessionOption, note: string): Proposal => ({
+    ...o,
+    message: fallbackMessage(o),
+    source: "fallback",
+    note,
+  });
+
+  if (!isLlmConfigured()) {
+    return worthwhile.map((o) => fallbackOf(o, "생성 AI 인증 없음 — 템플릿 문장"));
+  }
+
+  const done = new Map<string, Proposal>();
+  const notes = new Map<string, string>();
+  let pending = [...worthwhile];
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= 2 && pending.length; attempt++) {
+    let got: Record<string, string>;
+    try {
+      got = await callCombined(pending, notes);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      break; // 호출 자체가 실패하면 재시도해도 대개 같다 — 남은 건은 폴백
+    }
+
+    const stillBad: ConcessionOption[] = [];
+    for (const o of pending) {
+      const text = got[o.shipmentId];
+      if (!text) {
+        lastError = "응답에 이 화주 메시지가 없음";
+        stillBad.push(o);
+        continue;
       }
-    }),
-  );
+
+      const check = inspectOutput(text, allowedFor(o), PERSUASION_RULES);
+      if (check.clean) {
+        done.set(o.shipmentId, { ...o, message: text, source: "ai" });
+        continue;
+      }
+      notes.set(o.shipmentId, check.retryNote);
+      lastError = check.message;
+      stillBad.push(o);
+    }
+    pending = stillBad;
+  }
+
+  for (const o of pending) {
+    done.set(o.shipmentId, fallbackOf(o, `검사기가 AI 문장을 걸러냈습니다 — ${lastError}`));
+  }
+
+  // 순서는 입력 순서(순이득 내림차순)를 유지한다. 응답 순서에 흔들리면 안 된다.
+  return worthwhile.map((o) => done.get(o.shipmentId)!);
 }
 
 // ── 3. 한 번에 ─────────────────────────────────────────────────

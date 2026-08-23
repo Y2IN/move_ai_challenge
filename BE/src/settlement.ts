@@ -14,6 +14,7 @@
 
 import { computeBenefit, computeCost, computeSubsidy } from "./calc";
 import { loadLedger } from "./db/ledger";
+import { listUploads, mergeUploads } from "./db/settlement-docs";
 import { loadUniverse } from "./db/universe";
 import { aggregate, customPeriod, legInput, railDistanceKm } from "./esg/period";
 import type { LedgerData } from "./esg/types";
@@ -215,7 +216,7 @@ export async function getSettlement(
   seedData?: SeedData,
   contractNo?: string | null,
 ): Promise<SettlementResponse> {
-  const [loaded, source] = await Promise.all([loadUniverse(), loadLedger()]);
+  const [loaded, source, uploads] = await Promise.all([loadUniverse(), loadLedger(), listUploads()]);
   const data = seedData ?? loaded;
   const asOf = iso(now);
 
@@ -286,7 +287,8 @@ export async function getSettlement(
     }));
 
   // ── 증빙 ────────────────────────────────────────────────────
-  const documents: DocumentView[] = data.settlementDocuments.map((doc) => ({
+  // 업로드된 서류를 시드 목록에 덧입힌다 (업로드는 파일명·시각만 기록한다).
+  const documents: DocumentView[] = mergeUploads(data.settlementDocuments, uploads).map((doc) => ({
     ...doc,
     ok: !doc.required || doc.file !== null,
   }));

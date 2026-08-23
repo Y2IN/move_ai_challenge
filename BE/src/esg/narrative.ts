@@ -5,6 +5,8 @@
  *
  *  1. **숫자는 LLM이 만들지 않는다.** 계산된 수치를 프롬프트에 넣고 문장만 쓰게 한 뒤,
  *     생성 결과에서 입력에 없는 숫자가 나오면 재생성한다 (`report/verify.ts`).
+ *     숫자가 아닌 위험 표현(검증받은 척·"흡수/상쇄"·홍보 수식어)도 같이 검사한다
+ *     (`report/guard.ts`). 프롬프트의 금지사항은 **지켜졌는지 확인해야** 규칙이 된다.
  *  2. **병렬 호출.** 문단 5개를 순차로 돌리면 서버리스 실행 시간 제한에 걸린다.
  *  3. **폴백은 필수 경로다.** 키가 없든 네트워크가 끊기든 문서는 나온다. 배지만 달라진다.
  */
@@ -16,6 +18,7 @@ import {
   llmErrorStatus,
   LLM_MODEL,
 } from "../llm";
+import { inspectOutput } from "../report/guard";
 import { collectAllowedNumbers, findHallucinatedNumbers } from "../report/verify";
 import { buildIndicators, SCOPE3_CATEGORY } from "./indicators";
 import {
@@ -118,9 +121,17 @@ K-ESG 가이드라인·GRI·ISSB 기준에 맞는 지속가능경영보고서 �
 문체:
 - 공시 문서체. "~하였다", "~이다" 로 끝나는 평서형 국문.
 - 3~5문장 한 문단. 제목·목록·마크다운 없이 문단 텍스트만 출력.
-- 홍보성 수식어("혁신적", "획기적", "선도적")를 쓰지 마십시오.`;
+- 홍보성 수식어("혁신적", "획기적", "선도적")를 쓰지 마십시오.
 
-function userPrompt(spec: ParagraphSpec, facts: unknown, retry: boolean): string {
+이렇게 쓰지 마십시오:
+"당사는 혁신적인 모달 시프트로 탄소를 흡수하였으며, 외부 검증기관의 인증을 취득하였습니다."
+→ 홍보 수식어를 썼고, 감축을 "흡수"로 잘못 적었으며, 취득한 적 없는 인증을 적었습니다.
+
+이렇게 쓰십시오:
+"당사는 보고 기간 중 간선 운송의 일부를 도로에서 철도로 전환하였다. 이에 따라 해당 구간에서 발생하였을 온실가스가 감축되었으며, 산정 결과는 아래 지표에 반영하였다."
+→ 사실만 평서형으로 적었고, 감축을 "배출하지 않은 양"으로 서술하였습니다.`;
+
+function userPrompt(spec: ParagraphSpec, facts: unknown, retryNote: string): string {
   return [
     `# 작성할 문단`,
     `제목: ${spec.title}`,
@@ -132,10 +143,7 @@ function userPrompt(spec: ParagraphSpec, facts: unknown, retry: boolean): string
     JSON.stringify(facts, null, 2),
     "```",
     ``,
-    retry
-      ? `# 재작성 지시\n직전 출력에 위 데이터에 없는 숫자가 포함되었습니다. ` +
-        `위 JSON에 그대로 있는 값만 쓰고, 확신이 없으면 숫자를 빼고 서술하십시오.`
-      : ``,
+    retryNote ? `# 재작성 지시\n직전 출력이 검사에 걸렸습니다.\n${retryNote}` : ``,
     `문단 텍스트만 출력하십시오.`,
   ]
     .filter(Boolean)
@@ -145,11 +153,11 @@ function userPrompt(spec: ParagraphSpec, facts: unknown, retry: boolean): string
 async function callLlm(
   spec: ParagraphSpec,
   facts: unknown,
-  retry: boolean,
+  retryNote: string,
 ): Promise<string> {
   return generateText({
     system: SYSTEM_PROMPT,
-    prompt: userPrompt(spec, facts, retry),
+    prompt: userPrompt(spec, facts, retryNote),
     maxTokens: MAX_TOKENS,
     // 짧은 서술 문단이라 깊은 추론이 필요 없습니다. 추론 깊이를 낮춰 지연을 줄입니다.
     thinking: "low",
@@ -160,7 +168,7 @@ async function callLlm(
 /**
  * 문단 1개 생성. 실패해도 예외를 던지지 않습니다 — 항상 문단이 나옵니다.
  *
- * 흐름: 생성 → 숫자 검증 → (환각이면) 1회 재생성 → 그래도 환각이면 폴백.
+ * 흐름: 생성 → 숫자·표현 검사 → (걸리면) 사유를 알려주고 1회 재생성 → 그래도 걸리면 폴백.
  */
 async function generateSection(
   configured: boolean,
@@ -182,25 +190,34 @@ async function generateSection(
     return fallback(demoWarning("서술 에이전트 인증 정보가 없어"));
   }
 
+  let retryNote = "";
   for (const retry of [false, true]) {
     try {
-      const text = await callLlm(spec, facts, retry);
+      const text = await callLlm(spec, facts, retryNote);
       if (!text) continue;
 
-      const check = findHallucinatedNumbers(text, allowed);
+      // 원장이 실제로 제3자 검증을 받았으면 "검증받았다"는 서술은 사실이다.
+      // 그때만 해당 규칙을 푼다 — 기본값은 막는 쪽이다.
+      const check = inspectOutput(
+        text,
+        allowed,
+        undefined,
+        agg.verified ? ["unverified-assurance"] : [],
+      );
       if (check.clean) {
         return {
           ...base,
           text,
           source: "ai",
-          warnings: retry ? ["1회 재생성 후 숫자 검증을 통과했습니다."] : [],
+          warnings: retry ? ["1회 재생성 후 출력 검사를 통과했습니다."] : [],
         };
       }
+      retryNote = check.retryNote;
       if (retry) {
         // 이 경로는 사고가 아니라 방어선이 작동한 결과입니다. 숨기지 않고 그대로 적습니다.
-        // 숫자 검증기가 AI 문장을 걷어냈다는 사실 자체가 이 화면에서 제일 중요한 정보입니다.
+        // 검사기가 AI 문장을 걷어냈다는 사실 자체가 이 화면에서 제일 중요한 정보입니다.
         return fallback([
-          `수치 검증기가 AI 문장을 걸러냈습니다 — ${check.message} 사전 작성된 서술 초안으로 대체했습니다.`,
+          `출력 검사기가 AI 문장을 걸러냈습니다 — ${check.message} 사전 작성된 서술 초안으로 대체했습니다.`,
         ]);
       }
     } catch (error) {

@@ -204,7 +204,18 @@ export function registerFreight(input: ShipmentInput): Promise<RegisterResponse>
   return postJson<RegisterResponse>('/api/freights', input);
 }
 
-/** #16 POST /api/matching/request — 시드 화물 풀 + 방금 등록한 화물로 편성 */
-export function requestMatching(shipment: ShipmentInput | null = null): Promise<MatchResult> {
-  return postJson<MatchResult>('/api/matching/request', shipment ? { shipment } : {});
+/**
+ * #16 POST /api/matching/request — 매칭 풀(시드 + 등록 화물) + 방금 등록한 화물로 편성.
+ *
+ * `registeredId` 를 주면 서버가 그 건을 풀에서 뺍니다. 방금 등록한 화물이
+ * "풀에 있는 화물"과 "지금 입력"으로 두 번 세지 않게 하려는 것입니다.
+ */
+export function requestMatching(
+  shipment: ShipmentInput | null = null,
+  registeredId?: string | null,
+): Promise<MatchResult> {
+  return postJson<MatchResult>('/api/matching/request', {
+    ...(shipment ? { shipment } : {}),
+    ...(registeredId ? { registeredId } : {}),
+  });
 }

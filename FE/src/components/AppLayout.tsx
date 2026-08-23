@@ -36,12 +36,17 @@ const NAV_BY_ROLE: Record<Role, NavKey[]> = {
 /**
  * 메뉴별 기본 경로. 값이 없으면 '준비 중'으로 비활성.
  * ponytail: 시연 기준 상태를 상수로 박았다. clients·performance는 화면이 생기면 경로만 채우면 활성화된다.
+ *
+ * ⚠️ 메뉴의 기본 경로는 **LLM 을 태우지 않는 화면**이어야 한다. 예전에는
+ *    매칭 → /matching/negotiation, 보조금 → /subsidy/done 이라 메뉴를 누를
+ *    때마다 조율 실행·문단 생성이 새로 나갔다 (누를 때마다 과금·수 초 대기).
+ *    LLM 을 타는 화면은 사용자가 그 화면의 버튼으로 명시적으로 들어간다.
  */
 const NAV_PATH: Record<NavKey, string | null> = {
   home: '/home',
   freight: '/freight/new',
-  matching: '/matching/negotiation',
-  subsidy: '/subsidy/done',
+  matching: '/matching/unmatched',
+  subsidy: '/subsidy/new',
   settlement: '/settlement',
   wagons: '/korail/wagons',
   clients: '/korail/clients',

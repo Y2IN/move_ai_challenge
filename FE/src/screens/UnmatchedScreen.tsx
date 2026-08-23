@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AsyncSection, CardSkeleton } from '../components/AsyncSection';
 import { Banner, Card, CardTitle, InfoCell } from '../components/Card';
-import { getShipment } from '../lib/demo-session';
+import { getNegotiationId, getRegisteredId, getShipment } from '../lib/demo-session';
 import { formatNumber, formatPct } from '../lib/format';
 import { requestMatching, type MatchResult } from '../lib/freight';
+import { cancelNegotiation } from '../lib/negotiation';
 import { useAsync } from '../lib/use-async';
 import { agentNote } from '../mocks/negotiation';
 
@@ -23,7 +24,9 @@ interface UnmatchedScreenProps {
  * 화면을 열어만 봐도 LLM 값을 지불하게 됩니다.
  */
 export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
-  const match = useAsync<MatchResult>(useCallback(() => requestMatching(getShipment()), []));
+  const match = useAsync<MatchResult>(
+    useCallback(() => requestMatching(getShipment(), getRegisteredId()), []),
+  );
 
   return (
     <AppLayout active="matching">
@@ -31,6 +34,71 @@ export function UnmatchedScreen({ onNavigate }: UnmatchedScreenProps) {
         {(m) => <UnmatchedBody match={m} onNavigate={onNavigate} />}
       </AsyncSection>
     </AppLayout>
+  );
+}
+
+/**
+ * "다음 공차 일정 대기" — 예전에는 그냥 /home 으로 보냈습니다.
+ * 사용자가 기대하는 건 **다음 공차가 언제인지**이므로, 조율 세션이 있으면 #26 으로
+ * 안내를 받고(대기 전환), 없으면 이 편성의 화차 시각표를 그대로 보여줍니다.
+ */
+function NextWagonAction({
+  match: m,
+  onNavigate,
+}: {
+  match: MatchResult;
+  onNavigate?: (to: string) => void;
+}) {
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const describe = () =>
+    m.wagon
+      ? `${m.wagon.label} · ${m.wagon.departure.date} ${m.wagon.departure.time} 출발 (마감 ${m.wagon.cutoffAt.slice(0, 10)})`
+      : '지금 이 노선에 배정 가능한 공차가 없습니다.';
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const id = getNegotiationId();
+            if (id) {
+              const res = await cancelNegotiation(id);
+              setNotice(
+                res.nextWagon
+                  ? `다음 공차 ${res.nextWagon.label} · ${res.nextWagon.departAt.slice(0, 10)} 출발`
+                  : res.message,
+              );
+            } else {
+              setNotice(describe());
+            }
+          } catch {
+            setNotice(describe());
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="h-[52px] rounded-[14px] bg-[#F2F4F6] text-base font-bold text-[#333D4B] transition-colors hover:bg-[#E5E8EB] disabled:opacity-60"
+      >
+        {busy ? '확인 중…' : '다음 공차 일정 대기'}
+      </button>
+      {notice && (
+        <div className="rounded-xl bg-[#E8F3FF] px-4 py-3 text-[13px] leading-relaxed font-semibold text-[#1B64DA]">
+          {notice}
+          <button
+            type="button"
+            onClick={() => onNavigate?.('/home')}
+            className="ml-2 underline underline-offset-2"
+          >
+            홈으로
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -142,13 +210,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
             >
               조율 에이전트 실행
             </button>
-            <button
-              type="button"
-              onClick={() => onNavigate?.('/home')}
-              className="h-[52px] rounded-[14px] bg-[#F2F4F6] text-base font-bold text-[#333D4B] transition-colors hover:bg-[#E5E8EB]"
-            >
-              다음 공차 일정 대기
-            </button>
+            <NextWagonAction match={m} onNavigate={onNavigate} />
             <span className="text-[13px] leading-relaxed text-[#8B95A1]">
               적재율 {formatPct(m.loadFactor)} · 마감까지 {Math.max(0, Math.round(m.hoursToCutoff))}시간
             </span>

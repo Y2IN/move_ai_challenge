@@ -11,9 +11,49 @@ interface LoginScreenProps {
 /** 02a — 로그인 (역할 분기) */
 export function LoginScreen({ onLogin, onDemo, onSignup }: LoginScreenProps) {
   const [role, setRole] = useState<Role>('corp');
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
+      {/* 인증이 데모 범위 밖이라 재설정 메일을 보낼 곳이 없습니다. 그 사실을 그대로 알립니다. */}
+      {helpOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+          onClick={() => setHelpOpen(false)}
+        >
+          <div
+            className="flex w-[420px] flex-col gap-3 rounded-2xl bg-white p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-extrabold tracking-[-0.03em] text-[#191F28]">
+              비밀번호 재설정은 아직 없습니다
+            </h2>
+            <p className="text-[15px] leading-relaxed text-[#4E5968]">
+              이번 버전은 계정·인증 없이 동작합니다. 로그인 폼은 화면 흐름을 보여주기 위한
+              것이고, 실제 계정이 만들어지지 않으므로 재설정할 비밀번호도 없습니다.
+            </p>
+            <div className="mt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpOpen(false);
+                  onDemo?.();
+                }}
+                className="h-12 flex-1 rounded-xl bg-[#3182F6] text-base font-bold text-white transition-colors hover:bg-[#1B64DA]"
+              >
+                데모 계정으로 둘러보기
+              </button>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(false)}
+                className="h-12 rounded-xl border border-[#E5E8EB] px-5 text-base font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <AuthCard>
         <div className="flex flex-col justify-center gap-[22px] px-16 py-14">
           <div className="rounded-xl bg-[#F5F9FF] px-4 py-3.5 text-[15px] leading-[1.55] text-[#1B64DA]">
@@ -65,7 +105,9 @@ export function LoginScreen({ onLogin, onDemo, onSignup }: LoginScreenProps) {
           </div>
 
           <div className="flex justify-between text-[15px] text-[#8B95A1]">
-            <button type="button">비밀번호 찾기</button>
+            <button type="button" onClick={() => setHelpOpen(true)}>
+              비밀번호 찾기
+            </button>
             <span>
               아직 계정이 없으신가요?{' '}
               <button type="button" onClick={onSignup} className="font-bold text-[#3182F6]">

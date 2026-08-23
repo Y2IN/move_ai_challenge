@@ -13,7 +13,7 @@ import type {
   SettlementResponse,
   TripRow,
 } from '@railhub/be/settlement';
-import { getJson } from './api';
+import { getJson, postJson } from './api';
 
 export type {
   AchievementView,
@@ -24,8 +24,26 @@ export type {
   TripRow,
 };
 
-export function fetchSettlement(): Promise<SettlementResponse> {
-  return getJson<SettlementResponse>('/api/settlement');
+export function fetchSettlement(contractNo?: string | null): Promise<SettlementResponse> {
+  const q = contractNo ? `?contractNo=${encodeURIComponent(contractNo)}` : '';
+  return getJson<SettlementResponse>(`/api/settlement${q}`);
+}
+
+/** 정산 보고서 파일 주소 — 인쇄용 HTML 은 새 탭에서 바로 인쇄 대화상자를 띄웁니다. */
+export function settlementReportUrl(contractNo: string, format: 'pdf' | 'csv' | 'xlsx' = 'pdf'): string {
+  const print = format === 'pdf' ? '&autoprint=1' : '';
+  return `/api/settlement/report?format=${format}&contractNo=${encodeURIComponent(contractNo)}${print}`;
+}
+
+/**
+ * 증빙 서류 제출. **파일 본문은 보내지 않습니다** — 서버가 파일명·시각만 기록해
+ * 제출 상태를 채웁니다 (시연 범위).
+ */
+export function uploadSettlementDocument(
+  key: string,
+  fileName: string,
+): Promise<{ upload: { key: string; name: string; uploadedAt: string }; note: string }> {
+  return postJson(`/api/settlement/documents/${encodeURIComponent(key)}`, { fileName });
 }
 
 /** 실적이 기간 경과보다 뒤처졌는지. 배너를 띄울지 정하는 기준입니다. */

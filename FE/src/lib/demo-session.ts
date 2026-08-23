@@ -15,6 +15,8 @@ import type { ShipmentInput } from '@railhub/be/types';
 
 const SHIPMENT_KEY = 'railhub-shipment';
 const NEGOTIATION_KEY = 'railhub-negotiation-id';
+const REGISTERED_KEY = 'railhub-registered-id';
+const CONFIRMATION_KEY = 'railhub-confirmation-id';
 
 function read<T>(key: string): T | null {
   if (typeof window === 'undefined') return null;
@@ -41,8 +43,23 @@ export const setShipment = (input: ShipmentInput) => write(SHIPMENT_KEY, input);
 export const getNegotiationId = () => read<string>(NEGOTIATION_KEY);
 export const setNegotiationId = (id: string) => write(NEGOTIATION_KEY, id);
 
+/**
+ * 04a 에서 서버가 발급한 SHM-USER-NNN.
+ *
+ * 등록 화물은 이제 매칭 풀에 들어갑니다. 같은 건이 "풀에 있는 화물"과
+ * "지금 입력"으로 두 번 세이지 않도록, 이 id 를 매칭 요청에 함께 보내
+ * 서버가 풀에서 빼도록 합니다.
+ */
+export const getRegisteredId = () => read<string>(REGISTERED_KEY);
+export const setRegisteredId = (id: string) => write(REGISTERED_KEY, id);
+
+/** 확정된 편성 번호(GRP-NNN). 04e 는 이 번호로 **조회만** 합니다. */
+export const getConfirmationId = () => read<string>(CONFIRMATION_KEY);
+export const setConfirmationId = (id: string) => write(CONFIRMATION_KEY, id);
+
 export function clearDemoSession(): void {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(SHIPMENT_KEY);
-  window.sessionStorage.removeItem(NEGOTIATION_KEY);
+  for (const key of [SHIPMENT_KEY, NEGOTIATION_KEY, REGISTERED_KEY, CONFIRMATION_KEY]) {
+    window.sessionStorage.removeItem(key);
+  }
 }
