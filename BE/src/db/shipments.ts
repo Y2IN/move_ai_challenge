@@ -204,8 +204,13 @@ interface ConfirmationRow {
   calc: CalcResult | null;
 }
 
-const CONFIRMATION_COLS =
-  "group_id, status, wagon, members, total_ton, capacity_ton, load_factor, confirmed_at, calc";
+/**
+ * `*` 를 쓰는 이유: 승인 컬럼(approved_at·approved_by)은 나중에 추가된 것이라
+ * 열 이름을 명시하면 아직 마이그레이션을 안 돌린 프로젝트에서 SELECT 가 통째로
+ * 실패한다. `*` 면 있으면 오고 없으면 안 온다 — 두 상태를 한 쿼리로 감당한다.
+ * (실제로 컬럼을 추가한 뒤에도 이 목록이 낡아 승인 시각이 계속 null 로 보였다)
+ */
+const CONFIRMATION_COLS = "*";
 
 /**
  * 코레일 배차 승인 (api_list #43).
