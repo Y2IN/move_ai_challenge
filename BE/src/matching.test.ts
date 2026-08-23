@@ -103,9 +103,14 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
 // ── 4. 노선 검증 ───────────────────────────────────────────────
 
 {
-  const rev = match(seed, input({ originStationId: "OBONG", destStationId: "ULS-FRT" }), NOW);
-  ok("역방향 입력은 noWagon", rev.status === "noWagon", rev.status);
-  ok("역방향 메시지에 개설 노선 안내", rev.message.includes("노선"), rev.message);
+  // 복편(오봉→울산)은 노선이 **있으므로** 매칭돼야 한다.
+  const back = match(seed, input({ originStationId: "OBONG", destStationId: "ULS-FRT" }), NOW);
+  ok("개설된 복편 노선은 매칭된다", back.status !== "noWagon", back.status);
+
+  // 노선 마스터에 없는 조합은 화차를 훑기 전에 막혀야 한다 (부산진 → 광양)
+  const none = match(seed, input({ originStationId: "BSJ-FRT", destStationId: "GWY-FRT" }), NOW);
+  ok("미개설 노선은 noWagon", none.status === "noWagon", none.status);
+  ok("미개설 노선 메시지에 운행 노선 안내", none.message.includes("노선"), none.message);
 }
 
 // ── 5. 유연폭 ──────────────────────────────────────────────────
@@ -158,7 +163,8 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
 
   const a17 = seed.emptyWagons.find((w) => w.id === "WGN-A17")!;
   const b04 = seed.emptyWagons.find((w) => w.id === "WGN-B04")!;
-  const onLane = (s: Shipment) => shipmentOnLane(s, seed.lanes[0]);
+  const laneUlsObong = seed.lanes.find((l) => l.id === "LANE-ULS-OBONG")!;
+  const onLane = (s: Shipment) => shipmentOnLane(s, laneUlsObong);
 
   const seatedA17 = seatOnWagon(
     a17,
@@ -179,12 +185,14 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   );
 
   // 역방향 등록 화물이 남의 편성에 올라타면 안 된다
-  const reverse: Shipment = {
+  // 다른 노선 화물이 이 편성에 올라타면 안 된다 (복편은 별도 노선·별도 화차다)
+  const otherLane: Shipment = {
     ...registryShipment("SHM-USER-902", 10),
     origin: { ...seed.shipments[0].origin, stationId: "OBONG" },
     destination: { ...seed.shipments[0].destination, stationId: "ULS-FRT" },
   };
-  ok("역방향 등록 화물은 노선 필터에 걸린다", !shipmentOnLane(reverse, seed.lanes[0]));
+  const ulsObong = seed.lanes.find((l) => l.id === "LANE-ULS-OBONG")!;
+  ok("다른 노선 화물은 노선 필터에 걸린다", !shipmentOnLane(otherLane, ulsObong));
 
   // 입력 없이 부르는 시연 경로는 등록 화물이 아무리 쌓여도 시나리오 화차로 간다
   const heavy: SeedData = {

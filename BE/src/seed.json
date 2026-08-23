@@ -13,7 +13,8 @@
       "shipments[].fallbackHints 는 생성 AI 호출이 실패했을 때 쓰는 규칙기반 폴백 전용 값입니다.",
       "lanes[].roadDistanceKm 는 도로 직행 baseline 거리입니다. 철도 거리와 다릅니다.",
       "emptyWagons[].cutoffAt 은 모집 마감시한(출발 D-2)입니다. 이 시점에 정원 판정을 하고, minLoadRate 미만이면 편성을 취소합니다. minLoadRate 는 코레일 정책이 아니라 우리가 상한 보장 손실을 어디까지 감수할지의 선입니다.",
-      "시나리오 날짜(화차 cutoff/출발, 화물 희망일)는 dateAnchor(D0) 기준 상대 배치입니다. 런타임에 BE/src/roll.ts 의 rollDemoDates 가 오늘 기준으로 밀어줍니다 — 절대 날짜를 믿지 마세요."
+      "시나리오 날짜(화차 cutoff/출발, 화물 희망일)는 dateAnchor(D0) 기준 상대 배치입니다. 런타임에 BE/src/roll.ts 의 rollDemoDates 가 오늘 기준으로 밀어줍니다 — 절대 날짜를 믿지 마세요.",
+      "역·노선은 코레일 화물 취급역 기준으로 6개 역 · 6개 노선입니다. 노선마다 공차가 최소 1량 있어야 매칭이 성립합니다 — 역만 늘리면 그 조합은 전부 noWagon 이 됩니다."
     ]
   },
   "stations": [
@@ -41,6 +42,54 @@
         "forklift",
         "crane"
       ]
+    },
+    {
+      "id": "BSJ-FRT",
+      "name": "부산진역",
+      "region": "부산 동구",
+      "lat": 35.1226,
+      "lng": 129.051,
+      "handling": [
+        "container",
+        "crane",
+        "forklift"
+      ]
+    },
+    {
+      "id": "ONS-FRT",
+      "name": "온산역",
+      "region": "울산 울주",
+      "lat": 35.4331,
+      "lng": 129.3428,
+      "handling": [
+        "tank",
+        "drum",
+        "forklift"
+      ]
+    },
+    {
+      "id": "GWY-FRT",
+      "name": "광양역",
+      "region": "전남 광양",
+      "lat": 34.9407,
+      "lng": 127.6959,
+      "handling": [
+        "coil",
+        "crate",
+        "crane"
+      ]
+    },
+    {
+      "id": "JCH-FRT",
+      "name": "제천역",
+      "region": "충북 제천",
+      "lat": 37.1361,
+      "lng": 128.191,
+      "handling": [
+        "bulk",
+        "pallet",
+        "crane"
+      ]
     }
   ],
   "lanes": [
@@ -48,6 +97,46 @@
       "id": "LANE-ULS-OBONG",
       "originStationId": "ULS-FRT",
       "destStationId": "OBONG",
+      "railDistanceKm": 428.6,
+      "transitHours": 7.5,
+      "roadDistanceKm": 378.0
+    },
+    {
+      "id": "LANE-BSJ-OBONG",
+      "originStationId": "BSJ-FRT",
+      "destStationId": "OBONG",
+      "railDistanceKm": 441.7,
+      "transitHours": 8.0,
+      "roadDistanceKm": 396.0
+    },
+    {
+      "id": "LANE-ONS-OBONG",
+      "originStationId": "ONS-FRT",
+      "destStationId": "OBONG",
+      "railDistanceKm": 445.2,
+      "transitHours": 8.2,
+      "roadDistanceKm": 392.0
+    },
+    {
+      "id": "LANE-GWY-OBONG",
+      "originStationId": "GWY-FRT",
+      "destStationId": "OBONG",
+      "railDistanceKm": 377.4,
+      "transitHours": 7.0,
+      "roadDistanceKm": 344.0
+    },
+    {
+      "id": "LANE-JCH-OBONG",
+      "originStationId": "JCH-FRT",
+      "destStationId": "OBONG",
+      "railDistanceKm": 178.9,
+      "transitHours": 3.6,
+      "roadDistanceKm": 152.0
+    },
+    {
+      "id": "LANE-OBONG-ULS",
+      "originStationId": "OBONG",
+      "destStationId": "ULS-FRT",
       "railDistanceKm": 428.6,
       "transitHours": 7.5,
       "roadDistanceKm": 378.0
@@ -289,6 +378,277 @@
         "noWeekendDispatch": false,
         "requiresForklift": false
       }
+    },
+    {
+      "id": "SHM-D-001",
+      "shipperId": "SHP-001",
+      "shipperName": "동해정밀",
+      "status": "requested",
+      "cargo": {
+        "description": "철강재 9.0톤",
+        "category": "철강재",
+        "weightTon": 9.0,
+        "volumeCbm": 12.0,
+        "packaging": "crate",
+        "hazmat": false,
+        "requiresCover": false,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "동해정밀 출하지",
+        "address": "",
+        "stationId": "BSJ-FRT",
+        "shuttleKm": 12.4
+      },
+      "destination": {
+        "name": "수도권 물류센터",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 22.0
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-26",
+        "requiredArrivalBy": "2026-08-31"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 396.0,
+      "currentRoadFareKrw": 1120000,
+      "constraintText": "컨테이너로 나가는 물량입니다. 하루 이틀은 조정 가능합니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 2,
+        "hardArrivalBy": "2026-08-31",
+        "mustBeCovered": false,
+        "noWeekendDispatch": false,
+        "requiresForklift": true
+      }
+    },
+    {
+      "id": "SHM-D-002",
+      "shipperId": "SHP-002",
+      "shipperName": "남해케미칼",
+      "status": "requested",
+      "cargo": {
+        "description": "석유화학제품 8.0톤",
+        "category": "석유화학제품",
+        "weightTon": 8.0,
+        "volumeCbm": 9.0,
+        "packaging": "drum",
+        "hazmat": false,
+        "requiresCover": false,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "남해케미칼 출하지",
+        "address": "",
+        "stationId": "ONS-FRT",
+        "shuttleKm": 8.2
+      },
+      "destination": {
+        "name": "수도권 물류센터",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 25.5
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-27",
+        "requiredArrivalBy": "2026-09-02"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 392.0,
+      "currentRoadFareKrw": 890000,
+      "constraintText": "탱크화차 전용 물량입니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 2,
+        "hardArrivalBy": "2026-09-02",
+        "mustBeCovered": false,
+        "noWeekendDispatch": false,
+        "requiresForklift": false
+      }
+    },
+    {
+      "id": "SHM-D-003",
+      "shipperId": "SHP-003",
+      "shipperName": "광양스틸",
+      "status": "requested",
+      "cargo": {
+        "description": "철강재 11.0톤",
+        "category": "철강재",
+        "weightTon": 11.0,
+        "volumeCbm": 9.0,
+        "packaging": "coil",
+        "hazmat": false,
+        "requiresCover": false,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "광양스틸 출하지",
+        "address": "",
+        "stationId": "GWY-FRT",
+        "shuttleKm": 6.8
+      },
+      "destination": {
+        "name": "수도권 물류센터",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 22.0
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-26",
+        "requiredArrivalBy": "2026-08-31"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 344.0,
+      "currentRoadFareKrw": 1240000,
+      "constraintText": "코일이라 크레인 하역이 필요합니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 2,
+        "hardArrivalBy": "2026-08-31",
+        "mustBeCovered": false,
+        "noWeekendDispatch": false,
+        "requiresForklift": false
+      }
+    },
+    {
+      "id": "SHM-D-004",
+      "shipperId": "SHP-004",
+      "shipperName": "중원산업",
+      "status": "requested",
+      "cargo": {
+        "description": "기타 5.5톤",
+        "category": "기타",
+        "weightTon": 5.5,
+        "volumeCbm": 14.0,
+        "packaging": "pallet",
+        "hazmat": false,
+        "requiresCover": true,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "중원산업 출하지",
+        "address": "",
+        "stationId": "JCH-FRT",
+        "shuttleKm": 14.1
+      },
+      "destination": {
+        "name": "수도권 물류센터",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 22.0
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-27",
+        "requiredArrivalBy": "2026-09-01"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 152.0,
+      "currentRoadFareKrw": 430000,
+      "constraintText": "비 맞으면 안 되는 자재입니다. 유개화차로 부탁드립니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 3,
+        "hardArrivalBy": "2026-09-01",
+        "mustBeCovered": true,
+        "noWeekendDispatch": false,
+        "requiresForklift": true
+      }
+    },
+    {
+      "id": "SHM-D-005",
+      "shipperId": "SHP-005",
+      "shipperName": "한결소재",
+      "status": "scheduled",
+      "pullForwardEligible": true,
+      "cargo": {
+        "description": "화학원료 14.0톤",
+        "category": "화학원료",
+        "weightTon": 14.0,
+        "volumeCbm": 16.0,
+        "packaging": "drum",
+        "hazmat": false,
+        "requiresCover": false,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "한결소재 출하지",
+        "address": "",
+        "stationId": "ONS-FRT",
+        "shuttleKm": 8.2
+      },
+      "destination": {
+        "name": "수도권 물류센터",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 25.5
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-31",
+        "requiredArrivalBy": "2026-09-06"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 392.0,
+      "currentRoadFareKrw": 1620000,
+      "constraintText": "다음 주 출고 예정 물량입니다. 창고에 이미 나와 있어 당겨도 됩니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 4,
+        "hardArrivalBy": "2026-09-06",
+        "mustBeCovered": false,
+        "noWeekendDispatch": false,
+        "requiresForklift": false
+      }
+    },
+    {
+      "id": "SHM-D-006",
+      "shipperId": "SHP-006",
+      "shipperName": "경인유통",
+      "status": "requested",
+      "cargo": {
+        "description": "기타 13.0톤",
+        "category": "기타",
+        "weightTon": 13.0,
+        "volumeCbm": 30.0,
+        "packaging": "pallet",
+        "hazmat": false,
+        "requiresCover": false,
+        "requiresRefrigeration": false
+      },
+      "origin": {
+        "name": "경인유통 출하지",
+        "address": "",
+        "stationId": "OBONG",
+        "shuttleKm": 18.0
+      },
+      "destination": {
+        "name": "남부권 물류센터",
+        "address": "",
+        "stationId": "ULS-FRT",
+        "shuttleKm": 11.0
+      },
+      "schedule": {
+        "requestedDepartureDate": "2026-08-27",
+        "requiredArrivalBy": "2026-09-02"
+      },
+      "currentMode": "road",
+      "transportArrangement": "consignment",
+      "roadDirectDistanceKm": 378.0,
+      "currentRoadFareKrw": 1460000,
+      "constraintText": "수도권에서 울산으로 내려가는 복편 물량입니다.",
+      "parsedConstraints": null,
+      "fallbackHints": {
+        "departureFlexDays": 2,
+        "hardArrivalBy": "2026-09-02",
+        "mustBeCovered": false,
+        "noWeekendDispatch": false,
+        "requiresForklift": true
+      }
     }
   ],
   "emptyWagons": [
@@ -382,6 +742,155 @@
         "pallet",
         "crate",
         "roll",
+        "forklift"
+      ]
+    },
+    {
+      "id": "WGN-D12",
+      "label": "컨테이너화차 1량 (수도권 복귀 공차)",
+      "wagonType": "container",
+      "capacityTon": 48.0,
+      "capacityCbm": 76.0,
+      "capacityBasis": "컨테이너화차 1량 적재중량 기준",
+      "cutoffAt": "2026-08-25T18:00:00+09:00",
+      "minLoadRate": 0.6,
+      "reservedTon": 12.0,
+      "laneId": "LANE-BSJ-OBONG",
+      "departure": {
+        "stationId": "BSJ-FRT",
+        "date": "2026-08-26",
+        "dayOfWeek": "수",
+        "time": "23:10"
+      },
+      "arrival": {
+        "stationId": "OBONG",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "07:20"
+      },
+      "emptyReason": "수도권→부산 수송 완료 후 부산진에서 대기 중인 복귀 공차",
+      "handling": [
+        "container",
+        "crane",
+        "forklift"
+      ]
+    },
+    {
+      "id": "WGN-T03",
+      "label": "탱크화차 1량 (석유화학 전용)",
+      "wagonType": "tank",
+      "capacityTon": 30.0,
+      "capacityCbm": 32.0,
+      "capacityBasis": "탱크화차 1량 적재중량 기준",
+      "cutoffAt": "2026-08-26T18:00:00+09:00",
+      "minLoadRate": 0.6,
+      "reservedTon": 0.0,
+      "laneId": "LANE-ONS-OBONG",
+      "departure": {
+        "stationId": "ONS-FRT",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "21:40"
+      },
+      "arrival": {
+        "stationId": "OBONG",
+        "date": "2026-08-28",
+        "dayOfWeek": "금",
+        "time": "06:00"
+      },
+      "emptyReason": "온산 석유화학단지 출하 후 대기 중인 전용 공차",
+      "handling": [
+        "tank",
+        "drum"
+      ]
+    },
+    {
+      "id": "WGN-O07",
+      "label": "무개화차 1량 (제철 코일 전용)",
+      "wagonType": "open",
+      "capacityTon": 24.0,
+      "capacityCbm": 40.0,
+      "capacityBasis": "무개화차 1량 적재중량 기준",
+      "cutoffAt": "2026-08-25T18:00:00+09:00",
+      "minLoadRate": 0.6,
+      "reservedTon": 6.0,
+      "laneId": "LANE-GWY-OBONG",
+      "departure": {
+        "stationId": "GWY-FRT",
+        "date": "2026-08-26",
+        "dayOfWeek": "수",
+        "time": "20:30"
+      },
+      "arrival": {
+        "stationId": "OBONG",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "03:40"
+      },
+      "emptyReason": "광양제철 코일 수송 후 광양에서 대기 중인 복귀 공차",
+      "handling": [
+        "coil",
+        "crate",
+        "crane"
+      ]
+    },
+    {
+      "id": "WGN-C21",
+      "label": "유개화차 1량 (중부내륙 순환)",
+      "wagonType": "covered",
+      "capacityTon": 18.0,
+      "capacityCbm": 58.0,
+      "capacityBasis": "유개화차 1량 적재중량 기준",
+      "cutoffAt": "2026-08-26T18:00:00+09:00",
+      "minLoadRate": 0.6,
+      "reservedTon": 0.0,
+      "laneId": "LANE-JCH-OBONG",
+      "departure": {
+        "stationId": "JCH-FRT",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "09:15"
+      },
+      "arrival": {
+        "stationId": "OBONG",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "13:00"
+      },
+      "emptyReason": "제천 시멘트 수송 후 중부내륙에서 대기 중인 공차",
+      "handling": [
+        "pallet",
+        "crate",
+        "forklift"
+      ]
+    },
+    {
+      "id": "WGN-R05",
+      "label": "컨테이너화차 1량 (남행 복편)",
+      "wagonType": "container",
+      "capacityTon": 48.0,
+      "capacityCbm": 76.0,
+      "capacityBasis": "컨테이너화차 1량 적재중량 기준",
+      "cutoffAt": "2026-08-26T18:00:00+09:00",
+      "minLoadRate": 0.6,
+      "reservedTon": 0.0,
+      "laneId": "LANE-OBONG-ULS",
+      "departure": {
+        "stationId": "OBONG",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
+        "time": "22:50"
+      },
+      "arrival": {
+        "stationId": "ULS-FRT",
+        "date": "2026-08-28",
+        "dayOfWeek": "금",
+        "time": "06:30"
+      },
+      "emptyReason": "울산→수도권 수송 후 오봉에서 남행 화물을 기다리는 복편 공차",
+      "handling": [
+        "container",
+        "pallet",
         "forklift"
       ]
     }

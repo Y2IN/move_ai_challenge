@@ -183,7 +183,9 @@ function toCandidate(s: Shipment, seed: SeedData, isUserInput: boolean): MatchCa
   const shipper = seed.shippers.find((sp) => sp.id === s.shipperId);
   return {
     shipmentId: s.id,
-    shipperName: isUserInput ? "내 화물" : (shipper?.name ?? s.shipperId),
+    // 화주 마스터에 없는 화물(등록분·신규 노선 대기 물량)은 shipperName 을 쓴다.
+    // 마스터만 보면 "SHP-001" 같은 코드가 화면에 그대로 찍힌다.
+    shipperName: isUserInput ? "내 화물" : (shipper?.name ?? s.shipperName ?? s.shipperId),
     weightTon: s.cargo.weightTon,
     description: s.cargo.description,
     category: s.cargo.category,
