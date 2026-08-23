@@ -11,6 +11,8 @@
  * 원장에 없는 분기는 값을 지어내지 않고 `hasData: false` 로 비워 보냅니다.
  */
 
+import { loadLedger } from "./db/ledger";
+import { loadUniverse } from "./db/universe";
 import { aggregate } from "./esg/period";
 import { parsePeriod } from "./esg/period";
 import type { Persona } from "./types";
@@ -77,11 +79,12 @@ function shiftQuarter(year: number, quarter: number, back: number): { year: numb
  * 최근 `quarters` 분기 추이. `baseDate` 를 주면 그 시점 기준으로 셉니다
  * (시연에서 "오늘" 을 고정할 때 씁니다).
  */
-export function getHistory(
+export async function getHistory(
   persona: Persona,
   quarters = 4,
   baseDate?: string,
-): HistoryResponse {
+): Promise<HistoryResponse> {
+  const [data, source] = await Promise.all([loadUniverse(), loadLedger()]);
   const count = Math.min(Math.max(quarters, 1), 12);
   // 기준 분기 = 직전 완료 분기. #40 과 같은 규칙을 쓰려고 parsePeriod 를 그대로 씁니다.
   const base = parsePeriod(undefined, baseDate);
@@ -91,7 +94,7 @@ export function getHistory(
   for (let back = count - 1; back >= 0; back--) {
     const { year, quarter } = shiftQuarter(baseYear, baseQuarter, back);
     const id = `${year}Q${quarter}`;
-    const agg = aggregate({ period: parsePeriod(id) });
+    const agg = aggregate({ period: parsePeriod(id), ledger: source, data });
 
     items.push({
       period: id,

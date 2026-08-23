@@ -63,12 +63,15 @@ $$;
 revoke all on function railhub_next_seq(text) from public, anon, authenticated;
 
 -- ════════════════════════════════════════════════════════════════
--- 1. 기준 데이터 (seed.json 미러) — 읽기 전용
+-- 1. 매칭 유니버스 (역·노선·화주·공차·시드화물) — 앱이 실제로 읽는다
 -- ════════════════════════════════════════════════════════════════
 --
--- ⚠️ 앱의 매칭·계산은 **여전히 seed.json 을 읽는다.** 이 테이블들은 미러다.
---    시연 시나리오(14/18톤 → 반드시 미달)가 DB 상태에 흔들리면 안 되기 때문이다.
---    DB 가 잠들어도 시연은 멈추지 않는다 — 그게 이 이중화의 목적이다.
+-- 앱은 `BE/src/db/universe.ts` 의 loadUniverse() 로 이 테이블들을 읽는다.
+-- Table Editor 에서 화차를 한 량 늘리면 공차 화면과 매칭 결과가 따라 바뀐다.
+--
+-- 다섯 테이블 중 하나라도 비어 있으면 **통째로** 번들 seed.json 으로 폴백한다
+-- (섞으면 없는 노선을 가리키는 화차 같은 깨진 유니버스가 만들어진다).
+-- DB 가 잠들어도 시연은 멈추지 않는다 — 그게 이 이중화의 목적이다.
 
 create table if not exists stations (
   id          text primary key,
@@ -105,6 +108,12 @@ create table if not exists shippers (
   updated_at               timestamptz not null default now()
 );
 
+-- 협약 물량·기간 (화주영업 화면의 이행률 분모). 나중에 추가된 컬럼이라 alter 로 붙인다.
+alter table shippers add column if not exists contract jsonb not null default '{}'::jsonb;
+
+comment on column shippers.contract is
+  '전환교통 협약 — 번호·기간·협약물량. clients.ts 가 이행률 분모로 쓴다';
+
 create table if not exists empty_wagons (
   id              text primary key,
   label           text not null,
@@ -128,6 +137,10 @@ create table if not exists empty_wagons (
 
 comment on column empty_wagons.min_load_rate is
   '편성 성립 최저 적재율. 코레일 정책이 아니라 우리 손익분기선이다 (types.ts 참고)';
+
+-- 조율 데모 시나리오 화차. 저장소에 누적된 등록 화물은 이 화차에 앉히지 않는다
+-- (시작 상태가 반드시 정원 미달이어야 조율 시연이 성립한다 — matching.ts 참고).
+alter table empty_wagons add column if not exists demo_scenario boolean not null default false;
 
 create table if not exists seed_shipments (
   id                    text primary key,
@@ -234,6 +247,28 @@ create table if not exists confirmations (
 create index if not exists confirmations_confirmed_idx
   on confirmations (confirmed_at desc);
 
+-- 멱등 키. 화면이 같은 조율 세션으로 확정을 두 번 보내도(새로고침·더블클릭·
+-- StrictMode 이중 실행) 편성이 두 개 생기지 않는다.
+alter table confirmations add column if not exists client_key text;
+
+create unique index if not exists confirmations_client_key_idx
+  on confirmations (client_key) where client_key is not null;
+
+-- ── 정산 제출 서류 ──────────────────────────────────────────────
+-- 협약 정산에 첨부하는 서류의 제출 상태. 파일 자체는 보관하지 않고
+-- "무엇이 언제 올라왔는지"만 기록한다 (시연 범위).
+
+create table if not exists settlement_documents (
+  key         text primary key,
+  name        text not null,
+  required    boolean not null default true,
+  file        jsonb,
+  updated_at  timestamptz not null default now()
+);
+
+comment on column settlement_documents.file is
+  '업로드 메타데이터 { fileName, size, uploadedAt }. 파일 본문은 저장하지 않는다';
+
 create table if not exists negotiations (
   id          text primary key,
   seq         bigint not null unique,
@@ -285,7 +320,7 @@ begin
     'stations', 'lanes', 'shippers', 'empty_wagons', 'seed_shipments',
     'trips', 'trip_members',
     'registered_shipments', 'confirmations', 'negotiations',
-    'subsidy_applications', 'subsidy_revisions'
+    'subsidy_applications', 'subsidy_revisions', 'settlement_documents'
   ] loop
     execute format('alter table %I enable row level security', t);
     execute format('revoke all on table %I from anon, authenticated', t);

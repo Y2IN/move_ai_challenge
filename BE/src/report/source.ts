@@ -9,9 +9,9 @@
  * fixture 로 떨어지고, 응답에 어느 쪽을 썼는지 표시한다.
  */
 
+import { loadUniverse } from "../db/universe";
 import { match } from "../matching";
 import type { MatchResult } from "../matching";
-import { seed } from "../seed";
 import type { ShipmentInput } from "../types";
 import { latestConfirmation } from "../store";
 import { buildReportInput } from "./adapter";
@@ -65,6 +65,8 @@ export interface ResolveOptions {
  */
 export async function resolveReportInput(opts: ResolveOptions = {}): Promise<ReportSource> {
   try {
+    // 매칭 유니버스는 DB 우선 (미연결이면 번들 seed 로 폴백)
+    const seed = await loadUniverse();
     // 1) 확정된 편성이 있으면 그 실적으로 만든다.
     const confirmed = await latestConfirmation();
     if (confirmed?.calc) {

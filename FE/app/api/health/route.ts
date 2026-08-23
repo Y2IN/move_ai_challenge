@@ -1,4 +1,6 @@
 import { dbDisabledReason, isDbEnabled, tryDb, unwrap } from "@railhub/be/db/client";
+import { ledgerSource, loadLedger } from "@railhub/be/db/ledger";
+import { loadUniverse, universeSource } from "@railhub/be/db/universe";
 import { isLlmConfigured, llmAuthMode, LLM_MODEL } from "@railhub/be/llm";
 
 // ponytail: BE 워크스페이스 배선이 살아 있는지 확인하는 최소 라우트.
@@ -12,6 +14,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const dbConfigured = isDbEnabled();
+
+  // 매칭 유니버스·실적 원장을 실제로 어디서 읽고 있는지 — 시연 전 확인용.
+  // (로더가 캐시를 채우므로 이 호출 자체가 다음 요청을 빠르게 만든다)
+  const [universe, ledger] = await Promise.all([loadUniverse(), loadLedger()]);
 
   // 가장 싼 쿼리 하나 — 살아 있는지만 본다. 실패해도 예외는 안 난다(tryDb 계약).
   const ping = dbConfigured
@@ -36,6 +42,11 @@ export async function GET() {
       /** 기준 데이터가 투입돼 있는가 (npm run db:push) */
       seeded: Array.isArray(ping) && ping.length > 0,
       note: dbConfigured ? null : dbDisabledReason(),
+    },
+    /** 화면이 실제로 읽고 있는 데이터 출처. "bundle" 이면 DB 가 아니라 번들 JSON 이다 */
+    data: {
+      universe: { source: universeSource(), wagons: universe.emptyWagons.length, shipments: universe.shipments.length },
+      ledger: { source: ledgerSource(), trips: ledger.trips.length },
     },
   });
 }

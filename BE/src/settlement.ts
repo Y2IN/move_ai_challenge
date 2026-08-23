@@ -13,10 +13,15 @@
  */
 
 import { computeBenefit, computeCost, computeSubsidy } from "./calc";
-import { aggregate, customPeriod, ledger, legInput, railDistanceKm } from "./esg/period";
+import { loadLedger } from "./db/ledger";
+import { loadUniverse } from "./db/universe";
+import { aggregate, customPeriod, legInput, railDistanceKm } from "./esg/period";
+import type { LedgerData } from "./esg/types";
 import { SUBSIDY } from "./constants";
-import { seed } from "./seed";
 import type { SeedData, SettlementDocument, TransportContract } from "./types";
+
+/** 화면이 고른 협약 번호가 마스터에 없을 때 — 라우트가 400 으로 바꿉니다. */
+export class UnknownContractError extends Error {}
 
 const DAY_MS = 86_400_000;
 
@@ -127,7 +132,7 @@ const days = (from: string, to: string) =>
  * 평균으로 뭉개면 화주별 실적과 안 맞는 금액이 나옵니다. `aggregate()` 가
  * 편익을 건별로 더하는 것과 같은 이유입니다.
  */
-function recalcOver(from: string, to: string): {
+function recalcOver(from: string, to: string, source: LedgerData, data: SeedData): {
   additionalCostKrw: number;
   benefitCapKrw: number;
   subsidyKrw: number;
@@ -138,9 +143,9 @@ function recalcOver(from: string, to: string): {
   let additionalCostKrw = 0;
   let benefitCapKrw = 0;
 
-  for (const trip of ledger.trips) {
+  for (const trip of source.trips) {
     if (trip.date < from || trip.date > to) continue;
-    const railKm = railDistanceKm(trip);
+    const railKm = railDistanceKm(trip, data);
     for (const member of trip.members) {
       const input = legInput(trip, member, railKm);
       const subsidy = computeSubsidy(computeCost(input), computeBenefit(input));
@@ -178,9 +183,11 @@ function recalcOver(from: string, to: string): {
 function performanceOf(
   contract: TransportContract,
   now: Date,
+  source: LedgerData,
+  data: SeedData,
 ): ContractPerformance {
-  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo) });
-  const recalc = recalcOver(contract.periodFrom, contract.periodTo);
+  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo), ledger: source, data });
+  const recalc = recalcOver(contract.periodFrom, contract.periodTo, source, data);
   const ongoing = iso(now) <= contract.periodTo;
 
   return {
@@ -203,20 +210,34 @@ function performanceOf(
   };
 }
 
-export function getSettlement(
+export async function getSettlement(
   now: Date = new Date(),
-  data: SeedData = seed,
-): SettlementResponse {
+  seedData?: SeedData,
+  contractNo?: string | null,
+): Promise<SettlementResponse> {
+  const [loaded, source] = await Promise.all([loadUniverse(), loadLedger()]);
+  const data = seedData ?? loaded;
   const asOf = iso(now);
 
   // 진행 중인 협약이 정산 대상. 없으면 가장 최근에 끝난 것.
   const contracts = [...data.contracts].sort((a, b) => a.periodFrom.localeCompare(b.periodFrom));
+  // 화면에서 협약을 고르면 그 협약으로 정산을 다시 그린다. 모르는 번호는 400 이다
+  // (조용히 다른 협약을 보여주면 사용자는 자기가 고른 걸 보고 있다고 믿는다).
+  const selected = contractNo?.trim()
+    ? contracts.find((c) => c.no === contractNo.trim())
+    : undefined;
+  if (contractNo?.trim() && !selected) {
+    throw new UnknownContractError(
+      `알 수 없는 협약입니다: ${contractNo} (가능한 값: ${contracts.map((c) => c.no).join(", ")})`,
+    );
+  }
   const contract =
+    selected ??
     contracts.find((c) => c.periodFrom <= asOf && asOf <= c.periodTo) ??
     contracts[contracts.length - 1];
 
-  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo) });
-  const recalc = recalcOver(contract.periodFrom, contract.periodTo);
+  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo), ledger: source, data });
+  const recalc = recalcOver(contract.periodFrom, contract.periodTo, source, data);
 
   // ── 달성률 vs 경과율 ────────────────────────────────────────
   // "73% 이행" 만으로는 잘 가고 있는지 알 수 없습니다. 기간이 얼마나 지났는지와
@@ -293,7 +314,7 @@ export function getSettlement(
     trips,
     // `trips.length` 가 아니라 집계의 전건 수입니다 — trips 는 잘려 있습니다.
     tripSummary: { legCount: agg.legCount, tripCount: agg.tripCount, totalTon: agg.totalTon },
-    history: contracts.map((c) => performanceOf(c, now)),
+    history: contracts.map((c) => performanceOf(c, now, source, data)),
     documents,
     // 서류명 뒤에 조사를 붙이지 않습니다 — 받침에 따라 을/를이 갈리는데,
     // 서류가 추가될 때마다 그걸 신경 쓰게 됩니다.

@@ -407,8 +407,13 @@ export interface MatchRow {
   detail: MatchRowDetail;
 }
 
-/** #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다. */
-export type MatchSummary = Omit<MatchRow, "detail">;
+/**
+ * #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다.
+ *
+ * 단 `departAt` 은 예외로 목록에도 싣는다. 공차 관리 화면(04b)의 "출발 예정" 열이
+ * 이 값을 쓰는데, 행마다 상세를 따로 부르게 하면 열 전체가 "…" 로 남는다.
+ */
+export type MatchSummary = Omit<MatchRow, "detail"> & { departAt: string };
 
 /** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
 export interface DashboardSeed {

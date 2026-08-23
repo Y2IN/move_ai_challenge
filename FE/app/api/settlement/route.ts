@@ -1,4 +1,4 @@
-import { getSettlement } from "@railhub/be/settlement";
+import { getSettlement, UnknownContractError } from "@railhub/be/settlement";
 
 /**
  * 전환교통 협약 정산.
@@ -9,12 +9,20 @@ import { getSettlement } from "@railhub/be/settlement";
  */
 export const dynamic = "force-dynamic";
 
-/** GET /api/settlement?now=YYYY-MM-DD */
-export function GET(req: Request) {
-  const raw = new URL(req.url).searchParams.get("now");
+/** GET /api/settlement?now=YYYY-MM-DD&contractNo=KLARU-2026-0412 */
+export async function GET(req: Request) {
+  const sp = new URL(req.url).searchParams;
+  const raw = sp.get("now");
   const now = raw ? new Date(raw) : new Date();
   if (Number.isNaN(now.getTime())) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
-  return Response.json(getSettlement(now));
+  try {
+    return Response.json(await getSettlement(now, undefined, sp.get("contractNo")));
+  } catch (e) {
+    if (e instanceof UnknownContractError) {
+      return Response.json({ error: e.message }, { status: 400 });
+    }
+    throw e;
+  }
 }

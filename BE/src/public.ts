@@ -24,7 +24,9 @@
  * 보조금 대상 여부는 로그인 후 사업계획서에서 산정 결과 그대로 보여준다.
  */
 
-import { resolveAggregate } from "./esg/query";
+import { aggregateWith } from "./esg/query";
+import { loadLedger } from "./db/ledger";
+import { loadUniverse } from "./db/universe";
 import { seed } from "./seed";
 import type { BenefitBreakdownItem } from "./esg/types";
 import type { PublicStats, PublicStatsBreakdownItem } from "./types";
@@ -65,8 +67,9 @@ function previousQuarterId(periodId: string): string | null {
   return q === 1 ? `${year - 1}Q4` : `${year}Q${q - 1}`;
 }
 
-export function getPublicStats(): PublicStats {
-  const agg = resolveAggregate({});
+export async function getPublicStats(): Promise<PublicStats> {
+  const [data, ledger] = await Promise.all([loadUniverse(), loadLedger()]);
+  const agg = aggregateWith({}, ledger, data);
 
   // 전 분기 대비 증감률. **비교 대상이 없으면 지어내지 않고 생략한다.**
   // 직전 분기 실적이 0인데 "+100%" 같은 걸 띄우면 없는 성장을 주장하게 된다.
@@ -74,7 +77,7 @@ export function getPublicStats(): PublicStats {
   const prevId = previousQuarterId(agg.period.id);
   if (prevId) {
     try {
-      const prev = resolveAggregate({ period: prevId });
+      const prev = aggregateWith({ period: prevId }, ledger, data);
       if (prev.totalBenefitKrw > 0) {
         deltaPct = Math.round(
           ((agg.totalBenefitKrw - prev.totalBenefitKrw) / prev.totalBenefitKrw) * 100,
@@ -103,7 +106,7 @@ export function getPublicStats(): PublicStats {
     breakdown,
     // 플랫폼 누적 실적은 원장 한 분기로 계산할 수 있는 값이 아니다. 시드의 서비스
     // 소개용 수치를 그대로 쓴다 (seed.meta.fictional 로 가공 데이터임을 표시한다).
-    cumulative: seed.dashboard.cumulative,
+    cumulative: data.dashboard.cumulative,
     equivalents: { pineTrees: agg.pineTrees, trucksBlocked: agg.truckLoadsAvoided },
   };
 }

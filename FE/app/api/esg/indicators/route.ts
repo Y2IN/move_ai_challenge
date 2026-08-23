@@ -1,5 +1,5 @@
 import { buildIndicators } from "@railhub/be/esg/indicators";
-import { EsgQueryError, resolveAggregate } from "@railhub/be/esg/query";
+import { EsgQueryError, resolveAggregateDb } from "@railhub/be/esg/query";
 import type { EsgIndicatorsResponse } from "@/src/lib/esg";
 
 /**
@@ -13,11 +13,11 @@ import type { EsgIndicatorsResponse } from "@/src/lib/esg";
  */
 export const dynamic = "force-dynamic";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
   try {
-    const agg = resolveAggregate({
+    const agg = await resolveAggregateDb({
       period: params.get("period"),
       from: params.get("from"),
       to: params.get("to"),
