@@ -138,7 +138,13 @@ export function openNegotiationStream(
 export interface Confirmation {
   /** GRP-NNN — 확정할 때 발급됩니다 */
   groupId: string;
-  status: 'confirmed';
+  /**
+   * 화주의 '확정'과 코레일의 '승인'(#43)은 다른 사건입니다.
+   * 확정은 이 편성으로 가겠다는 의사, 승인은 화차를 실제로 내주겠다는 배차 결정입니다.
+   */
+  status: 'confirmed' | 'approved';
+  approvedAt?: string | null;
+  approvedBy?: string | null;
   wagon: {
     id: string;
     label: string;
@@ -211,4 +217,32 @@ export function calculateBenefits(
     acceptedShipmentIds,
     ...(registeredId ? { registeredId } : {}),
   });
+}
+
+// ── #21 제약 분류 ──────────────────────────────────────────────
+
+export interface ClassifiedConstraint {
+  field: string;
+  kind?: string;
+  summary?: string;
+  evidence?: string;
+}
+
+export interface ClassifyResponse {
+  demo: boolean;
+  source: 'ai' | 'rule';
+  notice: string;
+  sensitivity: { price: string; leadTime: string };
+  constraints: ClassifiedConstraint[];
+  warnings: string[];
+}
+
+/**
+ * 화주가 문장으로 적은 조건을 **절대 조건 / 조정 가능**으로 나눕니다.
+ *
+ * 등록 화면에서 미리 보여주면, 조율 에이전트가 나중에 무엇을 건드릴지
+ * 사용자가 등록 시점에 확인할 수 있습니다.
+ */
+export function classifyConstraints(utterance: string): Promise<ClassifyResponse> {
+  return postJson<ClassifyResponse>('/api/negotiation/classify', { utterance });
 }

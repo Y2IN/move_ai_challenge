@@ -19,6 +19,21 @@ export interface EsgQuery {
 
 export class EsgQueryError extends Error {}
 
+/**
+ * 집계 결과 캐시 키에 들어갈 유니버스 지문.
+ *
+ * `aggregate()` 는 기간·화주뿐 아니라 **노선 거리와 역·화주 이름**에도 의존한다
+ * (railDistanceKm · routeLabel · shipperName). 기간만으로 키를 만들면 유니버스가
+ * 바뀐 뒤에도 옛 집계가 그대로 나온다. 값이 작아 매번 만들어도 부담이 없다.
+ */
+function universeKey(data: SeedData): string {
+  return [
+    data.lanes.map((l) => `${l.id}:${l.railDistanceKm}`).join(","),
+    data.stations.map((s) => s.id).join(","),
+    data.shippers.map((s) => s.id).join(","),
+  ].join("|");
+}
+
 /** 기간·화주 해석만 (집계 전 공통 단계). */
 function resolveQuery(
   query: EsgQuery,
@@ -66,8 +81,9 @@ export function resolveAggregate(query: EsgQuery): EsgAggregate {
 export async function resolveAggregateDb(query: EsgQuery): Promise<EsgAggregate> {
   const [data, ledger] = await Promise.all([loadUniverse(), loadLedger()]);
   const { period, shipperId } = resolveQuery(query, data);
-  return memoAggregate(`${period.from}|${period.to}|${shipperId ?? "*"}`, () =>
-    aggregate({ period, shipperId, ledger, data }),
+  return memoAggregate(
+    `${period.from}|${period.to}|${shipperId ?? "*"}|${universeKey(data)}`,
+    () => aggregate({ period, shipperId, ledger, data }),
   );
 }
 
@@ -78,7 +94,8 @@ export function aggregateWith(
   data: SeedData,
 ): EsgAggregate {
   const { period, shipperId } = resolveQuery(query, data);
-  return memoAggregate(`${period.from}|${period.to}|${shipperId ?? "*"}`, () =>
-    aggregate({ period, shipperId, ledger, data }),
+  return memoAggregate(
+    `${period.from}|${period.to}|${shipperId ?? "*"}|${universeKey(data)}`,
+    () => aggregate({ period, shipperId, ledger, data }),
   );
 }

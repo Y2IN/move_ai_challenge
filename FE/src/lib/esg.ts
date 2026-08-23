@@ -166,3 +166,54 @@ export function scope3ExportUrl(format: Scope3Format, query: EsgQuery = {}): str
   if (format === 'pdf') params.set('autoprint', '1');
   return `/api/esg/scope3/export?${params.toString()}`;
 }
+
+/**
+ * #41 짝 — K-ESG 문단 직접 편집 저장.
+ *
+ * 리포트는 매번 실적에서 다시 생성되므로 결과를 통째로 저장할 수 없습니다
+ * (원장이 바뀌면 숫자도 바뀌어야 합니다). 사람이 고친 문단만 서버에 남겨 두고,
+ * 다음 생성 때 그 위에 덮어씌웁니다 — 새로고침해도 편집이 살아 있습니다.
+ */
+export function saveEsgSection(
+  key: EsgSectionKey,
+  text: string,
+  opts: { period?: string | null; shipperId?: string | null } = {},
+): Promise<{ persisted: boolean; note?: string; editedAt: string }> {
+  const q = new URLSearchParams();
+  if (opts.period) q.set('period', opts.period);
+  if (opts.shipperId) q.set('shipperId', opts.shipperId);
+  const qs = q.toString();
+  return (async () => {
+    const res = await fetch(
+      `/api/esg/report/sections/${encodeURIComponent(key)}${qs ? `?${qs}` : ''}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      },
+    );
+    if (!res.ok) await throwFrom(res);
+    return (await res.json()) as { persisted: boolean; note?: string; editedAt: string };
+  })();
+}
+
+// ── #29 적용 계수 ──────────────────────────────────────────────
+
+export interface Coefficients {
+  version: string;
+  /** 제3자 검증을 받았는지. false 면 화면에 그렇게 적어야 합니다 */
+  verified: boolean;
+  sources: Record<string, string>;
+}
+
+/**
+ * 편익 산정에 쓴 계수와 그 출처.
+ *
+ * 심사에서 가장 먼저 나오는 질문이 "그 숫자 어디서 나왔냐"입니다. 화면에 상수로
+ * 적어 두면 계수를 바꿀 때 화면만 낡으므로, 서버가 쓰는 값을 그대로 가져옵니다.
+ */
+export async function fetchCoefficients(): Promise<Coefficients> {
+  const res = await fetch('/api/coefficients');
+  if (!res.ok) await throwFrom(res);
+  return (await res.json()) as Coefficients;
+}

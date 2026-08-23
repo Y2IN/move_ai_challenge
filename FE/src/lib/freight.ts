@@ -219,3 +219,26 @@ export function requestMatching(
     ...(registeredId ? { registeredId } : {}),
   });
 }
+
+// ── #12 CSV 다건 등록 ──────────────────────────────────────────
+
+/**
+ * 미리보기와 확정은 **응답 모양이 다릅니다.**
+ * 미리보기는 검증만 해서 행별 결과를, 확정은 등록된 화물과 건너뛴 행을 줍니다.
+ * 하나로 뭉치면 미리보기 결과를 `skipped` 로 읽어 "오류 0건"으로 잘못 표시됩니다.
+ */
+export type { BulkPreview, BulkCommitResult, BulkRowResult } from '@railhub/be/bulk';
+
+export type BulkResult =
+  | import('@railhub/be/bulk').BulkPreview
+  | import('@railhub/be/bulk').BulkCommitResult;
+
+/**
+ * CSV 로 여러 건을 한 번에 등록합니다. **미리보기 → 확정** 2단계입니다 —
+ * 검증만 먼저 돌려 몇 건이 걸리는지 보여주고, 확인한 뒤에만 실제로 넣습니다.
+ */
+export function bulkFreights(csv: string, commit: false): Promise<import('@railhub/be/bulk').BulkPreview>;
+export function bulkFreights(csv: string, commit: true): Promise<import('@railhub/be/bulk').BulkCommitResult>;
+export function bulkFreights(csv: string, commit: boolean): Promise<BulkResult> {
+  return postJson<BulkResult>('/api/freights/bulk', { csv, commit });
+}

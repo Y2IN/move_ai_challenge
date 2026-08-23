@@ -45,6 +45,7 @@ import {
   insertNegotiation,
   insertShipment,
   listShipmentRecords,
+  markShipmentsStatus,
   updateShipmentRecord,
   type ConfirmationStatus,
 } from "./db/shipments";
@@ -144,6 +145,12 @@ interface IssuedSeq {
  * 그래서 이 경우엔 `localOnly` 를 세워 DB 쓰기를 아예 건너뛴다. 화면은 계속 동작하고
  * (그 인스턴스 메모리에는 남는다), 남의 데이터는 손대지 않는다.
  */
+const SEQ_FIELD = {
+  shipment: "seq",
+  confirm: "confirmSeq",
+  negotiation: "negSeq",
+} as const;
+
 async function issueSeq(
   kind: "shipment" | "confirm" | "negotiation",
   bump: () => number,
@@ -151,11 +158,38 @@ async function issueSeq(
   const fromDb = await nextSeq(kind);
   if (fromDb !== null) {
     // 폴백이 나중에 걸리더라도 이 인스턴스가 본 최댓값 위에서 시작하도록 맞춰 둔다.
-    if (fromDb > state.seq) state.seq = fromDb;
+    //
+    // ⚠️ **kind 별 카운터에 맞춰야 한다.** 예전에는 셋 다 화물 카운터(state.seq)에
+    //    넣어서, confirm·negotiation 은 DB 값과 한 번도 동기화되지 않았다. 그 상태로
+    //    RPC 만 실패하면 폴백이 GRP-001 을 다시 발급하고, 조회는 DB 를 먼저 보므로
+    //    **남의 편성**을 그려 준다.
+    const field = SEQ_FIELD[kind];
+    if (fromDb > state[field]) state[field] = fromDb;
     return { n: fromDb, localOnly: false };
   }
   return { n: bump(), localOnly: isDbEnabled() };
 }
+
+/**
+ * DB 가 켜져 있는데 쓰기가 실패했는가.
+ *
+ * `tryDb` 는 "DB 꺼짐"과 "쿼리 실패"를 똑같이 `null` 로 만든다. 읽기는 그래도 되지만
+ * **쓰기는 다르다** — 실패를 성공으로 응답하면 사용자는 저장됐다고 믿고, 다음 조회는
+ * DB 를 먼저 보므로 방금 한 일이 사라진 것처럼 보인다.
+ *
+ * 그렇다고 500 을 내지는 않는다. 이 앱의 계약은 "DB 가 죽어도 화면은 돈다"이고,
+ * 인메모리 미러 덕에 이 인스턴스에서는 실제로 계속 동작한다. 대신 `persisted: false`
+ * 를 실어 보내 화면이 그 사실을 말할 수 있게 한다 (LLM 폴백의 `source` 배지와 같은 취급).
+ */
+function persistedOk(result: unknown, localOnly: boolean): boolean {
+  if (localOnly) return false;
+  if (!isDbEnabled()) return true; // 애초에 DB 를 안 쓰는 구성 — 미러가 정상 경로다
+  return result !== null;
+}
+
+/** 저장 실패를 화면 문구로 옮길 때 쓰는 안내 */
+export const NOT_PERSISTED_NOTE =
+  "저장소에 기록하지 못했습니다 — 이 서버에서는 보이지만 다시 접속하면 사라질 수 있습니다.";
 
 /** 입력 + 발급 seq 로 Shipment 를 만든다. id·shipperId 규칙을 등록/수정이 공유한다. */
 function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipment {
@@ -208,15 +242,15 @@ export async function buildMatchData(excludeId?: string | null): Promise<SeedDat
 export async function registerShipment(
   input: ShipmentInput,
   data: SeedData = seed,
-): Promise<Shipment> {
+): Promise<{ shipment: Shipment; persisted: boolean }> {
   const { n, localOnly } = await issueSeq("shipment", () => (state.seq += 1));
   const shipment = buildShipment(input, n, data);
   const record: StoredShipment = { input, shipment, seq: n };
 
   // localOnly 면 DB 에 쓰지 않는다 — 남의 행을 덮어쓸 수 있다(issueSeq 주석 참고).
-  if (!localOnly) await insertShipment(record);
+  const saved = localOnly ? null : await insertShipment(record);
   registered.push(record); // 미러 — DB 가 죽어도 이 인스턴스에서는 계속 보인다
-  return shipment;
+  return { shipment, persisted: persistedOk(saved, localOnly) };
 }
 
 /** 등록된 화물 목록 — 최근 등록이 앞으로 온다. */
@@ -233,7 +267,7 @@ export async function getShipment(id: string): Promise<Shipment | null> {
 }
 
 export type UpdateResult =
-  | { status: "updated"; shipment: Shipment }
+  | { status: "updated"; shipment: Shipment; persisted: boolean }
   | { status: "notFound" }
   | { status: "invalid"; errors: Record<string, string> };
 
@@ -267,18 +301,20 @@ export async function updateShipment(
   const mirror = registered.find((r) => r.shipment.id === id);
   if (mirror) Object.assign(mirror, next);
 
-  return { status: "updated", shipment };
+  return { status: "updated", shipment, persisted: persistedOk(saved, false) };
 }
 
-/** 삭제 (#15). 있으면 지우고 true, 없으면 false. */
-export async function deleteShipment(id: string): Promise<boolean> {
+/** 삭제 (#15). 있으면 지우고 deleted:true, 없으면 false. */
+export async function deleteShipment(
+  id: string,
+): Promise<{ deleted: boolean; persisted: boolean }> {
   const inDb = await deleteShipmentRecord(id);
 
   const i = registered.findIndex((r) => r.shipment.id === id);
   if (i !== -1) registered.splice(i, 1);
 
   // DB 가 붙어 있으면 DB 의 판정이 우선. 폴백일 땐 미러에 있었는지로 판단한다.
-  return inDb ?? i !== -1;
+  return { deleted: inDb ?? i !== -1, persisted: persistedOk(inDb, false) };
 }
 
 /** 테스트·시연 리셋용 */
@@ -313,7 +349,7 @@ export interface Confirmation {
 }
 
 export type ConfirmResult =
-  | { status: "confirmed"; confirmation: Confirmation }
+  | { status: "confirmed"; confirmation: Confirmation; persisted: boolean }
   | { status: "notMatched"; match: MatchResult };
 
 /**
@@ -329,9 +365,9 @@ export async function confirmMatch(
   // 화면 새로고침·더블클릭·StrictMode 이중 실행으로 편성이 여러 개 생기던 문제를 막는다.
   if (opts.clientKey) {
     const existing = await findConfirmationByClientKey(opts.clientKey);
-    if (existing) return { status: "confirmed", confirmation: existing };
+    if (existing) return { status: "confirmed", confirmation: existing, persisted: true };
     const mirrored = confirmations.find((c) => c.clientKey === opts.clientKey);
-    if (mirrored) return { status: "confirmed", confirmation: mirrored };
+    if (mirrored) return { status: "confirmed", confirmation: mirrored, persisted: true };
   }
 
   const data = await buildMatchData(opts.registeredId ?? null);
@@ -359,9 +395,23 @@ export async function confirmMatch(
     calc: result.calc,
   };
 
-  if (!localOnly) await insertConfirmation(confirmation, n);
+  const savedConfirmation = localOnly ? null : await insertConfirmation(confirmation, n);
   confirmations.push(confirmation);
-  return { status: "confirmed", confirmation };
+
+  // 편성에 실린 등록 화물은 매칭 풀에서 빼야 한다. 안 그러면 이미 실려 나간
+  // 화물이 다음 편성의 적재율에 계속 더해진다 (buildMatchData 의 status 필터는
+  // 상태를 바꾸는 코드가 없어 그동안 아무것도 거르지 못했다).
+  const memberIds = result.members.map((m) => m.shipmentId);
+  await markShipmentsStatus(memberIds, "confirmed");
+  for (const r of registered) {
+    if (memberIds.includes(r.shipment.id)) r.shipment.status = "confirmed";
+  }
+
+  return {
+    status: "confirmed",
+    confirmation,
+    persisted: persistedOk(savedConfirmation, localOnly),
+  };
 }
 
 /**
@@ -385,7 +435,7 @@ export async function getConfirmation(groupId: string): Promise<Confirmation | n
 }
 
 export type ApproveResult =
-  | { status: "approved"; confirmation: Confirmation }
+  | { status: "approved"; confirmation: Confirmation; persisted: boolean }
   | { status: "notFound" }
   | { status: "alreadyApproved"; confirmation: Confirmation };
 
@@ -406,6 +456,9 @@ export async function approveConfirmation(
 
   const fromDb = await approveConfirmationRow(groupId, approvedBy);
   if (fromDb === "notFound") return { status: "notFound" };
+  // fromDb === null 이면 DB 에 승인이 안 남았다. 미러에는 반영하되 그 사실을 알린다 —
+  // 다음 조회는 DB 를 먼저 보므로 새로고침하면 다시 '확정' 으로 보인다.
+  const persisted = persistedOk(fromDb, false);
 
   const approved: Confirmation = fromDb ?? {
     ...current,
@@ -418,7 +471,7 @@ export async function approveConfirmation(
   const mirror = confirmations.find((c) => c.groupId === groupId);
   if (mirror) Object.assign(mirror, approved);
 
-  return { status: "approved", confirmation: approved };
+  return { status: "approved", confirmation: approved, persisted };
 }
 
 // ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────

@@ -198,12 +198,38 @@ function ConfirmedBody({
               </div>
             </div>
 
-            {/* 화차 배정 승인(#43)은 미구현이라, 지금 확실한 것(확정 시각·편성 번호)만 적습니다 */}
-            <div className="mt-[18px] flex items-center gap-2 border-t border-[#F2F4F6] pt-[14px] text-sm text-[#8B95A1]">
-              <span className="text-[13px] font-extrabold text-[#12A87A]">✓</span>
-              <span>
-                편성 확정 · <b className="font-bold text-[#4E5968]">{c.groupId}</b> ·{' '}
-                <span className="tabular-nums">{new Date(c.confirmedAt).toLocaleString('ko-KR')}</span>
+            {/* 확정(화주)과 배차 승인(코레일 #43)은 다른 사건이라 둘 다 보여줍니다 */}
+            <div className="mt-[18px] flex flex-col gap-1.5 border-t border-[#F2F4F6] pt-[14px] text-sm text-[#8B95A1]">
+              <span className="flex items-center gap-2">
+                <span className="text-[13px] font-extrabold text-[#12A87A]">✓</span>
+                <span>
+                  편성 확정 · <b className="font-bold text-[#4E5968]">{c.groupId}</b> ·{' '}
+                  <span className="tabular-nums">{new Date(c.confirmedAt).toLocaleString('ko-KR')}</span>
+                </span>
+              </span>
+              <span className="flex items-center gap-2">
+                {c.status === 'approved' ? (
+                  <>
+                    <span className="text-[13px] font-extrabold text-[#12A87A]">✓</span>
+                    <span>
+                      코레일 배차 승인
+                      {c.approvedAt ? (
+                        <>
+                          {' · '}
+                          <span className="tabular-nums">
+                            {new Date(c.approvedAt).toLocaleString('ko-KR')}
+                          </span>
+                        </>
+                      ) : null}
+                      {c.approvedBy ? ` · ${c.approvedBy}` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[13px] font-extrabold text-[#C77700]">…</span>
+                    <span>코레일 배차 승인 대기 중</span>
+                  </>
+                )}
               </span>
             </div>
           </Card>

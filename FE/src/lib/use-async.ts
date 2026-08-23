@@ -49,12 +49,16 @@ export function useAsync<T>(load: () => Promise<T>, once = false): AsyncHandle<T
       .catch((error: Error) => alive.current && setState({ status: 'error', message: error.message }));
   }, [load]);
 
-  const started = useRef(false);
+  /**
+   * `once` 는 **같은 load 함수의 중복 실행**만 막습니다 (dev StrictMode 의 2회 실행).
+   *
+   * 예전에는 boolean 래치라서 최초 1회 이후 load 가 바뀌어도 영영 다시 안 돌았습니다 —
+   * 조율 화면의 "조율 다시 실행" 버튼이 아무 동작도 안 하던 원인입니다.
+   */
+  const startedFor = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (once) {
-      if (started.current) return;
-      started.current = true;
-    }
+    if (once && startedFor.current === run) return;
+    startedFor.current = run;
     run();
   }, [run, once]);
 

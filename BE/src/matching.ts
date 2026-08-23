@@ -53,6 +53,17 @@ export const NEGOTIATION_WINDOW_HOURS = 48;
  */
 export const DEFAULT_FLEX_DAYS = 2;
 
+/**
+ * 지금 폼에 입력된 화물(아직 저장 전)의 id.
+ *
+ * 예전 기본값은 `SHM-USER-001` 이었는데, 그건 **저장소가 첫 등록 화물에 발급하는
+ * 번호와 같다.** 두 번째 화물을 등록하는 순간 라이브 입력과 저장된 1번 화물이
+ * 같은 id 로 편성에 두 번 실렸고, 그 결과 톤수가 이중 계상되고 시나리오 화차의
+ * `fromRegistry` 가드도 뚫렸다(id 가 같아 mustInclude 로 취급됨).
+ * 저장소는 `SHM-USER-<n>` 만 발급하므로 이 값과는 절대 겹치지 않는다.
+ */
+export const LIVE_INPUT_ID = "SHM-INPUT";
+
 export interface MatchResult {
   /**
    * `phase` 에서 파생됩니다. 둘이 따로 놀면 "phase=confirmed 인데 status=shortfall,
@@ -123,7 +134,7 @@ export function normalizeInput(input: ShipmentInput, seed: SeedData, id?: string
   const roadKm = lane?.roadDistanceKm ?? 380;
 
   return {
-    id: id ?? "SHM-USER-001",
+    id: id ?? LIVE_INPUT_ID,
     shipperId: "SHP-USER",
     shipperName: input.shipperName ?? "내 화물",
     status: "requested",
@@ -183,7 +194,9 @@ function toCandidate(s: Shipment, seed: SeedData, isUserInput: boolean): MatchCa
   const shipper = seed.shippers.find((sp) => sp.id === s.shipperId);
   return {
     shipmentId: s.id,
-    shipperName: isUserInput ? "내 화물" : (shipper?.name ?? s.shipperId),
+    // 화주 마스터에 없는 화물(등록분·신규 노선 대기 물량)은 shipperName 을 쓴다.
+    // 마스터만 보면 "SHP-001" 같은 코드가 화면에 그대로 찍힌다.
+    shipperName: isUserInput ? "내 화물" : (shipper?.name ?? s.shipperName ?? s.shipperId),
     weightTon: s.cargo.weightTon,
     description: s.cargo.description,
     category: s.cargo.category,
@@ -403,6 +416,10 @@ export function match(
   const { wagon, members } = best;
   const totalTon = members.reduce((a, m) => a + m.cargo.weightTon, 0);
   const shortfallTon = Math.max(0, wagon.capacityTon - totalTon);
+  // 정원 0 인 화차(대시보드에서 손으로 넣은 행 등)가 오면 나눗셈이 NaN 이 되고,
+  // JSON 직렬화가 그걸 null 로 바꿔 화면이 "적재율 0%" 를 그린다. wagonPhase 는
+  // 이미 막고 있으므로 응답값도 같은 규칙으로 맞춘다.
+  const loadFactor = wagon.capacityTon > 0 ? totalTon / wagon.capacityTon : 0;
 
   // 조율 후보 — 아직 접수 전이지만 당겨올 수 있는 예정 물량
   const negotiationCandidates = seed.shipments
@@ -430,7 +447,7 @@ export function match(
       members: memberCandidates,
       totalTon,
       capacityTon: wagon.capacityTon,
-      loadFactor: totalTon / wagon.capacityTon,
+      loadFactor,
       shortfallTon,
       negotiationCandidates,
       calc: null,
@@ -446,13 +463,13 @@ export function match(
     members: memberCandidates,
     totalTon,
     capacityTon: wagon.capacityTon,
-    loadFactor: totalTon / wagon.capacityTon,
+    loadFactor,
     // 0 으로 덮어쓰지 않는다 — 마감 후 최소 적재율로 성립한 편성은 자리가 남아
     // 있고, 조율 에이전트(negotiate.ts)가 이 값으로 "조율할 게 남았는지"를 판단한다.
     shortfallTon,
     negotiationCandidates,
     calc: buildCalc(members, wagon, lane, seed),
-    message: `동일 노선 ${members.length}건 · ${wagon.label} 배정 완료 · 적재율 ${Math.round((totalTon / wagon.capacityTon) * 100)}%`,
+    message: `동일 노선 ${members.length}건 · ${wagon.label} 배정 완료 · 적재율 ${Math.round(loadFactor * 100)}%`,
   };
 }
 

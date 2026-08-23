@@ -1,5 +1,10 @@
+'use client';
+
+import { useCallback } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AnalogyCard } from '../components/StatCard';
+import { fetchCoefficients, type Coefficients } from '../lib/esg';
+import { useAsync } from '../lib/use-async';
 
 /** 화면이 받는 표기 완료 데이터. 조립은 app/benefit/page.tsx 가 합니다. */
 export interface BenefitModeRow {
@@ -82,6 +87,43 @@ interface BenefitScreenProps {
 }
 
 /** 05 — 편익 대시보드. 도로 vs 철도 → 4대 편익 → 보조금 → 비유 → 그래프 */
+/**
+ * 적용 계수와 출처.
+ *
+ * 심사에서 가장 먼저 나오는 질문이 "그 숫자 어디서 나왔냐"다. 화면에 상수로
+ * 적어 두면 계수를 바꿀 때 여기만 낡으므로, 서버가 실제로 쓰는 값을 그대로 읽는다.
+ * 못 불러오면 아무 말도 안 하는 편이 낫다 — 없는 근거를 지어내지 않는다.
+ */
+function CoefficientNote() {
+  const coef = useAsync<Coefficients>(useCallback(() => fetchCoefficients(), []));
+  if (coef.state.status !== 'ready') return null;
+  const { version, verified, sources } = coef.state.data;
+  const rows = Object.entries(sources);
+  if (!rows.length) return null;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-[20px] bg-white p-6">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">
+          적용 계수 · 출처
+        </span>
+        <span className="text-[13px] tabular-nums text-[#8B95A1]">
+          {version}
+          {verified ? '' : ' · 제3자 검증 전'}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+        {rows.map(([key, src]) => (
+          <div key={key} className="flex justify-between gap-3 border-t border-[#F2F4F6] pt-2">
+            <span className="flex-none text-[13px] font-bold text-[#4E5968]">{key}</span>
+            <span className="text-right text-[13px] leading-relaxed text-[#8B95A1]">{src}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function BenefitScreen({ data, onNavigate }: BenefitScreenProps) {
   return (
     <AppLayout active="subsidy">
@@ -110,6 +152,8 @@ export function BenefitScreen({ data, onNavigate }: BenefitScreenProps) {
           </div>
         ))}
       </section>
+
+      <CoefficientNote />
 
       <section className="grid grid-cols-[1fr_300px] items-center gap-6 rounded-[20px] bg-white p-7">
         <div>

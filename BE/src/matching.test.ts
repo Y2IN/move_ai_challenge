@@ -48,10 +48,39 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   const hours = (new Date(a17.cutoffAt).getTime() - NOW.getTime()) / 3_600_000;
   ok("롤링 후 A17 마감이 미래다", hours > 0, `${hours.toFixed(1)}h`);
   ok("A17 마감이 조율 윈도우(48h) 안이다", hours <= NEGOTIATION_WINDOW_HOURS, `${hours.toFixed(1)}h`);
-  ok(
-    "롤링은 멱등이다 (두 번 적용해도 동일)",
-    JSON.stringify(rollDemoDates(seed, NOW)) === JSON.stringify(seed),
-  );
+  /**
+   * 롤링은 **원본에서 한 번만** 굴린다. 이미 롤링된 값을 다시 굴리면 anchor 가
+   * 오늘로 갱신돼 있어 delta 0 이 되고, 그 사이 일요일 보정이 한 번 더 걸리면
+   * 하루씩 누적된다. 그래서 "합성 멱등" 이 아니라 **어느 날 굴려도 같은 상대
+   * 배치가 나온다** 를 지킨다 — 이게 실제 경로(seed.ts·db/universe.ts)의 계약이다.
+   */
+  const RAW = raw as unknown as SeedData;
+  let rollOk = true;
+  const detail: string[] = [];
+  for (const day of ["2026-08-23", "2026-08-30", "2026-09-13", "2026-12-01", "2027-03-07"]) {
+    const at = new Date(`${day}T10:00:00+09:00`);
+    const rolled = rollDemoDates(RAW, at);
+    const w = rolled.emptyWagons.find((x) => x.id === "WGN-A17")!;
+    const h = (new Date(w.cutoffAt).getTime() - at.getTime()) / 3_600_000;
+    // 시나리오 화차는 언제 굴려도 조율 윈도우 안에 있어야 한다
+    if (!(h > 0 && h <= NEGOTIATION_WINDOW_HOURS)) {
+      rollOk = false;
+      detail.push(`${day}:${h.toFixed(0)}h`);
+    }
+    // 일요일 출발이 남아 있으면 안 되고, 마감→출발 간격은 원본과 같아야 한다
+    for (const rw of rolled.emptyWagons) {
+      const gap = (Date.parse(`${rw.departure.date}T00:00:00Z`) -
+        Date.parse(`${rw.cutoffAt.slice(0, 10)}T00:00:00Z`)) / 86_400_000;
+      const o = RAW.emptyWagons.find((x) => x.id === rw.id)!;
+      const oGap = (Date.parse(`${o.departure.date}T00:00:00Z`) -
+        Date.parse(`${o.cutoffAt.slice(0, 10)}T00:00:00Z`)) / 86_400_000;
+      if (gap !== oGap || new Date(`${rw.departure.date}T00:00:00Z`).getUTCDay() === 0) {
+        rollOk = false;
+        detail.push(`${day}:${rw.id}`);
+      }
+    }
+  }
+  ok("어느 날 굴려도 같은 상대 배치 (5개 날짜)", rollOk, detail.join(" "));
   const sundays = seed.emptyWagons.filter(
     (w) => new Date(`${w.departure.date}T00:00:00Z`).getUTCDay() === 0,
   );
@@ -103,9 +132,14 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
 // ── 4. 노선 검증 ───────────────────────────────────────────────
 
 {
-  const rev = match(seed, input({ originStationId: "OBONG", destStationId: "ULS-FRT" }), NOW);
-  ok("역방향 입력은 noWagon", rev.status === "noWagon", rev.status);
-  ok("역방향 메시지에 개설 노선 안내", rev.message.includes("노선"), rev.message);
+  // 복편(오봉→울산)은 노선이 **있으므로** 매칭돼야 한다.
+  const back = match(seed, input({ originStationId: "OBONG", destStationId: "ULS-FRT" }), NOW);
+  ok("개설된 복편 노선은 매칭된다", back.status !== "noWagon", back.status);
+
+  // 노선 마스터에 없는 조합은 화차를 훑기 전에 막혀야 한다 (부산진 → 광양)
+  const none = match(seed, input({ originStationId: "BSJ-FRT", destStationId: "GWY-FRT" }), NOW);
+  ok("미개설 노선은 noWagon", none.status === "noWagon", none.status);
+  ok("미개설 노선 메시지에 운행 노선 안내", none.message.includes("노선"), none.message);
 }
 
 // ── 5. 유연폭 ──────────────────────────────────────────────────
@@ -158,7 +192,8 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
 
   const a17 = seed.emptyWagons.find((w) => w.id === "WGN-A17")!;
   const b04 = seed.emptyWagons.find((w) => w.id === "WGN-B04")!;
-  const onLane = (s: Shipment) => shipmentOnLane(s, seed.lanes[0]);
+  const laneUlsObong = seed.lanes.find((l) => l.id === "LANE-ULS-OBONG")!;
+  const onLane = (s: Shipment) => shipmentOnLane(s, laneUlsObong);
 
   const seatedA17 = seatOnWagon(
     a17,
@@ -179,12 +214,14 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   );
 
   // 역방향 등록 화물이 남의 편성에 올라타면 안 된다
-  const reverse: Shipment = {
+  // 다른 노선 화물이 이 편성에 올라타면 안 된다 (복편은 별도 노선·별도 화차다)
+  const otherLane: Shipment = {
     ...registryShipment("SHM-USER-902", 10),
     origin: { ...seed.shipments[0].origin, stationId: "OBONG" },
     destination: { ...seed.shipments[0].destination, stationId: "ULS-FRT" },
   };
-  ok("역방향 등록 화물은 노선 필터에 걸린다", !shipmentOnLane(reverse, seed.lanes[0]));
+  const ulsObong = seed.lanes.find((l) => l.id === "LANE-ULS-OBONG")!;
+  ok("다른 노선 화물은 노선 필터에 걸린다", !shipmentOnLane(otherLane, ulsObong));
 
   // 입력 없이 부르는 시연 경로는 등록 화물이 아무리 쌓여도 시나리오 화차로 간다
   const heavy: SeedData = {

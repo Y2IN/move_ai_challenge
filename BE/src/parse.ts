@@ -48,6 +48,11 @@ export interface ParseCase {
   text: string;
   /** 이 텍스트가 들어오면 이 케이스로 매칭 */
   keywords: string[];
+  /**
+   * 희망 출발일을 오늘 + n일로 채운다. 생략하면 `fields.departDate` 를 그대로 쓴다
+   * (출발일이 아예 없는 케이스). **절대 날짜를 박지 말 것** — 며칠이면 과거가 된다.
+   */
+  departOffsetDays?: number;
   fields: ParsedFreight;
   warnings: string[];
 }
@@ -72,45 +77,139 @@ const ai = <T>(value: T, confidence: number, enumCode?: string): ParseField<T> =
 });
 const none = <T>(): ParseField<T> => ({ value: null, source: "none" });
 
+/**
+ * 데모 케이스.
+ *
+ * ## 두 가지를 반드시 지킨다
+ *
+ * 1. **출발일은 상대 오프셋으로 둔다** (`departOffsetDays`). 절대 날짜를 박아 두면
+ *    며칠 뒤 전부 과거가 되어, 예시를 눌러 채운 폼이 매칭에서 통째로 탈락한다
+ *    (실제로 "2026-08-18" 이 박혀 있어 그렇게 썩었다).
+ * 2. **역 마스터에 있는 지명만 쓴다.** 화면은 이 문장의 지명을 역 이름·지역명으로
+ *    맞춰 폼을 채운다(`matchStation`). 마스터에 없는 곳을 쓰면 역 칸이 빈 채로
+ *    남아 "AI가 못 채웠다"처럼 보인다.
+ */
 export const PARSE_CASES: ParseCase[] = [
   {
-    id: "petrochem-uls-gg",
-    label: "울산→경기 · 석유화학제품 8톤",
-    text: "울산 공장에서 경기 물류센터까지 석유화학제품 8톤, 다음주 화요일 출발",
-    keywords: ["석유화학", "울산 공장", "경기"],
+    id: "petrochem-uls-obong",
+    label: "울산→오봉 · 석유화학제품 8톤",
+    text: "울산 공장에서 경기 의왕 물류센터까지 석유화학제품 8톤, 모레 출발",
+    keywords: ["석유화학", "울산 공장", "의왕"],
+    departOffsetDays: 2,
     fields: {
       origin: ai("울산 공장", 0.94),
-      destination: ai("경기 물류센터", 0.91),
+      destination: ai("경기 의왕 물류센터", 0.91),
       item: ai("석유화학제품", 0.88, "PETROCHEM"),
       tons: ai(8, 0.97),
-      departDate: ai("2026-08-18", 0.72),
+      departDate: ai("", 0.72),
       corpType: none(),
     },
     warnings: ["희망 출발일이 상대 날짜로 표현되어 추정했습니다"],
   },
   {
-    id: "steel-uls-pt",
-    label: "울산→평택 · 철강재 3톤",
-    text: "울산 효문공장에서 평택 산업재 창고로 철강재 밸브 3톤, 20일 출발 희망",
-    keywords: ["철강", "밸브", "평택"],
+    id: "steel-uls-obong",
+    label: "울산→오봉 · 철강재 3톤",
+    text: "울산화물역에서 오봉역으로 철강재 밸브 3톤, 모레 출발 희망",
+    keywords: ["철강", "밸브", "울산화물역"],
+    departOffsetDays: 2,
     fields: {
-      origin: ai("울산 효문공장", 0.92),
-      destination: ai("평택 산업재 창고", 0.9),
+      origin: ai("울산화물역", 0.96),
+      destination: ai("오봉역", 0.95),
       item: ai("철강재", 0.85, "STEEL"),
       tons: ai(3, 0.95),
-      departDate: ai("2026-08-20", 0.9),
+      departDate: ai("", 0.9),
       corpType: none(),
     },
     warnings: [],
   },
   {
-    id: "chem-bs-sudo",
-    label: "부산→수도권 · 화학원료 12톤",
-    text: "부산신항에서 수도권까지 화학원료 12톤, 이번 주 금요일까지 도착 필요",
-    keywords: ["화학원료", "부산"],
+    id: "container-bsj-obong",
+    label: "부산진→오봉 · 컨테이너 철강재 9톤",
+    text: "부산진역에서 경기 의왕까지 철강재 9톤 컨테이너로 보냅니다. 모레 출발이면 됩니다",
+    keywords: ["부산진", "컨테이너"],
+    departOffsetDays: 2,
     fields: {
-      origin: ai("부산신항", 0.9),
-      destination: ai("수도권 물류센터", 0.8),
+      origin: ai("부산진역", 0.95),
+      destination: ai("경기 의왕", 0.9),
+      item: ai("철강재", 0.87, "STEEL"),
+      tons: ai(9, 0.96),
+      departDate: ai("", 0.8),
+      corpType: none(),
+    },
+    warnings: [],
+  },
+  {
+    id: "chem-ons-obong",
+    label: "온산→오봉 · 화학원료 16톤 (탱크)",
+    text: "온산역에서 오봉역까지 화학원료 16톤, 탱크화차로 3일 뒤 출발",
+    keywords: ["온산", "탱크", "화학원료"],
+    departOffsetDays: 3,
+    fields: {
+      origin: ai("온산역", 0.95),
+      destination: ai("오봉역", 0.94),
+      item: ai("화학원료", 0.89, "CHEM_MATERIAL"),
+      tons: ai(16, 0.97),
+      departDate: ai("", 0.85),
+      corpType: none(),
+    },
+    warnings: [],
+  },
+  {
+    id: "coil-gwy-obong",
+    label: "광양→오봉 · 코일 11톤",
+    text: "광양역에서 경기 의왕까지 철강 코일 11톤, 모레 보내고 싶습니다",
+    keywords: ["광양", "코일"],
+    departOffsetDays: 2,
+    fields: {
+      origin: ai("광양역", 0.94),
+      destination: ai("경기 의왕", 0.9),
+      item: ai("철강재", 0.86, "STEEL"),
+      tons: ai(11, 0.95),
+      departDate: ai("", 0.8),
+      corpType: none(),
+    },
+    warnings: [],
+  },
+  {
+    id: "cover-jch-obong",
+    label: "제천→오봉 · 우천불가 자재 5.5톤",
+    text: "제천역에서 오봉역까지 자재 5.5톤인데 비 맞으면 안 됩니다. 사흘 뒤 출발",
+    keywords: ["제천", "비 맞으면"],
+    departOffsetDays: 3,
+    fields: {
+      origin: ai("제천역", 0.95),
+      destination: ai("오봉역", 0.94),
+      item: ai("기타", 0.7, "ETC"),
+      tons: ai(5.5, 0.96),
+      departDate: ai("", 0.82),
+      corpType: none(),
+    },
+    warnings: ["우천 노출 불가 조건은 폼의 '조건·요청사항'에 그대로 남겨 두세요"],
+  },
+  {
+    id: "return-obong-uls",
+    label: "오봉→울산 · 복편 13톤",
+    text: "오봉역에서 울산화물역으로 내려가는 물량 13톤입니다. 모레 출발",
+    keywords: ["복편", "내려가는", "오봉역에서 울산"],
+    departOffsetDays: 2,
+    fields: {
+      origin: ai("오봉역", 0.95),
+      destination: ai("울산화물역", 0.94),
+      item: ai("기타", 0.72, "ETC"),
+      tons: ai(13, 0.96),
+      departDate: ai("", 0.8),
+      corpType: none(),
+    },
+    warnings: [],
+  },
+  {
+    id: "arrival-only-uls-obong",
+    label: "울산→오봉 · 출발일 없음 (도착 기한만)",
+    text: "울산화물역에서 경기 의왕까지 화학원료 12톤, 이번 주 안에 도착만 하면 됩니다",
+    keywords: ["이번 주 안에", "도착만"],
+    fields: {
+      origin: ai("울산화물역", 0.95),
+      destination: ai("경기 의왕", 0.9),
       item: ai("화학원료", 0.86, "CHEM_MATERIAL"),
       tons: ai(12, 0.96),
       departDate: none(),
@@ -119,6 +218,22 @@ export const PARSE_CASES: ParseCase[] = [
     warnings: ["도착 기한만 언급되어 출발일은 추정하지 못했습니다"],
   },
 ];
+
+/** 오늘 + n일 (로컬 달력 기준 — UTC 로 계산하면 KST 자정 직후 하루가 밀린다) */
+function offsetDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** 상대 오프셋을 오늘 기준 날짜로 채운 사본. 케이스 원본은 건드리지 않는다. */
+function withToday(c: ParseCase): ParsedFreight {
+  if (c.departOffsetDays === undefined) return c.fields;
+  return {
+    ...c.fields,
+    departDate: { ...c.fields.departDate, value: offsetDate(c.departOffsetDays) },
+  };
+}
 
 /** 데모 케이스 목록 (화면 picker 용) */
 export function listParseCases() {
@@ -143,7 +258,7 @@ export function parseFreightText(input: { text?: string; caseId?: string }): Par
     source: "rule",
     notice: DEMO_NOTICE,
     caseId: picked.id,
-    fields: picked.fields,
+    fields: withToday(picked),
     warnings: picked.warnings,
   };
 }

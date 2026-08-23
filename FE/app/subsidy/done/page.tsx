@@ -25,6 +25,7 @@ import {
   type Revision,
   type SubsidyExportFormat,
 } from "@/src/lib/subsidy";
+import { saveEsgSection } from "@/src/lib/esg";
 import { toApplyDocView } from "@/src/lib/subsidy-view";
 import { ApplyDoneScreen } from "@/src/screens/ApplyDoneScreen";
 
@@ -338,6 +339,14 @@ function SubsidyDoneInner() {
         },
       };
     });
+
+    // 서버에도 남긴다. 리포트는 매번 다시 생성되므로 편집분만 따로 보관하고
+    // 다음 생성 때 덮어씌운다 — 새로고침해도 편집이 살아 있다.
+    saveEsgSection(key, text)
+      .then((res) => {
+        if (!res.persisted && res.note) setReportError(`저장 주의 — ${res.note}`);
+      })
+      .catch((e: Error) => setReportError(`문단 저장 실패 — ${e.message}`));
   }, []);
 
   const exportScope3 = useCallback(

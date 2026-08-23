@@ -18,7 +18,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import ledgerRaw from "../esg/ledger.json";
-import { seed } from "../seed";
+// ⚠️ 롤링 전 원본을 밀어넣는다. 롤링된 값을 넣으면 DB 날짜가 "db:push 를 돌린 날"
+//    프레임에 얼어붙고, 런타임 롤링은 anchor 가 이미 그 날짜라 아무것도 못 민다.
+import { rawSeed as seed } from "../seed";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -350,6 +352,9 @@ async function main(): Promise<void> {
       `  실적 원장  — 편성 ${ledger.trips.length} · 로트 ${lotCount}`,
       "",
       "  Supabase 대시보드 → Table Editor 에서 바로 확인할 수 있습니다.",
+      "",
+      "  ⚠️ 이미 떠 있는 서버는 유니버스를 60초, 원장을 5분간 캐시합니다.",
+      "     바로 반영하려면 그만큼 기다리거나 서버를 다시 띄우세요.",
       "",
     ].join("\n"),
   );

@@ -42,6 +42,12 @@ function SubsidyGeneratingInner() {
    * 두 번 돌아 무료 티어 분당 한도를 그 자리에서 넘긴다. 한 번만 돌게 막는다.
    */
   const started = useRef(false);
+  /**
+   * 열려 있는 스트림을 닫는 함수. "생성 취소"가 **즉시** 부를 수 있어야 한다 —
+   * 화면 이동에 따른 언마운트 정리에만 맡기면 그때까지 서버가 문단을 계속 만든다.
+   * 스트림이 끊기면 서버 쪽 요청이 abort 되고, 라우트가 그 신호를 보고 멈춘다.
+   */
+  const stopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (started.current) return;
@@ -99,10 +105,13 @@ function SubsidyGeneratingInner() {
       });
     }, 15_000);
 
+    stopRef.current = () => stop?.();
+
     return () => {
       cancelled = true;
       clearTimeout(watchdog);
       stop?.();
+      stopRef.current = null;
     };
   }, [idFromQuery, router]);
 
@@ -149,7 +158,11 @@ function SubsidyGeneratingInner() {
       onViewResult={() =>
         router.replace(appId ? `/subsidy/done?id=${encodeURIComponent(appId)}` : "/subsidy/done")
       }
-      onCancel={() => router.push("/subsidy/new")}
+      onCancel={() => {
+        // 서버 생성을 먼저 끊고 나간다 (그냥 이동하면 문단이 끝까지 생성된다)
+        stopRef.current?.();
+        router.push("/subsidy/new");
+      }}
     />
   );
 }

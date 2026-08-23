@@ -64,7 +64,7 @@ export async function commitBulk(
   const rows = parseCsv(csv);
   for (const [i, raw] of rows.entries()) {
     const v = validateShipmentInput(raw, data);
-    if (v.ok && v.value) registered.push(await registerShipment(v.value, data));
+    if (v.ok && v.value) registered.push((await registerShipment(v.value, data)).shipment);
     else skipped.push({ row: i + 1, ok: false, errors: v.errors, raw });
   }
   return { mode: "commit", total: registered.length + skipped.length, registered, skipped };

@@ -49,15 +49,21 @@ export async function listUploads(): Promise<Map<string, { name: string; uploade
 }
 
 /** 업로드 기록. DB 에 못 써도 미러에는 남겨 화면이 즉시 반영되게 한다. */
-export async function saveUpload(key: string, fileName: string): Promise<DocUpload> {
+export async function saveUpload(
+  key: string,
+  fileName: string,
+  name = key,
+  required = true,
+): Promise<DocUpload> {
   const file = { name: fileName, uploadedAt: new Date().toISOString() };
   mirror.set(key, file);
 
   await tryDb("saveSettlementDoc", async (db) => {
+    // update 는 대상 행이 없어도 에러가 아니라 0행이라 "저장됐다"고 착각하게 된다
+    // (마이그레이션만 돌리고 db:push 를 안 한 프로젝트). upsert 로 행을 만든다.
     const res = await db
       .from("settlement_documents")
-      .update({ file, updated_at: file.uploadedAt })
-      .eq("key", key)
+      .upsert({ key, name, required, file, updated_at: file.uploadedAt }, { onConflict: "key" })
       .select("key");
     if (res.error) {
       if (/does not exist|schema cache/i.test(res.error.message)) return null;
