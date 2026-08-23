@@ -69,6 +69,22 @@ Supabase 를 붙였다면 스키마 적용 후 시드를 한 번 밀어 넣습�
 npm run db:push                    # seed.json + ledger.json 을 통째로 투입
 ```
 
+> 스키마를 **다시** 적용해야 하는 시점입니다 — 이번 버전에서 컬럼이 늘었습니다
+> (`shippers.contract` · `empty_wagons.demo_scenario` · `confirmations.client_key` ·
+> `settlement_documents` 테이블). 안 해도 앱은 뜨지만 협약 물량·확정 멱등·서류
+> 제출이 번들 값·인메모리로 떨어집니다. `db:push` 가 무엇을 건너뛰었는지 알려 줍니다.
+
+**매칭·화면 데이터는 이제 DB 에서 읽습니다.** `/api/health` 의
+`data.universe.source` · `data.ledger.source` 가 `db` 면 Supabase, `bundle` 이면
+번들 JSON 폴백입니다. Table Editor 에서 화차를 늘리면 공차 화면이 따라 바뀝니다.
+
+실적 원장을 다시 만들려면 (기준일이 오래돼 정산 격차가 벌어질 때):
+
+```bash
+npm run gen:ledger                 # 실행일 기준으로 원장 재생성 + seed.json 자동 동기화
+npm run db:push
+```
+
 ## 폴더 구조
 
 ```

@@ -368,8 +368,16 @@ export function match(
     // 사용자 화물이 안 들어간 편성은 의미 없음 (seatOnWagon 이 빈 배열을 돌려준다)
     if (members.length === 0) continue;
     const rate = wagon.capacityTon > 0 ? totalTon / wagon.capacityTon : 0;
+
+    // 입력 없이 부르는 건 **시연 경로**(조율 데모)다. 이때는 시나리오 화차를
+    // 우선한다 — 등록 화물이 쌓여 다른 화차가 더 차오르면 "14/18톤 미달 → 조율"
+    // 이야기가 그 화차로 밀려가 재현이 깨진다. 입력이 있으면 아래 적재율 규칙만 쓴다.
+    const scenarioPreferred = !userShipment && wagon.demoScenario && !best?.wagon.demoScenario;
+    const scenarioHeld = !userShipment && best?.wagon.demoScenario && !wagon.demoScenario;
+    if (scenarioHeld) continue;
+
     // 적재율이 같으면 더 많이 싣는 쪽 (같은 비율이면 큰 화차가 사회적 편익이 크다)
-    if (!best || rate > best.rate || (rate === best.rate && totalTon > best.ton)) {
+    if (!best || scenarioPreferred || rate > best.rate || (rate === best.rate && totalTon > best.ton)) {
       best = { wagon, members, rate, ton: totalTon };
     }
   }

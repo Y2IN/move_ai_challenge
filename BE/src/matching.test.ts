@@ -186,12 +186,28 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   };
   ok("역방향 등록 화물은 노선 필터에 걸린다", !shipmentOnLane(reverse, seed.lanes[0]));
 
-  // 적재율로 화차를 고른다 (톤수로 고르면 헐거운 큰 화차가 이긴다)
-  const picked = match(hybrid, null, NOW);
+  // 입력 없이 부르는 시연 경로는 등록 화물이 아무리 쌓여도 시나리오 화차로 간다
+  const heavy: SeedData = {
+    ...seed,
+    shipments: [
+      ...seed.shipments,
+      registryShipment("SHM-USER-901", 12),
+      registryShipment("SHM-USER-902", 7),
+    ],
+  };
+  const picked = match(heavy, null, NOW);
   ok(
-    "적재율이 높은 화차를 고른다 (시나리오 유지)",
-    picked.wagon?.id === "WGN-A17",
+    "시연 경로(입력 없음)는 시나리오 화차를 고른다",
+    picked.wagon?.id === "WGN-A17" && picked.totalTon === 14,
     `${picked.wagon?.id} ${picked.totalTon}/${picked.capacityTon}t`,
+  );
+
+  // 입력이 있으면 적재율 규칙만 쓴다 (시나리오 화차를 특별대우하지 않는다)
+  const withInput = match(heavy, input({ weightTon: 20 }), NOW);
+  ok(
+    "입력이 있으면 적재율로 고른다",
+    withInput.wagon?.id === "WGN-B04",
+    `${withInput.wagon?.id} ${withInput.totalTon}/${withInput.capacityTon}t`,
   );
 }
 
