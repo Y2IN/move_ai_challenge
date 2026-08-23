@@ -61,9 +61,11 @@ revoke all on table settlement_documents from anon, authenticated;
 --    리포트 자체는 실적 집계에서 매번 다시 생성한다(원장이 바뀌면 숫자도 바뀌어야
 --    하므로). 그래서 결과를 통째로 저장하지 않고 **사람이 고친 문단만** 남겨
 --    생성할 때마다 덮어씌운다. 사업계획서(#35)가 사용자 편집을 보존하는 것과 같다.
+--    ⚠️ shipper_id 는 기본키 구성 컬럼이라 Postgres 가 NOT NULL 을 건다.
+--       "전체 화주" 는 NULL 이 아니라 센티널 '*' 로 적는다 (db/esg-edits.ts 참고).
 create table if not exists esg_section_edits (
   period_id    text not null,
-  shipper_id   text,
+  shipper_id   text not null default '*',
   section_key  text not null,
   text         text not null,
   edited_at    timestamptz not null default now(),
