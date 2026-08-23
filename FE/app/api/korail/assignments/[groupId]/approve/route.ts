@@ -1,5 +1,5 @@
 import { badJson, readBody } from "@railhub/be/http";
-import { approveConfirmation } from "@railhub/be/store";
+import { approveConfirmation, NOT_PERSISTED_NOTE } from "@railhub/be/store";
 
 /**
  * api_list #43 — 화차 배정 승인 (코레일 담당자).
@@ -29,8 +29,11 @@ export async function POST(req: Request, ctx: Ctx) {
     return Response.json({ error: `편성을 찾을 수 없습니다: ${groupId}` }, { status: 404 });
   }
 
+  const persisted = result.status === "approved" ? result.persisted : true;
   return Response.json({
     confirmation: result.confirmation,
     alreadyApproved: result.status === "alreadyApproved",
+    persisted,
+    ...(persisted ? {} : { note: NOT_PERSISTED_NOTE }),
   });
 }

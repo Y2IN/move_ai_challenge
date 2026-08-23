@@ -1,6 +1,6 @@
 import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/http";
 import { loadUniverse } from "@railhub/be/db/universe";
-import { confirmMatch, validateShipmentInput } from "@railhub/be/store";
+import { confirmMatch, NOT_PERSISTED_NOTE, validateShipmentInput } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 // 코레일 공차 수송 확정 (#19). 매칭이 matched 일 때만 편성을 확정 기록한다.
@@ -51,5 +51,12 @@ export async function POST(req: Request) {
       { status: 409 },
     );
   }
-  return Response.json({ confirmation: result.confirmation }, { status: 201 });
+  return Response.json(
+    {
+      confirmation: result.confirmation,
+      persisted: result.persisted,
+      ...(result.persisted ? {} : { note: NOT_PERSISTED_NOTE }),
+    },
+    { status: 201 },
+  );
 }

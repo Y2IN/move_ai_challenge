@@ -416,6 +416,10 @@ export function match(
   const { wagon, members } = best;
   const totalTon = members.reduce((a, m) => a + m.cargo.weightTon, 0);
   const shortfallTon = Math.max(0, wagon.capacityTon - totalTon);
+  // 정원 0 인 화차(대시보드에서 손으로 넣은 행 등)가 오면 나눗셈이 NaN 이 되고,
+  // JSON 직렬화가 그걸 null 로 바꿔 화면이 "적재율 0%" 를 그린다. wagonPhase 는
+  // 이미 막고 있으므로 응답값도 같은 규칙으로 맞춘다.
+  const loadFactor = wagon.capacityTon > 0 ? totalTon / wagon.capacityTon : 0;
 
   // 조율 후보 — 아직 접수 전이지만 당겨올 수 있는 예정 물량
   const negotiationCandidates = seed.shipments
@@ -443,7 +447,7 @@ export function match(
       members: memberCandidates,
       totalTon,
       capacityTon: wagon.capacityTon,
-      loadFactor: totalTon / wagon.capacityTon,
+      loadFactor,
       shortfallTon,
       negotiationCandidates,
       calc: null,
@@ -459,13 +463,13 @@ export function match(
     members: memberCandidates,
     totalTon,
     capacityTon: wagon.capacityTon,
-    loadFactor: totalTon / wagon.capacityTon,
+    loadFactor,
     // 0 으로 덮어쓰지 않는다 — 마감 후 최소 적재율로 성립한 편성은 자리가 남아
     // 있고, 조율 에이전트(negotiate.ts)가 이 값으로 "조율할 게 남았는지"를 판단한다.
     shortfallTon,
     negotiationCandidates,
     calc: buildCalc(members, wagon, lane, seed),
-    message: `동일 노선 ${members.length}건 · ${wagon.label} 배정 완료 · 적재율 ${Math.round((totalTon / wagon.capacityTon) * 100)}%`,
+    message: `동일 노선 ${members.length}건 · ${wagon.label} 배정 완료 · 적재율 ${Math.round(loadFactor * 100)}%`,
   };
 }
 
