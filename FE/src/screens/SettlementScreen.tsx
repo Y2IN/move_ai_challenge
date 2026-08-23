@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useRef, useState, type ReactNode } from 'react';
 import { SUBSIDY } from '@railhub/be/constants';
 import { AppLayout } from '../components/AppLayout';
 import { AsyncSection, CardSkeleton } from '../components/AsyncSection';
@@ -10,6 +10,8 @@ import {
   fetchSettlement,
   isBehind,
   remainLabel,
+  settlementReportUrl,
+  uploadSettlementDocument,
   type AchievementView,
   type ContractPerformance,
   type DocumentView,
@@ -48,8 +50,12 @@ interface SettlementScreenProps {
  * (`/api/settlement`). 특히 min(A, B) 는 신청서(#31)·편익(#27)과 같은 함수를
  * 쓰므로 세 화면의 금액이 갈라질 수 없습니다 — 화면에서 다시 곱하지 마세요.
  */
-export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps) {
-  const settlement = useAsync<SettlementResponse>(useCallback(() => fetchSettlement(), []));
+export function SettlementScreen({ onNavigate }: SettlementScreenProps) {
+  // 협약을 고르면 그 협약으로 정산을 다시 그립니다 (예전에는 드롭다운이 닫히기만 했습니다).
+  const [contractNo, setContractNo] = useState<string | null>(null);
+  const settlement = useAsync<SettlementResponse>(
+    useCallback(() => fetchSettlement(contractNo), [contractNo]),
+  );
 
   return (
     <AppLayout active="settlement">
@@ -58,7 +64,14 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
         onRetry={settlement.reload}
         skeleton={<CardSkeleton height={520} />}
       >
-        {(data) => <SettlementBody data={data} onNavigate={onNavigate} onUpload={onUpload} />}
+        {(data) => (
+          <SettlementBody
+            data={data}
+            onNavigate={onNavigate}
+            onSelectContract={setContractNo}
+            onUploaded={settlement.reload}
+          />
+        )}
       </AsyncSection>
     </AppLayout>
   );
@@ -67,11 +80,13 @@ export function SettlementScreen({ onNavigate, onUpload }: SettlementScreenProps
 function SettlementBody({
   data,
   onNavigate,
-  onUpload,
+  onSelectContract,
+  onUploaded,
 }: {
   data: SettlementResponse;
   onNavigate?: (to: string) => void;
-  onUpload?: (name: string) => void;
+  onSelectContract: (no: string) => void;
+  onUploaded: () => void;
 }) {
   const { contract, achievement, recalc, history, trips, documents } = data;
 
@@ -80,7 +95,7 @@ function SettlementBody({
       <header className="flex items-end justify-between gap-6">
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2.5">
-            <PeriodSelect current={contract.no} history={history} />
+            <PeriodSelect current={contract.no} history={history} onSelect={onSelectContract} />
             <span className="text-sm text-[#6B7684]">협약 전체 대비 현재까지 실적</span>
           </div>
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">전환교통 협약 정산</h1>
@@ -126,16 +141,24 @@ function SettlementBody({
       <section className="grid grid-cols-[1fr_380px] items-start gap-4">
         <Trips trips={trips} summary={data.tripSummary} />
         <div className="flex flex-col gap-4">
-          <DocChecklist documents={documents} onUpload={onUpload} />
-          <ReportAction blockedReason={data.blockedReason} />
+          <DocChecklist documents={documents} onUploaded={onUploaded} />
+          <ReportAction blockedReason={data.blockedReason} contractNo={contract.no} />
         </div>
       </section>
     </>
   );
 }
 
-/** 협약 기간 선택. 지금은 표시만 하고 고르면 닫힌다 */
-function PeriodSelect({ current, history }: { current: string; history: ContractPerformance[] }) {
+/** 협약 기간 선택 — 고르면 그 협약 기준으로 정산을 다시 불러온다. */
+function PeriodSelect({
+  current,
+  history,
+  onSelect,
+}: {
+  current: string;
+  history: ContractPerformance[];
+  onSelect: (no: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const now = history.find((h) => h.no === current);
 
@@ -158,7 +181,10 @@ function PeriodSelect({ current, history }: { current: string; history: Contract
             <button
               key={h.no}
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onSelect(h.no);
+              }}
               className="flex w-full items-center justify-between gap-3 rounded-[10px] p-2.5 text-left hover:bg-[#F9FAFB]"
             >
               <span className="flex flex-col gap-[3px]">
@@ -495,10 +521,15 @@ function Trips({
   summary: { legCount: number; tripCount: number; totalTon: number };
 }) {
   // 명세가 길어서 화면에는 앞쪽만 펴고 나머지는 합계로 접습니다.
+  //
+  // 접힌 줄은 **서버가 준 전체 합계에서 빼서** 구합니다. `trips` 는 서버가 앞쪽만
+  // 잘라 보내므로(협약 한 건이 수천 건입니다) 배열 길이로 세면 "외 12건" 처럼
+  // 실제보다 한참 적게 나옵니다.
   const SHOWN = 8;
   const shown = trips.slice(0, SHOWN);
-  const rest = trips.slice(SHOWN);
-  const restTon = rest.reduce((sum, t) => sum + t.weightTon, 0);
+  const shownTon = shown.reduce((sum, t) => sum + t.weightTon, 0);
+  const restCount = Math.max(0, summary.legCount - shown.length);
+  const restTon = Math.max(0, Math.round((summary.totalTon - shownTon) * 10) / 10);
 
   return (
     <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
@@ -542,9 +573,9 @@ function Trips({
         </div>
       ))}
 
-      {rest.length > 0 && (
+      {restCount > 0 && (
         <div className="flex items-center justify-between gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]">
-          <span className="text-[15px] text-[#6B7684]">외 {rest.length}건</span>
+          <span className="text-[15px] text-[#6B7684]">외 {formatNumber(restCount)}건</span>
           <span className="text-[15px] font-semibold tabular-nums text-[#191F28]">{ton(restTon)}</span>
         </div>
       )}
@@ -554,10 +585,10 @@ function Trips({
 
 function DocChecklist({
   documents,
-  onUpload,
+  onUploaded,
 }: {
   documents: DocumentView[];
-  onUpload?: (name: string) => void;
+  onUploaded: () => void;
 }) {
   return (
     <div className="rounded-[20px] bg-white p-6">
@@ -597,17 +628,7 @@ function DocChecklist({
                 </span>
               </span>
             ) : (
-              <span className="ml-[30px] flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => onUpload?.(d.name)}
-                  className="h-[34px] flex-none rounded-lg border border-[#D1D6DB] bg-white px-3.5 text-[13px] font-bold text-[#333D4B] transition-colors hover:bg-[#F9FAFB]"
-                >
-                  파일 업로드
-                </button>
-                {/* 업로드 API 가 없어 버튼은 아직 붙일 데가 없습니다 */}
-                <span className="text-xs text-[#8B95A1]">업로드 API 준비 중</span>
-              </span>
+              <UploadButton doc={d} onUploaded={onUploaded} />
             )}
           </div>
         ))}
@@ -616,19 +637,90 @@ function DocChecklist({
   );
 }
 
-function ReportAction({ blockedReason }: { blockedReason: string | null }) {
+/**
+ * 증빙 제출 — 파일을 고르면 **파일명만** 서버에 기록합니다.
+ * 본문을 저장하지 않는다는 사실을 화면에도 적어 둡니다 (저장한 척하지 않습니다).
+ */
+function UploadButton({ doc, onUploaded }: { doc: DocumentView; onUploaded: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <span className="ml-[30px] flex items-center gap-2.5">
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          setBusy(true);
+          setError(null);
+          try {
+            await uploadSettlementDocument(doc.key, file.name);
+            onUploaded();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : '업로드에 실패했습니다.');
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className="h-[34px] flex-none rounded-lg border border-[#D1D6DB] bg-white px-3.5 text-[13px] font-bold text-[#333D4B] transition-colors hover:bg-[#F9FAFB] disabled:opacity-60"
+      >
+        {busy ? '기록 중…' : '파일 업로드'}
+      </button>
+      <span className="text-xs text-[#8B95A1]">
+        {error ?? '파일명·시각만 기록합니다 (본문 미저장)'}
+      </span>
+    </span>
+  );
+}
+
+function ReportAction({
+  blockedReason,
+  contractNo,
+}: {
+  blockedReason: string | null;
+  contractNo: string;
+}) {
   const blocked = blockedReason !== null;
   return (
     <div className="flex flex-col gap-2.5 rounded-[20px] bg-white p-6">
       <button
         type="button"
         disabled={blocked}
+        onClick={() => window.open(settlementReportUrl(contractNo, 'pdf'), '_blank')}
         className={`h-14 rounded-[14px] text-[17px] font-bold transition-colors ${
           blocked ? 'cursor-not-allowed bg-[#F2F4F6] text-[#B0B8C1]' : 'bg-[#3182F6] text-white hover:bg-[#1B64DA]'
         }`}
       >
         정산 보고서 생성
       </button>
+      {!blocked && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => window.open(settlementReportUrl(contractNo, 'xlsx'), '_blank')}
+            className="h-10 flex-1 rounded-[10px] border border-[#E5E8EB] bg-white text-[13px] font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+          >
+            엑셀로 내려받기
+          </button>
+          <button
+            type="button"
+            onClick={() => window.open(settlementReportUrl(contractNo, 'csv'), '_blank')}
+            className="h-10 flex-1 rounded-[10px] border border-[#E5E8EB] bg-white text-[13px] font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+          >
+            CSV 원자료
+          </button>
+        </div>
+      )}
 
       {blocked && (
         <p className="flex items-center gap-[7px] text-sm text-[#C77700]">

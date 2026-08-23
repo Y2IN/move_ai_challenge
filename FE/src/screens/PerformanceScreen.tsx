@@ -21,7 +21,8 @@ const COLS = 'grid grid-cols-[120px_1fr_1fr_1.2fr_1fr] gap-2.5';
 
 interface PerformanceScreenProps {
   onPublish?: () => void;
-  onOpenLast?: () => void;
+  /** 직전 분기 실적 리포트 — 그 분기 id 를 함께 넘긴다 */
+  onOpenLast?: (period: string) => void;
 }
 
 /**
@@ -157,7 +158,7 @@ function ReportPanel({
 }: {
   data: HistoryResponse;
   onPublish?: () => void;
-  onOpenLast?: () => void;
+  onOpenLast?: (period: string) => void;
 }) {
   const withData = data.items.filter((p) => p.hasData);
   const previous = withData.length >= 2 ? withData[withData.length - 2] : null;
@@ -181,7 +182,7 @@ function ReportPanel({
       {/* 직전 분기가 곧 "최근 발행분" 자리. 없으면 그렇게 적는다 */}
       <button
         type="button"
-        onClick={onOpenLast}
+        onClick={() => previous && onOpenLast?.(previous.period)}
         disabled={!previous}
         className="mt-1 border-t border-[#F2F4F6] pt-4 text-left text-sm leading-relaxed text-[#8B95A1] disabled:cursor-not-allowed"
       >

@@ -10,11 +10,11 @@ import { getClients } from "@railhub/be/clients";
 export const dynamic = "force-dynamic";
 
 /** GET /api/korail/clients?now=YYYY-MM-DD */
-export function GET(req: Request) {
+export async function GET(req: Request) {
   const raw = new URL(req.url).searchParams.get("now");
   const now = raw ? new Date(raw) : new Date();
   if (Number.isNaN(now.getTime())) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
-  return Response.json(getClients(now));
+  return Response.json(await getClients(now));
 }

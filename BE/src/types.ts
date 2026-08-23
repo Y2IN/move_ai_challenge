@@ -137,6 +137,12 @@ export interface Shipment {
   shipperName?: string;
   status: ShipmentStatus;
   pullForwardEligible?: boolean;
+  /**
+   * 저장소(등록 화물)에서 온 화물. 시드 풀 화물과 구분한다.
+   * 조율 데모 시나리오 화차(`EmptyWagon.demoScenario`)는 이 화물을 태우지 않는다 —
+   * 누적 등록이 시작 상태(14/18톤 미달)를 흔들면 조율 시연이 성립하지 않는다.
+   */
+  fromRegistry?: boolean;
   cargo: Cargo;
   origin: {
     name: string;
@@ -181,6 +187,12 @@ export interface EmptyWagon {
   minLoadRate: number;
   /** 현재까지 확보된 물량 (톤) */
   reservedTon: number;
+  /**
+   * 조율 데모 시나리오 화차 — 시작 상태가 반드시 정원 미달(14/18톤)이어야
+   * 조율 에이전트 시연이 성립한다. 저장소에 누적된 등록 화물은 이 화차에
+   * 앉히지 않는다 (방금 등록한 라이브 입력은 예외 — 성공 경로 시연용).
+   */
+  demoScenario?: boolean;
   laneId: string;
   departure: {
     stationId: string;
@@ -229,6 +241,12 @@ export interface ShipmentInput {
   requiresCover?: boolean;
   currentRoadFareKrw?: number;
   constraintText?: string;
+  /**
+   * 출발일 앞뒤 허용 폭(일). 비우면 ±2 로 간주합니다.
+   * 0 으로 강제하면 화차 시각표와 날짜가 정확히 일치할 때만 매칭돼
+   * 대부분의 등록이 noWagon 으로 끝납니다 — 폼에서 반드시 노출하세요.
+   */
+  departureFlexDays?: number;
 }
 
 // ── 계산 결과 ──────────────────────────────────────────────────
@@ -395,8 +413,20 @@ export interface MatchRow {
   detail: MatchRowDetail;
 }
 
-/** #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다. */
-export type MatchSummary = Omit<MatchRow, "detail">;
+/**
+ * #8 목록 응답용 요약 — 목록이 커질 수 있어 상세(detail)는 인라인하지 않고 #9 로 분리한다.
+ *
+ * 단 `departAt` 은 예외로 목록에도 싣는다. 공차 관리 화면(04b)의 "출발 예정" 열이
+ * 이 값을 쓰는데, 행마다 상세를 따로 부르게 하면 열 전체가 "…" 로 남는다.
+ */
+export type MatchSummary = Omit<MatchRow, "detail"> & {
+  departAt: string;
+  /**
+   * 코레일 배차 승인 상태 (#43). 시연용 예시 행은 undefined —
+   * 실제로 확정된 편성만 승인 대상이다.
+   */
+  approval?: { status: "confirmed" | "approved"; approvedAt: string | null };
+};
 
 /** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
 export interface DashboardSeed {
@@ -441,7 +471,7 @@ export interface PublicStatsBreakdownItem {
 /** 랜딩 히어로에 띄우는 이번 분기 사회환경적 편익 환산액 */
 export interface PublicBenefitTotal {
   amount: number;
-  /** 서버가 만든 표시 문자열 (예: "206만"). 화면에서 다시 축약하지 마십시오 */
+  /** 서버가 만든 표시 문자열 (예: "3억 4,200만"). 화면에서 다시 축약하지 마십시오 */
   label: string;
   /** 전 분기 대비 증감률. **비교할 실적이 없으면 생략됩니다** — 0을 넣지 않습니다 */
   deltaPct?: number;

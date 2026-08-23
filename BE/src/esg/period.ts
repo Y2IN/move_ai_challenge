@@ -17,7 +17,9 @@ import {
   TRUCK_CAPACITY_TON,
   VERIFIED,
 } from "../constants";
+import { todayYmd } from "../roll";
 import { seed } from "../seed";
+import type { SeedData } from "../types";
 import { computePollutants, emptyPollutantTotals, type PollutantTotals } from "./emissions";
 import ledgerRaw from "./ledger.json";
 import type {
@@ -59,7 +61,9 @@ export class PeriodParseError extends Error {}
  */
 export function parsePeriod(input?: string | null, baseDate?: string): EsgPeriod {
   const raw = (input ?? "").trim();
-  if (!raw) return previousQuarter(baseDate ?? ledger.meta.baseDate);
+  // 기본값은 **직전 완료 분기**. 원장 baseDate 가 아니라 오늘을 기준으로 삼는다 —
+  // 원장이 며칠 뒤처져 있어도 "지금 기준 직전 분기"가 공시 기준이다.
+  if (!raw) return previousQuarter(baseDate ?? todayYmd());
 
   const quarter = /^(\d{4})-?[Qq]([1-4])$/.exec(raw);
   if (quarter) {
@@ -131,19 +135,19 @@ export class LedgerDataError extends Error {}
  * 모르는 화주 id 를 400 으로 막는 것과 같은 이유입니다 — 조용히 틀린 숫자를 내는 것이
  * 제일 나쁩니다. 다만 이쪽은 사용자 입력이 아니라 우리 원장의 문제라 5xx 로 갑니다.
  */
-export function railDistanceKm(trip: LedgerTrip): number {
-  const lane = seed.lanes.find((l) => l.id === trip.laneId);
+export function railDistanceKm(trip: LedgerTrip, data: SeedData = seed): number {
+  const lane = data.lanes.find((l) => l.id === trip.laneId);
   if (!lane) {
     throw new LedgerDataError(
       `수송 실적 원장 ${trip.id} 의 노선 ${trip.laneId} 를 노선 마스터에서 찾을 수 없습니다. ` +
-        `(등록된 노선: ${seed.lanes.map((l) => l.id).join(", ")})`,
+        `(등록된 노선: ${data.lanes.map((l) => l.id).join(", ")})`,
     );
   }
   return lane.railDistanceKm;
 }
 
-function routeLabel(trip: LedgerTrip): string {
-  const name = (id: string) => seed.stations.find((s) => s.id === id)?.name ?? id;
+function routeLabel(trip: LedgerTrip, data: SeedData): string {
+  const name = (id: string) => data.stations.find((s) => s.id === id)?.name ?? id;
   return `${name(trip.originStationId)} → ${name(trip.destStationId)}`;
 }
 
@@ -170,12 +174,25 @@ export interface AggregateOptions {
   period: EsgPeriod;
   /** 특정 화주만 집계. 없으면 플랫폼 전체 */
   shipperId?: string | null;
+  /**
+   * 집계할 원장. 비우면 번들 ledger.json.
+   * DB 경로(`db/ledger.ts` 의 loadLedger)가 여기로 주입한다 — 집계 **규칙**은
+   * 그대로 두고 데이터 출처만 갈아끼우기 위한 이음매다.
+   */
+  ledger?: LedgerData;
+  /** 노선·역·화주 마스터. 비우면 번들 seed. */
+  data?: SeedData;
 }
 
 /** 원장에 실적이 하나도 없어도 예외를 던지지 않습니다. 빈 지표표가 정상 응답입니다. */
-export function aggregate({ period, shipperId }: AggregateOptions): EsgAggregate {
+export function aggregate({
+  period,
+  shipperId,
+  ledger: source = ledger,
+  data = seed,
+}: AggregateOptions): EsgAggregate {
   const targetShipper = shipperId ?? null;
-  const trips = ledger.trips.filter((t) => t.date >= period.from && t.date <= period.to);
+  const trips = source.trips.filter((t) => t.date >= period.from && t.date <= period.to);
 
   const rows: Scope3Row[] = [];
   const benefitByKey = new Map<string, BenefitBreakdownItem>();
@@ -194,7 +211,7 @@ export function aggregate({ period, shipperId }: AggregateOptions): EsgAggregate
   const countedShippers = new Set<string>();
 
   for (const trip of trips) {
-    const railKm = railDistanceKm(trip);
+    const railKm = railDistanceKm(trip, data);
     const members = targetShipper
       ? trip.members.filter((m) => m.shipperId === targetShipper)
       : trip.members;
@@ -240,7 +257,7 @@ export function aggregate({ period, shipperId }: AggregateOptions): EsgAggregate
         shipperName: member.shipperName,
         lotId: member.lotId,
         category: member.category,
-        route: routeLabel(trip),
+        route: routeLabel(trip, data),
         wagonId: trip.wagonId,
         wagonType: trip.wagonType,
         weightTon: member.weightTon,
@@ -275,7 +292,7 @@ export function aggregate({ period, shipperId }: AggregateOptions): EsgAggregate
     period,
     shipperId: targetShipper,
     shipperName: targetShipper
-      ? (seed.shippers.find((s) => s.id === targetShipper)?.name ?? targetShipper)
+      ? (data.shippers.find((s) => s.id === targetShipper)?.name ?? targetShipper)
       : null,
     tripCount: countedTrips.size,
     legCount: rows.length,

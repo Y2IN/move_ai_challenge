@@ -4,9 +4,10 @@ import { useCallback, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { ErrorNotice } from '../components/AsyncSection';
 import { ChoiceField, Field, SelectField, TextField } from '../components/Field';
-import { setShipment } from '../lib/demo-session';
+import { setConfirmationId, setRegisteredId, setShipment } from '../lib/demo-session';
 import {
   CORP_TYPES,
+  FLEX_CHOICES,
   FREIGHT_ITEMS,
   TRANSPORT_MODES,
   applyParsed,
@@ -19,11 +20,13 @@ import {
   toShipmentInput,
   validateForm,
   type CorpType,
+  type FlexChoice,
   type FreightField,
   type FreightForm,
   type StationOption,
   type TransportMode,
 } from '../lib/freight';
+import { confirmMatching } from '../lib/negotiation';
 import { useAsync } from '../lib/use-async';
 import type { ItemCategory } from '@railhub/be/types';
 
@@ -59,17 +62,27 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
   /** 역 마스터와 예시 문장은 화면 진입 때 한 번만 받습니다. */
   const masters = useAsync<Masters>(
     useCallback(
-      () =>
-        Promise.all([fetchStations(), fetchParseCases()]).then(([s, p]) => ({
-          stations: s.items,
-          cases: p.cases,
-          notice: p.notice,
-        })),
+      async () => {
+        // 예시 문장(#10 GET)이 실패해도 역 목록은 살아 있어야 합니다. 예전에는
+        // Promise.all 로 묶여 있어 한쪽만 실패해도 출발역·도착역이 통째로 잠겼습니다.
+        const [s, p] = await Promise.all([
+          fetchStations(),
+          fetchParseCases().catch(() => ({ cases: [], notice: '' })),
+        ]);
+        return { stations: s.items, cases: p.cases, notice: p.notice };
+      },
       [],
     ),
   );
   const stations = masters.state.status === 'ready' ? masters.state.data.stations : [];
   const stationOptions = stations.map((s) => ({ value: s.id, label: `${s.name} (${s.region})` }));
+  /** 실패를 "불러오는 중"으로 위장하지 않습니다 — 에러면 에러라고 적습니다. */
+  const placeholderOf = (ready: string) =>
+    stationOptions.length
+      ? ready
+      : masters.state.status === 'error'
+        ? '역 목록을 불러오지 못했습니다'
+        : '역 목록을 불러오는 중…';
 
   /** 값이 바뀐 필드는 AI 배지를 뗀다 */
   const setField = <K extends FreightField>(key: K, value: FreightForm[K]) => {
@@ -119,19 +132,31 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
     setSubmitError(null);
     const input = toShipmentInput(form, 'embark');
 
-    registerFreight(input)
-      .then(() => {
-        // 다음 화면들이 같은 화물로 이어지도록 들고 갑니다 (인증이 없어 서버가 못 찾습니다).
-        setShipment(input);
-        return requestMatching(input);
-      })
-      .then((result) => {
-        onNavigate?.(result.status === 'matched' ? '/matching/confirmed' : '/matching/unmatched');
-      })
-      .catch((error: Error) => {
-        setSubmitError(error.message);
-        setSubmitting(false);
+    (async () => {
+      const { shipment } = await registerFreight(input);
+      // 다음 화면들이 같은 화물로 이어지도록 들고 갑니다 (인증이 없어 서버가 못 찾습니다).
+      setShipment(input);
+      // 서버가 발급한 id — 매칭 풀에서 이 건을 빼 이중 계상을 막습니다.
+      setRegisteredId(shipment.id);
+
+      const result = await requestMatching(input, shipment.id);
+      if (result.status !== 'matched') {
+        onNavigate?.('/matching/unmatched');
+        return;
+      }
+
+      // 바로 성립한 경우엔 여기서 확정까지 합니다. 확정 화면은 조회 전용이라
+      // 거기서 편성이 만들어지지 않습니다 (예전엔 그 화면이 매번 새로 발급했습니다).
+      const { confirmation } = await confirmMatching(input, [], {
+        registeredId: shipment.id,
+        clientKey: `reg:${shipment.id}`,
       });
+      setConfirmationId(confirmation.groupId);
+      onNavigate?.('/matching/confirmed');
+    })().catch((error: Error) => {
+      setSubmitError(error.message);
+      setSubmitting(false);
+    });
   };
 
   return (
@@ -199,7 +224,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                   value={form.originStationId}
                   options={stationOptions}
                   disabled={!stationOptions.length}
-                  placeholder={stationOptions.length ? '출발역 선택' : '역 목록을 불러오는 중…'}
+                  placeholder={placeholderOf('출발역 선택')}
                   onChange={(v) => setField('originStationId', v)}
                 />
               </Field>
@@ -209,7 +234,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                   value={form.destStationId}
                   options={stationOptions}
                   disabled={!stationOptions.length}
-                  placeholder={stationOptions.length ? '도착역 선택' : '역 목록을 불러오는 중…'}
+                  placeholder={placeholderOf('도착역 선택')}
                   onChange={(v) => setField('destStationId', v)}
                 />
               </Field>
@@ -234,6 +259,15 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
 
               <Field label="희망 출발일" ai={aiFields.has('departDate')} error={errors.departDate}>
                 <TextField type="date" value={form.departDate} onChange={(v) => setField('departDate', v)} />
+              </Field>
+
+              {/* 화차 시각표와 정확히 같은 날짜만 고집하면 매칭이 거의 안 잡힌다 */}
+              <Field label="출발일 유연폭">
+                <SelectField<FlexChoice>
+                  value={form.flexDays}
+                  options={FLEX_CHOICES}
+                  onChange={(v) => setField('flexDays', v)}
+                />
               </Field>
 
               <Field label="기업 구분">

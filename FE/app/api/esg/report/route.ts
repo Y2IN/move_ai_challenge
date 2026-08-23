@@ -4,7 +4,7 @@ import {
   parsePreviousSections,
 } from "@railhub/be/esg/narrative";
 import { isSectionKey, SECTION_KEYS } from "@railhub/be/esg/paragraphs";
-import { EsgQueryError, resolveAggregate } from "@railhub/be/esg/query";
+import { EsgQueryError, resolveAggregateDb } from "@railhub/be/esg/query";
 import type { EsgSectionKey } from "@railhub/be/esg/types";
 
 /**
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const agg = resolveAggregate({
+    const agg = await resolveAggregateDb({
       period: body.period,
       from: body.from,
       to: body.to,

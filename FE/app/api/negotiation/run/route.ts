@@ -1,6 +1,5 @@
 import { negotiate } from "@railhub/be/negotiate";
-import { seed } from "@railhub/be/seed";
-import { saveNegotiation } from "@railhub/be/store";
+import { buildMatchData, saveNegotiation } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 /**
@@ -15,7 +14,7 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
-    | { shipment?: ShipmentInput; now?: string }
+    | { shipment?: ShipmentInput; now?: string; registeredId?: string }
     | null;
 
   const now = body?.now ? new Date(body.now) : new Date();
@@ -24,7 +23,8 @@ export async function POST(req: Request) {
   }
 
   // 결과를 세션으로 저장하고 id 를 함께 반환 — #25 조회·#26 취소가 이 id 를 쓴다.
-  const result = await negotiate(seed, body?.shipment ?? null, now);
+  const data = await buildMatchData(body?.registeredId ?? null);
+  const result = await negotiate(data, body?.shipment ?? null, now);
   const { id } = await saveNegotiation(result);
   return Response.json({ id, ...result });
 }

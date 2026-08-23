@@ -9,8 +9,9 @@
  * 같은 규칙이 두 군데 생기고, 한쪽만 고치는 순간 갈라집니다.
  */
 
+import { loadLedger } from "./db/ledger";
+import { loadUniverse } from "./db/universe";
 import { aggregate, customPeriod } from "./esg/period";
-import { seed } from "./seed";
 import type { CompanyGrade, SeedData } from "./types";
 
 /** 이행률이 이 아래면 미달 위험. 협약 감액의 경계선입니다. */
@@ -73,7 +74,12 @@ function statusOf(rate: number, tripCount: number): ClientStatus {
   return rate < RISK_RATE ? "미달 위험" : "정상";
 }
 
-export function getClients(now: Date = new Date(), data: SeedData = seed): ClientsResponse {
+export async function getClients(
+  now: Date = new Date(),
+  seedData?: SeedData,
+): Promise<ClientsResponse> {
+  const [loaded, source] = await Promise.all([loadUniverse(), loadLedger()]);
+  const data = seedData ?? loaded;
   // 협약 기간은 화주마다 같게 운영합니다. 첫 화주 것을 기준 기간으로 씁니다.
   const first = data.shippers[0]?.contract;
   const from = first?.periodFrom ?? "2026-01-01";
@@ -81,7 +87,7 @@ export function getClients(now: Date = new Date(), data: SeedData = seed): Clien
   const period = customPeriod(from, to);
 
   const items: ClientRow[] = data.shippers.map((shipper) => {
-    const agg = aggregate({ period, shipperId: shipper.id });
+    const agg = aggregate({ period, shipperId: shipper.id, ledger: source, data });
     const contractTon = shipper.contract.contractTon;
     const rate = contractTon > 0 ? agg.totalTon / contractTon : 0;
 

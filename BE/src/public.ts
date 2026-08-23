@@ -9,6 +9,8 @@
  * 심사자가 랜딩의 숫자를 보고 한 번 클릭하면 자릿수가 다른 값을 본다.
  *
  * 그래서 여기도 같은 집계(`resolveAggregate`)에서 뽑는다. 값이 한 곳에서만 나온다.
+ * (반대 방향도 맞춰 뒀다 — 홈 대시보드가 읽는 `seed.dashboard` 는 이제 큐레이션
+ * 상수가 아니라 같은 집계의 사본이다. 자세한 건 `dashboard.ts` 머리말.)
  *
  * ## 왜 보조금이 아니라 편익인가
  *
@@ -22,7 +24,9 @@
  * 보조금 대상 여부는 로그인 후 사업계획서에서 산정 결과 그대로 보여준다.
  */
 
-import { resolveAggregate } from "./esg/query";
+import { aggregateWith } from "./esg/query";
+import { loadLedger } from "./db/ledger";
+import { loadUniverse } from "./db/universe";
 import { seed } from "./seed";
 import type { BenefitBreakdownItem } from "./esg/types";
 import type { PublicStats, PublicStatsBreakdownItem } from "./types";
@@ -63,8 +67,9 @@ function previousQuarterId(periodId: string): string | null {
   return q === 1 ? `${year - 1}Q4` : `${year}Q${q - 1}`;
 }
 
-export function getPublicStats(): PublicStats {
-  const agg = resolveAggregate({});
+export async function getPublicStats(): Promise<PublicStats> {
+  const [data, ledger] = await Promise.all([loadUniverse(), loadLedger()]);
+  const agg = aggregateWith({}, ledger, data);
 
   // 전 분기 대비 증감률. **비교 대상이 없으면 지어내지 않고 생략한다.**
   // 직전 분기 실적이 0인데 "+100%" 같은 걸 띄우면 없는 성장을 주장하게 된다.
@@ -72,7 +77,7 @@ export function getPublicStats(): PublicStats {
   const prevId = previousQuarterId(agg.period.id);
   if (prevId) {
     try {
-      const prev = resolveAggregate({ period: prevId });
+      const prev = aggregateWith({ period: prevId }, ledger, data);
       if (prev.totalBenefitKrw > 0) {
         deltaPct = Math.round(
           ((agg.totalBenefitKrw - prev.totalBenefitKrw) / prev.totalBenefitKrw) * 100,
@@ -101,12 +106,12 @@ export function getPublicStats(): PublicStats {
     breakdown,
     // 플랫폼 누적 실적은 원장 한 분기로 계산할 수 있는 값이 아니다. 시드의 서비스
     // 소개용 수치를 그대로 쓴다 (seed.meta.fictional 로 가공 데이터임을 표시한다).
-    cumulative: seed.dashboard.cumulative,
+    cumulative: data.dashboard.cumulative,
     equivalents: { pineTrees: agg.pineTrees, trucksBlocked: agg.truckLoadsAvoided },
   };
 }
 
-/** 158000000 → "1억 5,800만" · 2064641 → "206만" (억·만 단위, 0인 자리는 생략) */
+/** 342004280 → "3억 4,200만" · 2064641 → "206만" (억·만 단위, 0인 자리는 생략) */
 function formatKrwShort(n: number): string {
   const eok = Math.floor(n / 100_000_000);
   const man = Math.floor((n % 100_000_000) / 10_000);

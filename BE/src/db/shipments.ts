@@ -136,9 +136,18 @@ export async function deleteShipmentRecord(
 
 // ── 편성 확정 ──────────────────────────────────────────────────
 
+/** 편성 상태 — 확정(화주 측) → 승인(코레일 배차 담당자) */
+export type ConfirmationStatus = "confirmed" | "approved";
+
 export interface ConfirmationRecord {
   groupId: string;
-  status: "confirmed";
+  status: ConfirmationStatus;
+  /** 코레일이 배정을 승인한 시각. 미승인이면 null */
+  approvedAt?: string | null;
+  /** 승인한 담당자 표기 */
+  approvedBy?: string | null;
+  /** 멱등 키 — 같은 키의 확정 요청은 기존 편성을 재사용한다 */
+  clientKey?: string | null;
   wagon: EmptyWagon;
   members: MatchCandidate[];
   totalTon: number;
@@ -153,28 +162,39 @@ export async function insertConfirmation(
   seq: number,
 ): Promise<ConfirmationRecord | null> {
   return tryDb("insertConfirmation", async (db) => {
-    unwrap(
-      await db.from("confirmations").insert({
-        group_id: c.groupId,
-        seq,
-        status: c.status,
-        wagon_id: c.wagon.id,
-        total_ton: c.totalTon,
-        capacity_ton: c.capacityTon,
-        load_factor: c.loadFactor,
-        confirmed_at: c.confirmedAt,
-        wagon: c.wagon,
-        members: c.members,
-        calc: c.calc,
-      }),
-    );
+    const row: Record<string, unknown> = {
+      group_id: c.groupId,
+      seq,
+      status: c.status,
+      wagon_id: c.wagon.id,
+      total_ton: c.totalTon,
+      capacity_ton: c.capacityTon,
+      load_factor: c.loadFactor,
+      confirmed_at: c.confirmedAt,
+      wagon: c.wagon,
+      members: c.members,
+      calc: c.calc,
+    };
+    if (c.clientKey) row.client_key = c.clientKey;
+
+    const res = await db.from("confirmations").insert(row);
+    // client_key 는 나중에 추가된 컬럼이다. 없는 프로젝트에서는 빼고 다시 넣는다
+    // (멱등은 못 하지만 확정 자체는 되어야 한다).
+    if (res.error && /client_key/i.test(res.error.message)) {
+      delete row.client_key;
+      unwrap(await db.from("confirmations").insert(row));
+      return c;
+    }
+    unwrap(res);
     return c;
   });
 }
 
 interface ConfirmationRow {
   group_id: string;
-  status: "confirmed";
+  status: ConfirmationStatus;
+  approved_at?: string | null;
+  approved_by?: string | null;
   wagon: EmptyWagon;
   members: MatchCandidate[];
   total_ton: number;
@@ -184,29 +204,111 @@ interface ConfirmationRow {
   calc: CalcResult | null;
 }
 
+/**
+ * `*` 를 쓰는 이유: 승인 컬럼(approved_at·approved_by)은 나중에 추가된 것이라
+ * 열 이름을 명시하면 아직 마이그레이션을 안 돌린 프로젝트에서 SELECT 가 통째로
+ * 실패한다. `*` 면 있으면 오고 없으면 안 온다 — 두 상태를 한 쿼리로 감당한다.
+ * (실제로 컬럼을 추가한 뒤에도 이 목록이 낡아 승인 시각이 계속 null 로 보였다)
+ */
+const CONFIRMATION_COLS = "*";
+
+/**
+ * 코레일 배차 승인 (api_list #43).
+ *
+ * `status` 는 기존 컬럼이라 스키마 변경 없이 동작한다. 승인 시각·담당자 컬럼은
+ * 나중에 추가된 것이라 없으면 상태만 바꾼다 (승인 자체는 되어야 한다).
+ */
+export async function approveConfirmationRow(
+  groupId: string,
+  approvedBy: string,
+): Promise<ConfirmationRecord | "notFound" | null> {
+  return tryDb("approveConfirmation", async (db) => {
+    const at = new Date().toISOString();
+
+    const full = await db
+      .from("confirmations")
+      .update({ status: "approved", approved_at: at, approved_by: approvedBy })
+      .eq("group_id", groupId)
+      .select(CONFIRMATION_COLS);
+
+    if (!full.error) {
+      const rows = full.data as ConfirmationRow[];
+      return rows.length ? toConfirmation(rows[0]) : ("notFound" as const);
+    }
+    if (!/approved_at|approved_by/i.test(full.error.message)) {
+      throw new Error(full.error.message);
+    }
+
+    const rows = unwrap(
+      await db
+        .from("confirmations")
+        .update({ status: "approved" })
+        .eq("group_id", groupId)
+        .select(CONFIRMATION_COLS),
+    ) as ConfirmationRow[];
+    if (!rows.length) return "notFound" as const;
+    return { ...toConfirmation(rows[0]), approvedAt: at, approvedBy };
+  });
+}
+
+function toConfirmation(r: ConfirmationRow): ConfirmationRecord {
+  return {
+    groupId: r.group_id,
+    status: r.status,
+    approvedAt: r.approved_at ?? null,
+    approvedBy: r.approved_by ?? null,
+    wagon: r.wagon,
+    members: r.members,
+    totalTon: r.total_ton,
+    capacityTon: r.capacity_ton,
+    loadFactor: r.load_factor,
+    confirmedAt: r.confirmed_at,
+    calc: r.calc,
+  };
+}
+
 /** 가장 최근 확정 편성. 없으면 null. 사업계획서가 실적을 집계할 때 쓴다. */
 export async function findLatestConfirmation(): Promise<ConfirmationRecord | null> {
   return tryDb("findLatestConfirmation", async (db) => {
     const rows = unwrap(
       await db
         .from("confirmations")
-        .select("group_id, status, wagon, members, total_ton, capacity_ton, load_factor, confirmed_at, calc")
+        .select(CONFIRMATION_COLS)
         .order("confirmed_at", { ascending: false })
         .limit(1),
     ) as ConfirmationRow[];
-    if (!rows.length) return null;
-    const r = rows[0];
-    return {
-      groupId: r.group_id,
-      status: r.status,
-      wagon: r.wagon,
-      members: r.members,
-      totalTon: r.total_ton,
-      capacityTon: r.capacity_ton,
-      loadFactor: r.load_factor,
-      confirmedAt: r.confirmed_at,
-      calc: r.calc,
-    };
+    return rows.length ? toConfirmation(rows[0]) : null;
+  });
+}
+
+/** 편성 번호(GRP-NNN)로 한 건. 확정 화면이 새로고침돼도 같은 편성을 다시 그린다. */
+export async function findConfirmation(groupId: string): Promise<ConfirmationRecord | null> {
+  return tryDb("findConfirmation", async (db) => {
+    const rows = unwrap(
+      await db.from("confirmations").select(CONFIRMATION_COLS).eq("group_id", groupId).limit(1),
+    ) as ConfirmationRow[];
+    return rows.length ? toConfirmation(rows[0]) : null;
+  });
+}
+
+/**
+ * 멱등 키로 기존 확정을 찾는다. 컬럼이 없는 프로젝트에서는 null (멱등 없이 동작).
+ */
+export async function findConfirmationByClientKey(
+  clientKey: string,
+): Promise<ConfirmationRecord | null> {
+  return tryDb("findConfirmationByClientKey", async (db) => {
+    const res = await db
+      .from("confirmations")
+      .select(CONFIRMATION_COLS)
+      .eq("client_key", clientKey)
+      .limit(1);
+    if (res.error) {
+      if (/client_key/i.test(res.error.message)) return null;
+      throw new Error(res.error.message);
+    }
+    const rows = res.data as ConfirmationRow[];
+    return rows.length ? toConfirmation(rows[0]) : null;
   });
 }
 

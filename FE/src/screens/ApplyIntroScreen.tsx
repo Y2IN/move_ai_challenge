@@ -1,10 +1,13 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { useAccount } from '../lib/account';
 import { fetchEsgIndicators, type EsgIndicatorsResponse } from '../lib/esg';
 import { formatDocDate, formatTon, formatTrips } from '../lib/format';
+import { ApplyDocument } from '../components/ApplyDocument';
+import { fetchApplication } from '../lib/subsidy';
+import { toApplyDocView, type ApplyDocView } from '../lib/subsidy-view';
 import { useAsync } from '../lib/use-async';
 import { applyMeta, breadcrumb, checklist, type ChecklistItem } from '../mocks/apply';
 
@@ -36,16 +39,37 @@ export function ApplyIntroScreen({
   /** 이 화면의 수치는 전부 #40 집계입니다. LLM 을 타지 않아 재진입이 쌉니다. */
   const indicators = useAsync<EsgIndicatorsResponse>(useCallback(() => fetchEsgIndicators(), []));
   const account = useAccount('corp');
+
+  // 빈 서식 미리보기 — 저장되지 않는 초안(stage: "draft")을 그대로 렌더합니다.
+  // 별도 라우트가 필요 없습니다: 없는 id 로 조회하면 서버가 빈 서식을 돌려줍니다.
+  const [preview, setPreview] = useState<ApplyDocView | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const openPreview = useCallback(async () => {
+    setPreviewBusy(true);
+    setPreviewError(null);
+    try {
+      const res = await fetchApplication('preview');
+      setPreview(toApplyDocView(res.document));
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : '빈 서식을 불러오지 못했습니다.');
+    } finally {
+      setPreviewBusy(false);
+    }
+  }, []);
   const res = indicators.state.status === 'ready' ? indicators.state.data : null;
+  /** 로딩과 실패는 다른 상태입니다. 실패를 "집계 중…" 으로 두면 영원히 기다리게 됩니다. */
+  const pending = indicators.state.status === 'error' ? '집계에 실패했습니다' : '집계 중…';
 
   const criteria = [
     {
       label: '대상 기간',
-      value: res ? `${formatDocDate(res.period.from)} ~ ${formatDocDate(res.period.to)}` : '집계 중…',
+      value: res ? `${formatDocDate(res.period.from)} ~ ${formatDocDate(res.period.to)}` : pending,
     },
     {
       label: '전환 운송 실적',
-      value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : '집계 중…',
+      value: res ? `${formatTrips(res.summary.tripCount)} · ${formatTon(res.summary.totalTon)}` : pending,
     },
     // 인증(#1~#5)이 MVP 범위 밖이라 `/api/me` 가 없습니다. 신청 주체는 계정 표시값입니다.
     { label: '신청 주체', value: res?.shipperName ?? account?.org ?? '확인 중…' },
@@ -54,6 +78,37 @@ export function ApplyIntroScreen({
 
   return (
     <AppLayout active="subsidy">
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-8"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="mx-auto flex w-[880px] max-w-full flex-col gap-4 rounded-2xl bg-white p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xl font-extrabold tracking-[-0.03em] text-[#191F28]">
+                  빈 서식 미리보기
+                </h2>
+                <p className="text-[13px] text-[#8B95A1]">
+                  실제 생성 전 서식 구조만 보여줍니다. 이 문서는 저장되지 않습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="h-10 rounded-xl border border-[#E5E8EB] px-4 text-sm font-bold text-[#4E5968] transition-colors hover:bg-[#F9FAFB]"
+              >
+                닫기
+              </button>
+            </div>
+            {/* 재생성 핸들러를 주지 않아 읽기 전용으로 렌더됩니다 */}
+            <ApplyDocument doc={preview} />
+          </div>
+        </div>
+      )}
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm text-[#8B95A1]">
           <button type="button" onClick={onBack} className="font-bold text-[#4E5968]">
@@ -68,7 +123,11 @@ export function ApplyIntroScreen({
         </div>
 
         <span className="text-sm font-bold text-[#3182F6]">
-          {res ? `${res.period.label} 실적 기준` : '실적을 집계하는 중…'}
+          {res
+            ? `${res.period.label} 실적 기준`
+            : indicators.state.status === 'error'
+              ? '실적을 집계하지 못했습니다'
+              : '실적을 집계하는 중…'}
         </span>
         <h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[#191F28]">{applyMeta.title}</h1>
         <p className="text-base text-[#6B7684]">{applyMeta.legalBasis}</p>
@@ -131,13 +190,32 @@ export function ApplyIntroScreen({
             </button>
             <button
               type="button"
-              className="h-[52px] rounded-[14px] bg-[#F2F4F6] text-base font-bold text-[#333D4B] transition-colors hover:bg-[#E5E8EB]"
+              disabled={previewBusy}
+              onClick={openPreview}
+              className="h-[52px] rounded-[14px] bg-[#F2F4F6] text-base font-bold text-[#333D4B] transition-colors hover:bg-[#E5E8EB] disabled:opacity-60"
             >
-              빈 서식 미리보기
+              {previewBusy ? '서식 불러오는 중…' : '빈 서식 미리보기'}
             </button>
             {error && (
               <p className="mt-1.5 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
                 초안을 시작하지 못했습니다 — {error}
+              </p>
+            )}
+            {indicators.state.status === 'error' && (
+              <p className="mt-1.5 flex items-center gap-2 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
+                실적 집계를 불러오지 못했습니다.
+                <button
+                  type="button"
+                  onClick={indicators.reload}
+                  className="font-bold underline underline-offset-2"
+                >
+                  다시 시도
+                </button>
+              </p>
+            )}
+            {previewError && (
+              <p className="mt-1.5 rounded-lg bg-[#FFF0F0] px-3 py-2 text-[13px] leading-relaxed text-[#E03131]">
+                빈 서식을 불러오지 못했습니다 — {previewError}
               </p>
             )}
             <p className="mt-1.5 text-[13px] leading-relaxed text-[#8B95A1]">{applyMeta.disclaimer}</p>

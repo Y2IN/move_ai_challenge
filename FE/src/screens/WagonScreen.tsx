@@ -6,6 +6,7 @@ import { AsyncSection, CardSkeleton, SkeletonGrid } from '../components/AsyncSec
 import { LoadBar, StatusBadge } from '../components/StatusBadge';
 import { StatCard } from '../components/StatCard';
 import {
+  approveAssignment,
   fetchDashboard,
   fetchMatch,
   fetchMatches,
@@ -15,7 +16,7 @@ import {
   type MatchRowData,
   type StatData,
 } from '../lib/dashboard';
-import { formatNumber, formatPct } from '../lib/format';
+import { formatDateTime, formatNumber, formatPct } from '../lib/format';
 import { requestMatching, type MatchResult } from '../lib/freight';
 import { useAccount } from '../lib/account';
 import { useAsync } from '../lib/use-async';
@@ -29,9 +30,9 @@ const TABLE_MIN_W = 'min-w-[1100px]';
 /**
  * detail 배열에서 키로 값 찾기.
  *
- * `detail` 은 행을 펼칠 때 #9 로 받아 오므로 그 전엔 null 이다. 목록 API(#8)에는
- * 출발 시각이 없어서, 이 열은 펼치기 전까지 '…' 로 둔다. 전부 미리 채우려면
- * 행 수만큼 #9 를 호출해야 해서 목록이 그만큼 느려진다.
+ * `detail` 은 행을 펼칠 때 #9 로 받아 오므로 그 전엔 null 이다.
+ * 출발 시각처럼 목록(#8)에 함께 오는 값은 여기 말고 행 데이터에서 바로 읽는다 —
+ * 예전에는 이 열 전체가 펼치기 전까지 '…' 였다.
  */
 function pick(row: MatchRowData, keys: string[]) {
   if (!row.detail) return '…';
@@ -40,6 +41,52 @@ function pick(row: MatchRowData, keys: string[]) {
     if (hit) return hit.v;
   }
   return '-';
+}
+
+/**
+ * #43 화차 배정 승인 — 코레일 담당자가 이 편성으로 화차를 내주겠다고 확정하는 자리.
+ *
+ * 확정(화주 의사)과 승인(코레일 배차)은 다른 사건이라 상태를 나눠 보여줍니다.
+ * 시연용 예시 행에는 `approval` 이 없어 이 줄이 뜨지 않습니다.
+ */
+function ApprovalBar({ row, onApproved }: { row: MatchRowData; onApproved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const approved = row.approval?.status === 'approved';
+
+  return (
+    <div className="flex items-center justify-between gap-4 px-5 pb-4">
+      {approved ? (
+        <span className="text-sm font-semibold text-[#12A87A]">
+          배차 승인 완료
+          {row.approval?.approvedAt ? ` · ${row.approval.approvedAt.slice(0, 10)}` : ''}
+        </span>
+      ) : (
+        <span className="text-sm text-[#6B7684]">
+          화주가 확정한 편성입니다. 배차를 승인하면 화차가 이 편성에 배정됩니다.
+        </span>
+      )}
+      {error && <span className="text-sm text-[#D22030]">{error}</span>}
+      <button
+        type="button"
+        disabled={approved || busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await approveAssignment(row.id);
+            onApproved();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : '승인하지 못했습니다.');
+            setBusy(false);
+          }
+        }}
+        className="h-10 flex-none rounded-[10px] bg-[#0B1220] px-4 text-sm font-bold text-white transition-colors hover:bg-[#191F28] disabled:bg-[#E5E8EB] disabled:text-[#B0B8C1]"
+      >
+        {approved ? '승인됨' : busy ? '승인 중…' : '배차 승인'}
+      </button>
+    </div>
+  );
 }
 
 /** 공차 쪽 집계 — 최소 적재 기준·잔여 용량·부족 물량의 출처 */
@@ -89,9 +136,17 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
     ),
   );
 
-  /** 최소 적재 기준은 화차 설정값이다. 화면에 상수로 박으면 "이 60%는 어디서 나온 숫자냐"에 답할 수 없다. */
+  /**
+   * 최소 적재 기준은 화차 설정값이다. 화면에 상수로 박으면 "이 60%는 어디서 나온
+   * 숫자냐"에 답할 수 없다.
+   *
+   * 첫 화차 한 건만 보지 않는다 — 공차 목록이 비면 기준이 null 이 되어 '적재 미달'
+   * 배지와 '합적 화주 찾기' CTA 가 통째로 사라졌다. 전 화차의 최솟값을 쓴다.
+   */
   const minLoadRate =
-    supply.state.status === 'ready' ? (supply.state.data.vacancies[0]?.wagon.minLoadRate ?? null) : null;
+    supply.state.status === 'ready' && supply.state.data.vacancies.length > 0
+      ? Math.min(...supply.state.data.vacancies.map((v) => v.wagon.minLoadRate))
+      : null;
   const minPct = minLoadRate == null ? null : Math.round(minLoadRate * 100);
 
   /** 행을 처음 펼칠 때만 상세(#9)를 받아 온다. */
@@ -175,6 +230,11 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
                       <span />
                     </div>
 
+                    {rows.length === 0 && (
+                      <div className="px-4 py-10 text-center text-[15px] text-[#8B95A1]">
+                        표시할 편성이 없습니다.
+                      </div>
+                    )}
                     {rows.map((row) => {
                       const under = minPct != null && row.load < minPct;
                       const open = openRow === row.id;
@@ -206,7 +266,7 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
                             </span>
 
                             <span className="text-center text-sm tabular-nums text-[#4E5968]">
-                              {pick(row, ['출발', '출발 예정'])}
+                              {row.departAt ? formatDateTime(row.departAt) : pick(row, ['출발', '출발 예정'])}
                             </span>
 
                             <span className="text-center text-[15px] font-semibold tabular-nums text-[#4E5968]">
@@ -223,6 +283,10 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
 
                             <span className="text-center text-[15px] text-[#B0B8C1]">{open ? '⌃' : '⌄'}</span>
                           </button>
+
+                          {row.approval && (
+                            <ApprovalBar row={row} onApproved={matches.reload} />
+                          )}
 
                           {under && minPct != null && (
                             <div className="flex items-center justify-between gap-4 px-5 pb-4">

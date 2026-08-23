@@ -62,7 +62,14 @@ check(
 );
 check("감축률 인용", `감축률은 ${(agg.reductionRate * 100).toFixed(1)}%이다.`, true);
 check("천단위 콤마", `사회환경적 편익은 ${agg.totalBenefitKrw.toLocaleString("ko-KR")}원이다.`, true);
-check("만 단위 축약", "금전 환산액은 약 24만원이다.", true);
+// 축약 표기는 **집계에서 뽑습니다.** 상수로 박아 두면 원장 물량이 바뀔 때마다
+// 정상 문장이 환각으로 잡혀 이 테스트가 검출기 대신 데이터를 검사하게 됩니다.
+const ghgKrw = agg.benefitItems.find((i) => i.key === "ghg")!.amountKrw;
+check(
+  "만 단위 축약",
+  `금전 환산액은 약 ${Math.floor(ghgKrw / 10_000).toLocaleString("ko-KR")}만원이다.`,
+  true,
+);
 check("GRI·ISSB 인용", "GRI 305-3 및 ISSB IFRS S2 Scope 3 Cat.4 에 따라 산정하였다.", true);
 check("ISO 인용", "ISO 14064-3 에 따른 제3자 검증은 실시하지 않았다.", true);
 check("K-ESG 코드", "K-ESG E-3-2 및 E-7-1 지표에 대응한다.", true);

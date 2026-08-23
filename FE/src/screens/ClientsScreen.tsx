@@ -92,9 +92,13 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
                   <span className="text-right">상태</span>
                 </div>
 
-                {data.items.map((r) => (
-                  <ClientLine key={r.id} row={r} riskRate={data.riskRate} />
-                ))}
+                {data.items.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-[15px] text-[#8B95A1]">
+                    이 기간에 협약 실적이 있는 화주가 없습니다.
+                  </div>
+                ) : (
+                  data.items.map((r) => <ClientLine key={r.id} row={r} riskRate={data.riskRate} />)
+                )}
               </div>
 
               <SalesPanel data={data} onExport={onExport} />

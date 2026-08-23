@@ -24,46 +24,55 @@ export async function GET(_req: Request, ctx: Ctx) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-      const capacity = result.before.capacityTon;
-      let ton = result.before.totalTon;
-      let load = capacity ? ton / capacity : 0;
+      // 예외가 나면 커넥션만 끊겨 화면은 "연결이 끊겼습니다" 만 띄우고 사유를 알 수 없다.
+      // 보조금 스트림과 같은 계약(error 이벤트를 보내고 정상 종료)으로 맞춘다.
+      try {
+        const capacity = result.before.capacityTon;
+        let ton = result.before.totalTon;
+        let load = capacity ? ton / capacity : 0;
 
-      send("start", { negotiationId: id, feasible: result.feasible, loadRate: round2(load) });
-      await wait(400);
+        send("start", { negotiationId: id, feasible: result.feasible, loadRate: round2(load) });
+        await wait(400);
 
-      for (let i = 0; i < result.proposals.length; i++) {
-        const p = result.proposals[i];
-        // 제안 제시
-        send("proposal", {
-          step: i + 1,
-          shipper: p.shipperName,
-          lever: p.lever,
-          ask: p.ask,
-          conflict: p.conflict,
-          narrative: p.message,
-          savingKrw: p.savingKrw,
-          status: "CONDITIONAL",
+        for (let i = 0; i < result.proposals.length; i++) {
+          const p = result.proposals[i];
+          // 제안 제시
+          send("proposal", {
+            step: i + 1,
+            shipper: p.shipperName,
+            lever: p.lever,
+            ask: p.ask,
+            conflict: p.conflict,
+            narrative: p.message,
+            savingKrw: p.savingKrw,
+            status: "CONDITIONAL",
+          });
+          await wait(700);
+
+          // 수락 반영 → 적재율 상승.
+          // ⚠️ 정원을 넘겨 싣지 않는다. 그냥 더하면 마지막 제안에서 17+4=21톤/18톤 =
+          //    117% 같은, 이 시스템에 존재할 수 없는 적재율이 화면을 스쳐 지나간다
+          //    (매처가 낸 최종값은 100%다). 재생값은 최종값과 같은 규칙을 따라야 한다.
+          const from = load;
+          ton = capacity ? Math.min(ton + p.weightTon, capacity) : ton + p.weightTon;
+          load = capacity ? ton / capacity : load;
+          send("loadRate", { from: round2(from), to: round2(load), step: i + 1 });
+          send("proposal", { step: i + 1, shipper: p.shipperName, status: "ACCEPTED", savingKrw: p.savingKrw });
+          await wait(600);
+        }
+
+        send("done", {
+          finalLoadRate: round2(result.after ? result.after.loadRate : load),
+          feasible: result.feasible,
+          message: result.message,
         });
-        await wait(700);
-
-        // 수락 반영 → 적재율 상승.
-        // ⚠️ 정원을 넘겨 싣지 않는다. 그냥 더하면 마지막 제안에서 17+4=21톤/18톤 =
-        //    117% 같은, 이 시스템에 존재할 수 없는 적재율이 화면을 스쳐 지나간다
-        //    (매처가 낸 최종값은 100%다). 재생값은 최종값과 같은 규칙을 따라야 한다.
-        const from = load;
-        ton = capacity ? Math.min(ton + p.weightTon, capacity) : ton + p.weightTon;
-        load = capacity ? ton / capacity : load;
-        send("loadRate", { from: round2(from), to: round2(load), step: i + 1 });
-        send("proposal", { step: i + 1, shipper: p.shipperName, status: "ACCEPTED", savingKrw: p.savingKrw });
-        await wait(600);
+      } catch (e) {
+        send("error", {
+          message: e instanceof Error ? e.message : "조율 진행을 재생하지 못했습니다.",
+        });
+      } finally {
+        controller.close();
       }
-
-      send("done", {
-        finalLoadRate: round2(result.after ? result.after.loadRate : load),
-        feasible: result.feasible,
-        message: result.message,
-      });
-      controller.close();
     },
   });
 

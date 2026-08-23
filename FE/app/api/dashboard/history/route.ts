@@ -12,7 +12,7 @@ import { toPositiveInt } from "@railhub/be/http";
 export const dynamic = "force-dynamic";
 
 /** GET /api/dashboard/history?persona=corp|korail&quarters=4 */
-export function GET(req: Request) {
+export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const persona = sp.get("persona") ?? "corp";
   if (!isPersona(persona)) {
@@ -23,5 +23,5 @@ export function GET(req: Request) {
   }
 
   const quarters = toPositiveInt(sp.get("quarters")) ?? 4;
-  return Response.json(getHistory(persona, quarters, sp.get("baseDate") ?? undefined));
+  return Response.json(await getHistory(persona, quarters, sp.get("baseDate") ?? undefined));
 }

@@ -20,32 +20,35 @@
 
 ---
 
-## 구현 현황 (2026-08-13 · main 병합 후 · 전 43개 기준)
+## 구현 현황 (2026-08-23 갱신)
 
-화물등록·매칭·대시보드(feat/cargo-matching) + 조율·보조금·ESG(main PR#6)까지 병합된 기준.
-각 섹션 표의 **상태** 열 참고 (✅ 완료 · 🟡 부분 · ❌ 미구현 · ➖ MVP 제외 · ⛔ 보류).
+- **✅ 완료 (41):** 랜딩·대시보드 · 화물등록 · 매칭 · 조율(#21~#26) · 편익 · 보조금 ·
+  ESG · 마스터 · 정산. **#36 재생성 · #37 문단 편집 저장 · #38 변경 이력 ·
+  #43 배차 승인 전부 구현+배선 완료.**
+- **➖ MVP 제외 (5):** 인증 #1~#5 — 계정 없이 데모(역할 선택은 클라 처리)
+- **❌ 미구현 (1):** #30 preflight — 정적 체크리스트 + #40 실측으로 대체
+- **🗑 삭제:** `/api/negotiation/accept` — 확정 API 가 유일 경로라 사문화
 
-- **✅ 완료 (34):**
-  - 랜딩·대시보드: #6 #7 #8 #9
-  - 화물등록: #10 파싱(데모) · #11 #12 #13 #14 #15
-  - 매칭: #16 #18 #19
-  - 조율: #21 classify(데모) · #22 run · #23 stream(SSE) · #25 조회 · #26 취소
-  - 편익: #27 calculate · #28 summary · #29 coefficients
-  - 보조금: #31 #32 #33 #34 #35 #37 #38 #39
-  - ESG: #40 #41 #42
-  - 마스터: master/stations · master/wagon-types
-- **🟡 부분 (2):** #20 reconcilable(후보만, lever 미보강) · #24 reply(`negotiation/accept`만 존재)
-- **❌ 미구현 (3):** #30 preflight · #36 문단재생성 · #43 코레일승인
-- **🔶 데모(LLM 후속):** #10 파싱(케이스 반환) · #21 classify(규칙기반) — Gemini 붙이면 교체
-- **➖ MVP 제외 (5):** 인증 #1~#5 — 인증 없이 데모(역할 선택은 클라 처리)
-- **⛔ 보류 (1):** #17 job — 매칭이 sync라 불필요
+### 이번 갱신에서 추가된 라우트
 
-> **주의 2가지:**
-> ① **FE는 아직 API 미연동** — 화면은 전부 목 데이터. API는 seed 기반으로 실제 동작하지만 UI와 안 이어짐.
-> ② **LLM 라우트**(#22 조율 · #41 ESG · #32/#35/#37 보조금 서술)는 `GEMINI_API_KEY` 있으면 실제 Gemini, 없으면 규칙 폴백.
-> 남은 우선순위: 인증 #3 데모(P0) · #27 benefits 라우트(대시보드 라이브 연결) · #10 파싱 · FE↔API 연동.
+| Method | Path | 용도 |
+|---|---|---|
+| GET | `/api/matching/confirmations/latest` | 최근 확정 편성 (확정 화면 조회 전용화) |
+| GET | `/api/matching/confirmations/{groupId}` | 편성 번호로 조회 |
+| GET | `/api/settlement/report` | 정산 보고서 (csv·xlsx·pdf) |
+| POST | `/api/settlement/documents/{key}` | 증빙 제출 (파일명만 기록) |
+| GET | `/api/korail/clients/export` | 화주 영업 리스트 |
+| GET | `/api/korail/performance/report` | 수송 실적 리포트 |
+| POST | `/api/korail/assignments/{groupId}/approve` | #43 화차 배정 승인 (멱등) |
+
+### 데이터 출처 (전면 DB 전환 후)
+
+매칭 유니버스(역·노선·화주·공차·시드화물)와 실적 원장(trips·trip_members)을
+**Supabase 에서 읽습니다**. `/api/health` 의 `data.universe.source` ·
+`data.ledger.source` 로 확인할 수 있고, DB 가 없으면 번들 JSON 으로 폴백합니다.
 
 ---
+
 
 ## 1. 인증 · 계정 (5개) — ➖ MVP 제외
 

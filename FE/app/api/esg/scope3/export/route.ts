@@ -1,4 +1,4 @@
-import { EsgQueryError, resolveAggregate } from "@railhub/be/esg/query";
+import { EsgQueryError, resolveAggregateDb } from "@railhub/be/esg/query";
 import { buildExport, EXPORT_FORMATS, isExportFormat } from "@railhub/be/esg/scope3";
 
 /**
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const agg = resolveAggregate({
+    const agg = await resolveAggregateDb({
       period: params.get("period"),
       from: params.get("from"),
       to: params.get("to"),

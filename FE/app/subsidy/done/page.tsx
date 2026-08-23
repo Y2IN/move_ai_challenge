@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchEsgIndicators,
   generateEsgReport,
@@ -14,13 +14,15 @@ import {
 } from "@/src/lib/esg";
 import {
   applicationExportUrl,
-  createApplication,
   fetchApplication,
   fetchLatestApplication,
+  fetchRevisions,
   regenerateAll,
+  saveParagraph,
   regenerateParagraph,
   type ApplicationPayload,
   type ParagraphKey,
+  type Revision,
   type SubsidyExportFormat,
 } from "@/src/lib/subsidy";
 import { toApplyDocView } from "@/src/lib/subsidy-view";
@@ -36,6 +38,7 @@ import { ApplyDoneScreen } from "@/src/screens/ApplyDoneScreen";
 function SubsidyDoneInner() {
   // 06b 가 넘겨준 초안 id. 있으면 그걸 쓰고, 없을 때만 최근 초안을 찾는다.
   const requestedId = useSearchParams().get("id");
+  const router = useRouter();
 
   const [indicators, setIndicators] = useState<EsgIndicatorsResponse | null>(null);
   const [indicatorsError, setIndicatorsError] = useState<string | null>(null);
@@ -51,6 +54,20 @@ function SubsidyDoneInner() {
   const [keptUserEdits, setKeptUserEdits] = useState<ParagraphKey[]>([]);
   const applicationId = application?.applicationId ?? null;
 
+  // ── 변경 이력 (#38) ─────────────────────────────────────────
+  // AI 초안이 사람 손을 어떻게 거쳤는지가 이 제품의 심사 방어선입니다.
+  const [revisions, setRevisions] = useState<Revision[] | null>(null);
+  const [revisionsError, setRevisionsError] = useState<string | null>(null);
+
+  const openRevisions = useCallback(() => {
+    if (!applicationId) return;
+    setRevisions([]);
+    setRevisionsError(null);
+    fetchRevisions(applicationId)
+      .then((res) => setRevisions(res.revisions))
+      .catch((e: Error) => setRevisionsError(e.message));
+  }, [applicationId]);
+
   /**
    * 초안이 있으면 그대로 가져오고(#34→#33), 없을 때만 새로 만듭니다(#31).
    * 조회는 LLM 을 타지 않으므로 재진입이 싸집니다.
@@ -61,16 +78,20 @@ function SubsidyDoneInner() {
     setKeptUserEdits([]);
 
     // 06b 에서 넘어온 경우: 그 초안을 그대로 연다. 스트림이 이미 문단을 채워 뒀다.
+    // ⚠️ 초안이 없다고 **여기서 새로 만들지 않는다.** 예전에는 이 화면에 들어오기만
+    //    해도 문단 6개가 생성돼(LLM) 요금과 대기가 발생했다. 초안 발급은 06a 의
+    //    "보고서 초안 생성" 버튼이 한다.
     const resolve = requestedId
       ? fetchApplication(requestedId)
-      : fetchLatestApplication().then((latest) =>
-          latest.exists && latest.applicationId
-            ? fetchApplication(latest.applicationId)
-            : createApplication(),
-        );
+      : fetchLatestApplication().then((latest) => {
+          if (latest.exists && latest.applicationId) return fetchApplication(latest.applicationId);
+          router.replace("/subsidy/new");
+          return null;
+        });
 
     resolve
       .then((app) => {
+        if (!app) return;
         setApplication(app);
         // 06b 를 건너뛰고 들어와 문단이 비어 있으면(pending) 여기서 채운다.
         // 06b 를 정상으로 거쳤다면 이 경로는 타지 않는다.
@@ -82,7 +103,7 @@ function SubsidyDoneInner() {
         ).catch(() => { /* 실패해도 빈 서식은 이미 떠 있다 */ });
       })
       .catch((error: Error) => setDocError(error.message));
-  }, [requestedId]);
+  }, [requestedId, router]);
 
   /** #36 문단 하나만 재생성(↻). 응답 문단만 갈아 끼웁니다. */
   const regenerateDocParagraph = useCallback(
@@ -107,6 +128,40 @@ function SubsidyDoneInner() {
         })
         // 실패해도 기존 문서는 그대로 둡니다 — 배너로만 알립니다.
         .catch((error: Error) => setDocError(`문단 재생성 실패 — ${error.message}`))
+        .finally(() => setDocBusyKeys((prev) => prev.filter((k) => k !== key)));
+    },
+    [applicationId],
+  );
+
+  /**
+   * #37 문단 직접 편집 저장.
+   *
+   * 저장하면 서버가 출처를 `user` 로 내리고(우리가 보증하지 않는 문장) 변경 이력에
+   * 남깁니다. 응답에는 편집한 문단만 오므로 그 문단만 갈아 끼웁니다.
+   */
+  const editDocParagraph = useCallback(
+    (key: ParagraphKey, text: string) => {
+      if (!applicationId) return;
+      setDocBusyKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+      setDocError(null);
+
+      saveParagraph(applicationId, key, text)
+        .then((res) => {
+          setApplication((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  document: {
+                    ...prev.document,
+                    paragraphs: { ...prev.document.paragraphs, [key]: res.paragraph },
+                  },
+                }
+              : prev,
+          );
+          // 서버가 근거 없는 수치를 잡아냈으면 숨기지 않고 그대로 알립니다.
+          if (res.warning) setDocError(`저장했습니다 — ${res.warning}`);
+        })
+        .catch((error: Error) => setDocError(`문단 저장 실패 — ${error.message}`))
         .finally(() => setDocBusyKeys((prev) => prev.filter((k) => k !== key)));
     },
     [applicationId],
@@ -312,6 +367,7 @@ function SubsidyDoneInner() {
         keptUserEdits,
       }}
       onRegenerateParagraph={regenerateDocParagraph}
+      onEditParagraph={editDocParagraph}
       onRegenerateAllDoc={regenerateAllDoc}
       onRetryDoc={loadDoc}
       onExportDoc={exportDoc}
@@ -321,6 +377,10 @@ function SubsidyDoneInner() {
       onRegenerateAllEsg={generateAll}
       onRetryIndicators={loadIndicators}
       onExportScope3={exportScope3}
+      onOpenRevisions={applicationId ? openRevisions : undefined}
+      revisions={revisions}
+      revisionsError={revisionsError}
+      onCloseRevisions={() => setRevisions(null)}
     />
   );
 }

@@ -105,26 +105,94 @@ const ledger = ledgerRaw as unknown as { trips: Trip[] };
 
 // ── 유틸 ───────────────────────────────────────────────────────
 
-/** upsert 한 벌. 실패하면 즉시 죽는다 (부분 투입 상태로 성공을 보고하지 않기 위해). */
+/** upsert 한 번에 보내는 행 수. */
+const CHUNK = 500;
+
+/**
+ * upsert 한 벌. 실패하면 즉시 죽는다 (부분 투입 상태로 성공을 보고하지 않기 위해).
+ *
+ * `optional: true` 인 테이블·컬럼은 예외다 — schema.sql 을 아직 다시 적용하지
+ * 않았을 수 있는 신규 항목이라, 없으면 건너뛰고 무엇을 건너뛰었는지 알려 준다.
+ */
 async function push(
   table: string,
   rows: Record<string, unknown>[],
   onConflict: string,
+  optional = false,
 ): Promise<void> {
   if (!rows.length) {
     console.log(`  · ${table.padEnd(22)} 0건 (건너뜀)`);
     return;
   }
-  const { error } = await db.from(table).upsert(rows, { onConflict });
-  if (error) {
-    console.error(`\n✖ ${table} 투입 실패: ${error.message}`);
-    if (/does not exist|schema cache/i.test(error.message)) {
-      console.error("  → schema.sql 을 아직 적용하지 않은 것 같습니다.");
-      console.error("     Supabase 대시보드 → SQL Editor 에 BE/src/db/schema.sql 을 붙여넣고 Run 하세요.\n");
+
+  // 실적 원장은 로트가 수천 건입니다. 한 요청에 전부 실으면 본문이 MB 단위가 되어
+  // PostgREST 가 거절하거나 타임아웃으로 끊깁니다. 나눠 보냅니다.
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await db.from(table).upsert(rows.slice(i, i + CHUNK), { onConflict });
+    if (error) {
+      const missing = /does not exist|schema cache|column/i.test(error.message);
+      if (optional && missing) {
+        console.log(`  · ${table.padEnd(22)} 건너뜀 — ${error.message}`);
+        console.log("     (schema.sql 을 다시 적용하면 들어갑니다)");
+        return;
+      }
+      console.error(`\n✖ ${table} 투입 실패 (${i + 1}~${Math.min(i + CHUNK, rows.length)}행): ${error.message}`);
+      if (missing) {
+        console.error("  → schema.sql 을 아직 적용하지 않은 것 같습니다.");
+        console.error("     Supabase 대시보드 → SQL Editor 에 BE/src/db/schema.sql 을 붙여넣고 Run 하세요.\n");
+      }
+      process.exit(1);
     }
+  }
+  console.log(`  ✓ ${table.padEnd(22)} ${rows.length}건`);
+}
+
+/**
+ * 컬럼이 없을 수도 있는 upsert. 성공하면 true, 컬럼 부재로 실패하면 false.
+ * (그 외 오류는 push 와 같이 즉시 죽는다 — 조용히 넘기면 안 되는 실패다)
+ */
+async function tryPush(
+  table: string,
+  rows: Record<string, unknown>[],
+  onConflict: string,
+): Promise<boolean> {
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await db.from(table).upsert(rows.slice(i, i + CHUNK), { onConflict });
+    if (!error) continue;
+    if (/does not exist|schema cache|column/i.test(error.message)) {
+      console.log(`  · ${table.padEnd(22)} 일부 컬럼 건너뜀 — ${error.message}`);
+      console.log("     (schema.sql 을 다시 적용하면 들어갑니다)");
+      return false;
+    }
+    console.error(`\n✖ ${table} 투입 실패: ${error.message}`);
     process.exit(1);
   }
   console.log(`  ✓ ${table.padEnd(22)} ${rows.length}건`);
+  return true;
+}
+
+/**
+ * 이미 있는 행의 일부 컬럼만 갱신. 컬럼이 없으면 건너뛴다.
+ * (upsert 는 INSERT 경로 때문에 NOT NULL 컬럼을 전부 요구한다)
+ */
+async function tryUpdate(
+  table: string,
+  keyCol: string,
+  rows: { id: string; patch: Record<string, unknown> }[],
+): Promise<boolean> {
+  for (const { id, patch } of rows) {
+    const { error } = await db.from(table).update(patch).eq(keyCol, id);
+    if (!error) continue;
+    if (/does not exist|schema cache|column/i.test(error.message)) {
+      console.log(`  · ${table.padEnd(22)} 일부 컬럼 건너뜀 — ${error.message}`);
+      console.log("     (schema.sql 을 다시 적용하면 들어갑니다)");
+      return false;
+    }
+    console.error(`\n✖ ${table} 갱신 실패: ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`  ✓ ${table.padEnd(22)} ${rows.length}건 갱신`);
+  return true;
 }
 
 // ── 투입 ───────────────────────────────────────────────────────
@@ -161,18 +229,21 @@ async function main(): Promise<void> {
     "id",
   );
 
-  await push(
+  const shipperBase = seed.shippers.map((s) => ({
+    id: s.id,
+    name: s.name,
+    industry: s.industry,
+    company_grade: s.companyGrade,
+    esg_disclosure_required: s.esgDisclosureRequired,
+    contact: s.contact,
+  }));
+  // contract 는 나중에 추가된 컬럼이다. 없으면 빼고 한 번 더 밀어 본다.
+  const withContract = await tryPush(
     "shippers",
-    seed.shippers.map((s) => ({
-      id: s.id,
-      name: s.name,
-      industry: s.industry,
-      company_grade: s.companyGrade,
-      esg_disclosure_required: s.esgDisclosureRequired,
-      contact: s.contact,
-    })),
+    seed.shippers.map((s, i) => ({ ...shipperBase[i], contract: s.contract })),
     "id",
   );
+  if (!withContract) await push("shippers", shipperBase, "id");
 
   await push(
     "empty_wagons",
@@ -191,9 +262,18 @@ async function main(): Promise<void> {
       arrival_date: w.arrival.date,
       empty_reason: w.emptyReason,
       handling: w.handling,
+      // demoScenario 는 payload 안에도 있다 — 로더는 payload 를 읽으므로
+      // 컬럼이 없어도 시나리오 보존이 동작한다.
       payload: w,
     })),
     "id",
+  );
+  // demo_scenario 만 따로 채운다. upsert 로 보내면 INSERT 경로가 먼저 평가돼
+  // label 같은 NOT NULL 컬럼이 비어 제약에 걸린다 — 이미 있는 행이므로 update 다.
+  await tryUpdate(
+    "empty_wagons",
+    "id",
+    seed.emptyWagons.map((w) => ({ id: w.id, patch: { demo_scenario: w.demoScenario ?? false } })),
   );
 
   await push(
@@ -211,6 +291,18 @@ async function main(): Promise<void> {
       payload: s,
     })),
     "id",
+  );
+
+  await push(
+    "settlement_documents",
+    seed.settlementDocuments.map((d) => ({
+      key: d.key,
+      name: d.name,
+      required: d.required,
+      file: null,
+    })),
+    "key",
+    true,
   );
 
   console.log("\n확정 수송 실적 원장 (ledger.json)");

@@ -9,6 +9,7 @@ interface SignupScreenProps {
 /** 02a — 회원가입. 역할을 먼저 고르면 입력 항목과 CTA 문구가 바뀐다 */
 export function SignupScreen({ onSubmit }: SignupScreenProps) {
   const [role, setRole] = useState<Role>('corp');
+  // 체크를 풀면 실제로 가입 버튼이 잠깁니다 (예전에는 값이 어디에도 쓰이지 않았습니다).
   const [agreed, setAgreed] = useState(true);
   const org = orgField[role];
 
@@ -16,8 +17,11 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
     <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
       {/* 높이 고정 없이 내용만큼 — 카드 안에서 스크롤되지 않게 */}
       <div className="flex w-[620px] flex-col gap-[22px] rounded-[20px] bg-white px-12 pb-10 pt-12 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+        {/* 실제로 계정이 만들어지지 않는다는 사실과 버튼 동작을 일치시킵니다.
+            예전 문구("가입 불가")는 버튼이 정상 진입시켜 서로 모순이었습니다. */}
         <div className="rounded-xl bg-[#FFFBF2] px-4 py-3.5 text-[15px] font-semibold text-[#B45309]">
-          데모 버전에서는 회원가입이 불가합니다.
+          이번 버전은 계정 없이 동작합니다 — 가입 정보는 저장되지 않고, 바로 데모 화면으로
+          들어갑니다.
         </div>
 
         <div className="flex flex-col gap-2">
@@ -69,8 +73,9 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
 
         <button
           type="button"
+          disabled={!agreed}
           onClick={() => onSubmit?.(role)}
-          className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA]"
+          className="h-14 rounded-[14px] bg-[#3182F6] text-[17px] font-bold text-white transition-colors hover:bg-[#1B64DA] disabled:bg-[#C4CBD4]"
         >
           {signupCta[role]}
         </button>

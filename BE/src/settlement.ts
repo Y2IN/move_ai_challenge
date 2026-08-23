@@ -13,12 +13,22 @@
  */
 
 import { computeBenefit, computeCost, computeSubsidy } from "./calc";
-import { aggregate, customPeriod, ledger, legInput, railDistanceKm } from "./esg/period";
+import { loadLedger } from "./db/ledger";
+import { listUploads, mergeUploads } from "./db/settlement-docs";
+import { loadUniverse } from "./db/universe";
+import { aggregate, customPeriod, legInput, railDistanceKm } from "./esg/period";
+import type { LedgerData } from "./esg/types";
 import { SUBSIDY } from "./constants";
-import { seed } from "./seed";
 import type { SeedData, SettlementDocument, TransportContract } from "./types";
 
+/** 화면이 고른 협약 번호가 마스터에 없을 때 — 라우트가 400 으로 바꿉니다. */
+export class UnknownContractError extends Error {}
+
 const DAY_MS = 86_400_000;
+
+/** 응답에 싣는 실적 명세 행 수 상한. 화면이 펴는 행 수(8)보다 넉넉히 둡니다. */
+const TRIP_ROWS_LIMIT = 20;
+
 const round = (n: number) => Math.round(n);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -97,10 +107,13 @@ export interface SettlementResponse {
   contract: TransportContract & { status: string };
   achievement: AchievementView;
   recalc: RecalcView;
+  /** 앞쪽 일부만 담깁니다 (최대 `TRIP_ROWS_LIMIT` 행). 전체 규모는 `tripSummary` 를 보십시오. */
   trips: TripRow[];
   /**
    * 명세는 **화주 단위**(편성 × 화주)입니다 — 운송장이 화주별로 발행되므로
    * 증빙도 그 단위입니다. 편성 수와 다르니 둘 다 실어 보냅니다.
+   *
+   * `trips` 는 잘려 있으므로 접힌 줄("외 N건")의 건수·물량은 **여기서** 빼서 씁니다.
    */
   tripSummary: { legCount: number; tripCount: number; totalTon: number };
   history: ContractPerformance[];
@@ -120,7 +133,7 @@ const days = (from: string, to: string) =>
  * 평균으로 뭉개면 화주별 실적과 안 맞는 금액이 나옵니다. `aggregate()` 가
  * 편익을 건별로 더하는 것과 같은 이유입니다.
  */
-function recalcOver(from: string, to: string): {
+function recalcOver(from: string, to: string, source: LedgerData, data: SeedData): {
   additionalCostKrw: number;
   benefitCapKrw: number;
   subsidyKrw: number;
@@ -131,9 +144,9 @@ function recalcOver(from: string, to: string): {
   let additionalCostKrw = 0;
   let benefitCapKrw = 0;
 
-  for (const trip of ledger.trips) {
+  for (const trip of source.trips) {
     if (trip.date < from || trip.date > to) continue;
-    const railKm = railDistanceKm(trip);
+    const railKm = railDistanceKm(trip, data);
     for (const member of trip.members) {
       const input = legInput(trip, member, railKm);
       const subsidy = computeSubsidy(computeCost(input), computeBenefit(input));
@@ -171,9 +184,11 @@ function recalcOver(from: string, to: string): {
 function performanceOf(
   contract: TransportContract,
   now: Date,
+  source: LedgerData,
+  data: SeedData,
 ): ContractPerformance {
-  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo) });
-  const recalc = recalcOver(contract.periodFrom, contract.periodTo);
+  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo), ledger: source, data });
+  const recalc = recalcOver(contract.periodFrom, contract.periodTo, source, data);
   const ongoing = iso(now) <= contract.periodTo;
 
   return {
@@ -196,20 +211,34 @@ function performanceOf(
   };
 }
 
-export function getSettlement(
+export async function getSettlement(
   now: Date = new Date(),
-  data: SeedData = seed,
-): SettlementResponse {
+  seedData?: SeedData,
+  contractNo?: string | null,
+): Promise<SettlementResponse> {
+  const [loaded, source, uploads] = await Promise.all([loadUniverse(), loadLedger(), listUploads()]);
+  const data = seedData ?? loaded;
   const asOf = iso(now);
 
   // 진행 중인 협약이 정산 대상. 없으면 가장 최근에 끝난 것.
   const contracts = [...data.contracts].sort((a, b) => a.periodFrom.localeCompare(b.periodFrom));
+  // 화면에서 협약을 고르면 그 협약으로 정산을 다시 그린다. 모르는 번호는 400 이다
+  // (조용히 다른 협약을 보여주면 사용자는 자기가 고른 걸 보고 있다고 믿는다).
+  const selected = contractNo?.trim()
+    ? contracts.find((c) => c.no === contractNo.trim())
+    : undefined;
+  if (contractNo?.trim() && !selected) {
+    throw new UnknownContractError(
+      `알 수 없는 협약입니다: ${contractNo} (가능한 값: ${contracts.map((c) => c.no).join(", ")})`,
+    );
+  }
   const contract =
+    selected ??
     contracts.find((c) => c.periodFrom <= asOf && asOf <= c.periodTo) ??
     contracts[contracts.length - 1];
 
-  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo) });
-  const recalc = recalcOver(contract.periodFrom, contract.periodTo);
+  const agg = aggregate({ period: customPeriod(contract.periodFrom, contract.periodTo), ledger: source, data });
+  const recalc = recalcOver(contract.periodFrom, contract.periodTo, source, data);
 
   // ── 달성률 vs 경과율 ────────────────────────────────────────
   // "73% 이행" 만으로는 잘 가고 있는지 알 수 없습니다. 기간이 얼마나 지났는지와
@@ -236,9 +265,17 @@ export function getSettlement(
   };
 
   // ── 실적 명세 ───────────────────────────────────────────────
+  //
+  // **앞쪽 일부만 보냅니다.** 협약 한 건의 실적은 수천 건이고 화면은 그중 8행만
+  // 펴고 나머지는 "외 N건 · 합계"로 접습니다. 전건을 실어 보내면 화면에 안 그릴
+  // 수백 KB를 매번 내려보내게 됩니다. 접힌 줄에 필요한 건수·물량은 `tripSummary`
+  // 가 이미 전건 기준으로 담고 있으므로 화면은 그걸로 계산합니다.
+  //
+  // 전건 명세가 필요한 곳은 증빙 제출이고, 그건 Scope 3 내보내기(#42)의 몫입니다.
   const trips: TripRow[] = agg.rows
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, TRIP_ROWS_LIMIT)
     .map((row, i) => ({
       no: i + 1,
       tripId: row.tripId,
@@ -250,7 +287,8 @@ export function getSettlement(
     }));
 
   // ── 증빙 ────────────────────────────────────────────────────
-  const documents: DocumentView[] = data.settlementDocuments.map((doc) => ({
+  // 업로드된 서류를 시드 목록에 덧입힌다 (업로드는 파일명·시각만 기록한다).
+  const documents: DocumentView[] = mergeUploads(data.settlementDocuments, uploads).map((doc) => ({
     ...doc,
     ok: !doc.required || doc.file !== null,
   }));
@@ -276,8 +314,9 @@ export function getSettlement(
       formulaNote: `${SUBSIDY.legalBasis} · min(A, B)`,
     },
     trips,
-    tripSummary: { legCount: trips.length, tripCount: agg.tripCount, totalTon: agg.totalTon },
-    history: contracts.map((c) => performanceOf(c, now)),
+    // `trips.length` 가 아니라 집계의 전건 수입니다 — trips 는 잘려 있습니다.
+    tripSummary: { legCount: agg.legCount, tripCount: agg.tripCount, totalTon: agg.totalTon },
+    history: contracts.map((c) => performanceOf(c, now, source, data)),
     documents,
     // 서류명 뒤에 조사를 붙이지 않습니다 — 받침에 따라 을/를이 갈리는데,
     // 서류가 추가될 때마다 그걸 신경 쓰게 됩니다.

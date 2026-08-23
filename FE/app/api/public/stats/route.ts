@@ -4,8 +4,8 @@ import { getPublicStats } from "@railhub/be/public";
 export const revalidate = 60;
 
 /** GET /api/public/stats */
-export function GET() {
-  return Response.json(getPublicStats(), {
+export async function GET() {
+  return Response.json(await getPublicStats(), {
     headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
   });
 }
