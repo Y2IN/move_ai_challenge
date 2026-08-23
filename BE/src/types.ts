@@ -419,7 +419,14 @@ export interface MatchRow {
  * 단 `departAt` 은 예외로 목록에도 싣는다. 공차 관리 화면(04b)의 "출발 예정" 열이
  * 이 값을 쓰는데, 행마다 상세를 따로 부르게 하면 열 전체가 "…" 로 남는다.
  */
-export type MatchSummary = Omit<MatchRow, "detail"> & { departAt: string };
+export type MatchSummary = Omit<MatchRow, "detail"> & {
+  departAt: string;
+  /**
+   * 코레일 배차 승인 상태 (#43). 시연용 예시 행은 undefined —
+   * 실제로 확정된 편성만 승인 대상이다.
+   */
+  approval?: { status: "confirmed" | "approved"; approvedAt: string | null };
+};
 
 /** 시드의 대시보드 큐레이션 데이터 (분기 집계) */
 export interface DashboardSeed {

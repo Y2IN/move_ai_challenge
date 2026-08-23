@@ -6,6 +6,7 @@ import { AsyncSection, CardSkeleton, SkeletonGrid } from '../components/AsyncSec
 import { LoadBar, StatusBadge } from '../components/StatusBadge';
 import { StatCard } from '../components/StatCard';
 import {
+  approveAssignment,
   fetchDashboard,
   fetchMatch,
   fetchMatches,
@@ -40,6 +41,52 @@ function pick(row: MatchRowData, keys: string[]) {
     if (hit) return hit.v;
   }
   return '-';
+}
+
+/**
+ * #43 화차 배정 승인 — 코레일 담당자가 이 편성으로 화차를 내주겠다고 확정하는 자리.
+ *
+ * 확정(화주 의사)과 승인(코레일 배차)은 다른 사건이라 상태를 나눠 보여줍니다.
+ * 시연용 예시 행에는 `approval` 이 없어 이 줄이 뜨지 않습니다.
+ */
+function ApprovalBar({ row, onApproved }: { row: MatchRowData; onApproved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const approved = row.approval?.status === 'approved';
+
+  return (
+    <div className="flex items-center justify-between gap-4 px-5 pb-4">
+      {approved ? (
+        <span className="text-sm font-semibold text-[#12A87A]">
+          배차 승인 완료
+          {row.approval?.approvedAt ? ` · ${row.approval.approvedAt.slice(0, 10)}` : ''}
+        </span>
+      ) : (
+        <span className="text-sm text-[#6B7684]">
+          화주가 확정한 편성입니다. 배차를 승인하면 화차가 이 편성에 배정됩니다.
+        </span>
+      )}
+      {error && <span className="text-sm text-[#D22030]">{error}</span>}
+      <button
+        type="button"
+        disabled={approved || busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await approveAssignment(row.id);
+            onApproved();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : '승인하지 못했습니다.');
+            setBusy(false);
+          }
+        }}
+        className="h-10 flex-none rounded-[10px] bg-[#0B1220] px-4 text-sm font-bold text-white transition-colors hover:bg-[#191F28] disabled:bg-[#E5E8EB] disabled:text-[#B0B8C1]"
+      >
+        {approved ? '승인됨' : busy ? '승인 중…' : '배차 승인'}
+      </button>
+    </div>
+  );
 }
 
 /** 공차 쪽 집계 — 최소 적재 기준·잔여 용량·부족 물량의 출처 */
@@ -236,6 +283,10 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
 
                             <span className="text-center text-[15px] text-[#B0B8C1]">{open ? '⌃' : '⌄'}</span>
                           </button>
+
+                          {row.approval && (
+                            <ApprovalBar row={row} onApproved={matches.reload} />
+                          )}
 
                           {under && minPct != null && (
                             <div className="flex items-center justify-between gap-4 px-5 pb-4">

@@ -152,7 +152,9 @@ export interface MatchesResult {
 }
 
 /** 실제로 확정된 편성을 목록 행으로. 없으면 null. */
-async function confirmedRow(data: SeedData): Promise<MatchRow | null> {
+async function confirmedRow(
+  data: SeedData,
+): Promise<(MatchRow & { approval: MatchSummary["approval"] }) | null> {
   const c = await findLatestConfirmation();
   if (!c) return null;
 
@@ -174,6 +176,7 @@ async function confirmedRow(data: SeedData): Promise<MatchRow | null> {
     status: "group",
     savingPct: roadOnly > 0 ? Math.round((saving / roadOnly) * 100) : 0,
     savingKrw: Math.round(saving),
+    approval: { status: c.status, approvedAt: c.approvedAt ?? null },
     detail: {
       partners,
       departAt: `${c.wagon.departure.date}T${c.wagon.departure.time}:00+09:00`,
@@ -214,6 +217,7 @@ export async function getMatch(id: string, seedData?: SeedData): Promise<MatchRo
 }
 
 /** 목록 행에서 상세(detail)를 떼되, 출발 예정 시각은 남긴다 (04b "출발 예정" 열). */
-function toSummary({ detail, ...summary }: MatchRow): MatchSummary {
+function toSummary(row: MatchRow & { approval?: MatchSummary["approval"] }): MatchSummary {
+  const { detail, ...summary } = row;
   return { ...summary, departAt: detail.departAt };
 }

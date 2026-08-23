@@ -22,12 +22,17 @@ export interface ApplyDocumentProps {
   doc: ApplyDocView;
   /** #36 문단 단위 재생성 */
   onRegenerate?: (key: ParagraphKey) => void;
+  /**
+   * #37 문단 직접 편집 — 저장하면 출처가 `user` 로 내려가고 변경 이력(#38)에 남습니다.
+   * 생략하면 편집 버튼이 뜨지 않습니다 (빈 서식 미리보기처럼 읽기 전용일 때).
+   */
+  onEdit?: (key: ParagraphKey, text: string) => void;
   /** 재생성 중인 문단 — 해당 블록만 잠깁니다 */
   busyKeys?: ParagraphKey[];
 }
 
 /** 06c 탭 1 — 전환교통 지원사업 사업계획서 (별지 제3호 서식) */
-export function ApplyDocument({ doc, onRegenerate, busyKeys = [] }: ApplyDocumentProps) {
+export function ApplyDocument({ doc, onRegenerate, onEdit, busyKeys = [] }: ApplyDocumentProps) {
   /** 문단 블록. 서식의 각 장 아래에 붙습니다. */
   const para = (key: ParagraphKey, className: string) => {
     const p = doc.paragraphs[key];
@@ -39,6 +44,7 @@ export function ApplyDocument({ doc, onRegenerate, busyKeys = [] }: ApplyDocumen
         label={p.label}
         busy={busyKeys.includes(key)}
         onRegenerate={onRegenerate ? () => onRegenerate(key) : undefined}
+        onEdit={onEdit ? (next) => onEdit(key, next) : undefined}
       />
     );
   };

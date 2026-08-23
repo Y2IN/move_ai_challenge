@@ -13,7 +13,7 @@ import type {
   MatchSummary,
   Persona,
 } from '@railhub/be/types';
-import { getJson } from './api';
+import { getJson, postJson } from './api';
 import { formatCo2, formatDateTime, formatKrw, formatNumber } from './format';
 
 export type { DashboardResponse, KpiCard, MatchRow, MatchSummary, Persona };
@@ -39,6 +39,19 @@ export function fetchMatches(pageSize = 20): Promise<MatchesResponse> {
 }
 
 /** #9 GET /api/matches/{id} — 행 펼침 상세 (lazy) */
+/**
+ * #43 화차 배정 승인 (코레일 담당자).
+ *
+ * 화주의 "확정"과 코레일의 "승인"은 다른 사건입니다 — 확정은 화주가 이 편성으로
+ * 가겠다는 의사, 승인은 코레일이 그 화차를 실제로 내주겠다는 배차 결정입니다.
+ * 연타해도 같은 결과입니다 (서버가 멱등 처리).
+ */
+export function approveAssignment(
+  groupId: string,
+): Promise<{ confirmation: { groupId: string; status: 'confirmed' | 'approved'; approvedAt: string | null }; alreadyApproved: boolean }> {
+  return postJson(`/api/korail/assignments/${encodeURIComponent(groupId)}/approve`, {});
+}
+
 export function fetchMatch(id: string): Promise<MatchRow> {
   return getJson<MatchRow>(`/api/matches/${encodeURIComponent(id)}`);
 }
@@ -102,6 +115,8 @@ export interface MatchRowData {
   tone: MatchTone;
   /** 출발 예정 시각 — 목록(#8)에 함께 옵니다 (펼치기 전에도 열이 채워집니다) */
   departAt: string;
+  /** 코레일 배차 승인 상태 (#43). 시연용 예시 행은 undefined — 승인 대상이 아닙니다 */
+  approval?: { status: 'confirmed' | 'approved'; approvedAt: string | null };
   /** #9 로 받아 온 상세. 아직 안 받았으면 null (펼칠 때 채웁니다) */
   detail: MatchDetail[] | null;
 }
@@ -123,6 +138,7 @@ export function toMatchRowData(m: MatchSummary, persona: Persona): MatchRowData 
     saving: persona === 'corp' ? `-${m.savingPct}%` : `+${formatKrw(m.savingKrw)}`,
     tone: m.status,
     departAt: m.departAt,
+    approval: m.approval,
     detail: null,
   };
 }

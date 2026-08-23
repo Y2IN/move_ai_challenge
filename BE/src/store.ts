@@ -32,6 +32,7 @@
 import { isDbEnabled, nextSeq } from "./db/client";
 import { loadUniverse } from "./db/universe";
 import {
+  approveConfirmationRow,
   cancelNegotiationRow,
   clearAll as clearDb,
   deleteShipmentRecord,
@@ -45,6 +46,7 @@ import {
   insertShipment,
   listShipmentRecords,
   updateShipmentRecord,
+  type ConfirmationStatus,
 } from "./db/shipments";
 import { DEFAULT_FLEX_DAYS, match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
@@ -294,7 +296,11 @@ export async function clearShipments(): Promise<void> {
 
 export interface Confirmation {
   groupId: string;
-  status: "confirmed";
+  /** 확정(화주) → 승인(코레일 배차 담당자, #43) */
+  status: ConfirmationStatus;
+  /** 코레일이 배정을 승인한 시각. 미승인이면 null */
+  approvedAt?: string | null;
+  approvedBy?: string | null;
   /** 멱등 키 — 같은 키로 다시 확정 요청이 오면 새로 만들지 않고 이 편성을 돌려준다 */
   clientKey?: string | null;
   wagon: EmptyWagon;
@@ -376,6 +382,43 @@ export async function getConfirmation(groupId: string): Promise<Confirmation | n
   const fromDb = await findConfirmation(groupId);
   if (fromDb) return fromDb;
   return confirmations.find((c) => c.groupId === groupId) ?? null;
+}
+
+export type ApproveResult =
+  | { status: "approved"; confirmation: Confirmation }
+  | { status: "notFound" }
+  | { status: "alreadyApproved"; confirmation: Confirmation };
+
+/**
+ * 코레일 배차 승인 (#43).
+ *
+ * 화주 쪽 "확정"과 코레일 쪽 "승인"은 다른 사건이다. 확정은 화주가 이 편성으로
+ * 가겠다는 의사이고, 승인은 코레일이 그 화차를 실제로 내주겠다는 배차 결정이다.
+ * 둘을 한 상태로 뭉개면 화면에서 "누가 무엇을 기다리는 중인지" 를 못 보여준다.
+ */
+export async function approveConfirmation(
+  groupId: string,
+  approvedBy = "코레일 배차",
+): Promise<ApproveResult> {
+  const current = await getConfirmation(groupId);
+  if (!current) return { status: "notFound" };
+  if (current.status === "approved") return { status: "alreadyApproved", confirmation: current };
+
+  const fromDb = await approveConfirmationRow(groupId, approvedBy);
+  if (fromDb === "notFound") return { status: "notFound" };
+
+  const approved: Confirmation = fromDb ?? {
+    ...current,
+    status: "approved",
+    approvedAt: new Date().toISOString(),
+    approvedBy,
+  };
+
+  // 미러도 맞춰 둔다 (DB 가 꺼져 있어도 이 인스턴스에서는 승인 상태가 보인다)
+  const mirror = confirmations.find((c) => c.groupId === groupId);
+  if (mirror) Object.assign(mirror, approved);
+
+  return { status: "approved", confirmation: approved };
 }
 
 // ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────

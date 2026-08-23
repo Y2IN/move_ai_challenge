@@ -58,6 +58,8 @@ export interface DocTabState {
 interface ApplyDoneScreenProps {
   doc: DocTabState;
   onRegenerateParagraph: (key: ParagraphKey) => void;
+  /** #37 문단 직접 편집 — 저장하면 출처가 user 로 내려가고 이력에 남습니다 */
+  onEditParagraph: (key: ParagraphKey, text: string) => void;
   onRegenerateAllDoc: () => void;
   onRetryDoc: () => void;
   onExportDoc: (format: SubsidyExportFormat) => void;
@@ -141,8 +143,12 @@ function RevisionPanel({
 function DocTab({
   doc,
   onRegenerateParagraph,
+  onEditParagraph,
   onRetryDoc,
-}: Pick<ApplyDoneScreenProps, "doc" | "onRegenerateParagraph" | "onRetryDoc">) {
+}: Pick<
+  ApplyDoneScreenProps,
+  "doc" | "onRegenerateParagraph" | "onEditParagraph" | "onRetryDoc"
+>) {
   // 문서를 아예 못 받은 경우에만 통째로 에러 화면입니다. 문단 재생성 실패처럼
   // 이미 그려진 문서가 있는 실패는 아래에서 배너로만 알립니다 — 문서를 지우면 안 됩니다.
   if (doc.error && !doc.doc) {
@@ -203,6 +209,7 @@ function DocTab({
         doc={doc.doc}
         busyKeys={doc.busyKeys}
         onRegenerate={doc.applicationId ? onRegenerateParagraph : undefined}
+        onEdit={doc.applicationId ? onEditParagraph : undefined}
       />
     </div>
   );
@@ -312,6 +319,7 @@ function PanelCard({
 export function ApplyDoneScreen({
   doc,
   onRegenerateParagraph,
+  onEditParagraph,
   onRegenerateAllDoc,
   onRetryDoc,
   onExportDoc,
@@ -408,6 +416,7 @@ export function ApplyDoneScreen({
             <DocTab
               doc={doc}
               onRegenerateParagraph={onRegenerateParagraph}
+              onEditParagraph={onEditParagraph}
               onRetryDoc={onRetryDoc}
             />
           ) : (

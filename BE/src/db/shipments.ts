@@ -136,9 +136,16 @@ export async function deleteShipmentRecord(
 
 // ── 편성 확정 ──────────────────────────────────────────────────
 
+/** 편성 상태 — 확정(화주 측) → 승인(코레일 배차 담당자) */
+export type ConfirmationStatus = "confirmed" | "approved";
+
 export interface ConfirmationRecord {
   groupId: string;
-  status: "confirmed";
+  status: ConfirmationStatus;
+  /** 코레일이 배정을 승인한 시각. 미승인이면 null */
+  approvedAt?: string | null;
+  /** 승인한 담당자 표기 */
+  approvedBy?: string | null;
   /** 멱등 키 — 같은 키의 확정 요청은 기존 편성을 재사용한다 */
   clientKey?: string | null;
   wagon: EmptyWagon;
@@ -185,7 +192,9 @@ export async function insertConfirmation(
 
 interface ConfirmationRow {
   group_id: string;
-  status: "confirmed";
+  status: ConfirmationStatus;
+  approved_at?: string | null;
+  approved_by?: string | null;
   wagon: EmptyWagon;
   members: MatchCandidate[];
   total_ton: number;
@@ -198,10 +207,51 @@ interface ConfirmationRow {
 const CONFIRMATION_COLS =
   "group_id, status, wagon, members, total_ton, capacity_ton, load_factor, confirmed_at, calc";
 
+/**
+ * 코레일 배차 승인 (api_list #43).
+ *
+ * `status` 는 기존 컬럼이라 스키마 변경 없이 동작한다. 승인 시각·담당자 컬럼은
+ * 나중에 추가된 것이라 없으면 상태만 바꾼다 (승인 자체는 되어야 한다).
+ */
+export async function approveConfirmationRow(
+  groupId: string,
+  approvedBy: string,
+): Promise<ConfirmationRecord | "notFound" | null> {
+  return tryDb("approveConfirmation", async (db) => {
+    const at = new Date().toISOString();
+
+    const full = await db
+      .from("confirmations")
+      .update({ status: "approved", approved_at: at, approved_by: approvedBy })
+      .eq("group_id", groupId)
+      .select(CONFIRMATION_COLS);
+
+    if (!full.error) {
+      const rows = full.data as ConfirmationRow[];
+      return rows.length ? toConfirmation(rows[0]) : ("notFound" as const);
+    }
+    if (!/approved_at|approved_by/i.test(full.error.message)) {
+      throw new Error(full.error.message);
+    }
+
+    const rows = unwrap(
+      await db
+        .from("confirmations")
+        .update({ status: "approved" })
+        .eq("group_id", groupId)
+        .select(CONFIRMATION_COLS),
+    ) as ConfirmationRow[];
+    if (!rows.length) return "notFound" as const;
+    return { ...toConfirmation(rows[0]), approvedAt: at, approvedBy };
+  });
+}
+
 function toConfirmation(r: ConfirmationRow): ConfirmationRecord {
   return {
     groupId: r.group_id,
     status: r.status,
+    approvedAt: r.approved_at ?? null,
+    approvedBy: r.approved_by ?? null,
     wagon: r.wagon,
     members: r.members,
     totalTon: r.total_ton,

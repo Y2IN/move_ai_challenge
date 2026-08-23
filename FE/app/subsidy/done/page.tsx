@@ -18,6 +18,7 @@ import {
   fetchLatestApplication,
   fetchRevisions,
   regenerateAll,
+  saveParagraph,
   regenerateParagraph,
   type ApplicationPayload,
   type ParagraphKey,
@@ -127,6 +128,40 @@ function SubsidyDoneInner() {
         })
         // 실패해도 기존 문서는 그대로 둡니다 — 배너로만 알립니다.
         .catch((error: Error) => setDocError(`문단 재생성 실패 — ${error.message}`))
+        .finally(() => setDocBusyKeys((prev) => prev.filter((k) => k !== key)));
+    },
+    [applicationId],
+  );
+
+  /**
+   * #37 문단 직접 편집 저장.
+   *
+   * 저장하면 서버가 출처를 `user` 로 내리고(우리가 보증하지 않는 문장) 변경 이력에
+   * 남깁니다. 응답에는 편집한 문단만 오므로 그 문단만 갈아 끼웁니다.
+   */
+  const editDocParagraph = useCallback(
+    (key: ParagraphKey, text: string) => {
+      if (!applicationId) return;
+      setDocBusyKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
+      setDocError(null);
+
+      saveParagraph(applicationId, key, text)
+        .then((res) => {
+          setApplication((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  document: {
+                    ...prev.document,
+                    paragraphs: { ...prev.document.paragraphs, [key]: res.paragraph },
+                  },
+                }
+              : prev,
+          );
+          // 서버가 근거 없는 수치를 잡아냈으면 숨기지 않고 그대로 알립니다.
+          if (res.warning) setDocError(`저장했습니다 — ${res.warning}`);
+        })
+        .catch((error: Error) => setDocError(`문단 저장 실패 — ${error.message}`))
         .finally(() => setDocBusyKeys((prev) => prev.filter((k) => k !== key)));
     },
     [applicationId],
@@ -332,6 +367,7 @@ function SubsidyDoneInner() {
         keptUserEdits,
       }}
       onRegenerateParagraph={regenerateDocParagraph}
+      onEditParagraph={editDocParagraph}
       onRegenerateAllDoc={regenerateAllDoc}
       onRetryDoc={loadDoc}
       onExportDoc={exportDoc}
