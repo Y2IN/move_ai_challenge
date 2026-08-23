@@ -138,7 +138,13 @@ export function openNegotiationStream(
 export interface Confirmation {
   /** GRP-NNN — 확정할 때 발급됩니다 */
   groupId: string;
-  status: 'confirmed';
+  /**
+   * 화주의 '확정'과 코레일의 '승인'(#43)은 다른 사건입니다.
+   * 확정은 이 편성으로 가겠다는 의사, 승인은 화차를 실제로 내주겠다는 배차 결정입니다.
+   */
+  status: 'confirmed' | 'approved';
+  approvedAt?: string | null;
+  approvedBy?: string | null;
   wagon: {
     id: string;
     label: string;

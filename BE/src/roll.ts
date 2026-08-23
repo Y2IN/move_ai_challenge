@@ -60,15 +60,17 @@ function isSunday(ymd: string): boolean {
 }
 
 function rollWagon(w: EmptyWagon, delta: number): EmptyWagon {
-  let dep = shiftYmd(w.departure.date, delta);
-  let arr = shiftYmd(w.arrival.date, delta);
-  if (isSunday(dep)) {
-    dep = shiftYmd(dep, 1);
-    arr = shiftYmd(arr, 1);
-  }
+  // 일요일 보정은 **화차 전체를 같은 폭으로** 민다. 예전에는 출발·도착만 +1 하고
+  // cutoffAt 은 그대로 둬서 마감→출발 간격이 시드 설계보다 하루 넓어졌고,
+  // 도착만 밀린 탓에 화물의 도착기한 검사가 경계에서 흔들렸다.
+  const sundayShift = isSunday(shiftYmd(w.departure.date, delta)) ? 1 : 0;
+  const total = delta + sundayShift;
+
+  const dep = shiftYmd(w.departure.date, total);
+  const arr = shiftYmd(w.arrival.date, total);
   return {
     ...w,
-    cutoffAt: shiftIso(w.cutoffAt, delta),
+    cutoffAt: shiftIso(w.cutoffAt, total),
     departure: { ...w.departure, date: dep, dayOfWeek: dayOfWeek(dep) },
     arrival: { ...w.arrival, date: arr, dayOfWeek: dayOfWeek(arr) },
   };
@@ -96,7 +98,11 @@ function rollShipment(s: Shipment, delta: number): Shipment {
 /**
  * 시나리오 날짜를 오늘 기준으로 민 복사본을 돌려준다.
  * `meta.dateAnchor` 가 없으면 그대로 돌려준다 (롤링 미적용 데이터 보호).
- * 결과의 dateAnchor 는 오늘로 갱신된다 — 두 번 적용해도 같은 결과(멱등).
+ *
+ * ⚠️ **롤링된 값을 다시 롤링하지 마라.** 결과의 dateAnchor 가 오늘로 갱신되므로
+ *    두 번째 호출은 delta 0 이 되어 아무것도 안 밀고(그래서 무해해 보이지만),
+ *    일요일 보정은 그 사이 한 번 더 걸릴 수 있어 하루씩 누적된다. 항상
+ *    `rawSeed`(롤링 전 원본)에서 한 번만 굴린다 — seed.ts·db/universe.ts 참고.
  */
 export function rollDemoDates(data: SeedData, today: Date = new Date()): SeedData {
   const anchor = data.meta?.dateAnchor;

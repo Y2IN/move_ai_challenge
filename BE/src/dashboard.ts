@@ -15,8 +15,12 @@
  */
 
 import { loadLedger } from "./db/ledger";
-import { findLatestConfirmation } from "./db/shipments";
+
 import { loadUniverse } from "./db/universe";
+// DB 전용 findLatestConfirmation 이 아니라 store 의 진입점을 쓴다 —
+// 폴백 모드(환경변수 없음·DB 잠듦)에서 확정 편성이 목록에서 통째로 사라져
+// 코레일 배차 승인(#43) 버튼이 영영 안 뜨던 원인이다. report/source.ts 와 같은 경로다.
+import { latestConfirmation } from "./store";
 import { aggregateWith } from "./esg/query";
 import type { EsgAggregate } from "./esg/types";
 import type {
@@ -155,7 +159,7 @@ export interface MatchesResult {
 async function confirmedRow(
   data: SeedData,
 ): Promise<(MatchRow & { approval: MatchSummary["approval"] }) | null> {
-  const c = await findLatestConfirmation();
+  const c = await latestConfirmation();
   if (!c) return null;
 
   const partners = c.members.map((m) => m.shipperName);

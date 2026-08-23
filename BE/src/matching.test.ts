@@ -48,10 +48,39 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   const hours = (new Date(a17.cutoffAt).getTime() - NOW.getTime()) / 3_600_000;
   ok("롤링 후 A17 마감이 미래다", hours > 0, `${hours.toFixed(1)}h`);
   ok("A17 마감이 조율 윈도우(48h) 안이다", hours <= NEGOTIATION_WINDOW_HOURS, `${hours.toFixed(1)}h`);
-  ok(
-    "롤링은 멱등이다 (두 번 적용해도 동일)",
-    JSON.stringify(rollDemoDates(seed, NOW)) === JSON.stringify(seed),
-  );
+  /**
+   * 롤링은 **원본에서 한 번만** 굴린다. 이미 롤링된 값을 다시 굴리면 anchor 가
+   * 오늘로 갱신돼 있어 delta 0 이 되고, 그 사이 일요일 보정이 한 번 더 걸리면
+   * 하루씩 누적된다. 그래서 "합성 멱등" 이 아니라 **어느 날 굴려도 같은 상대
+   * 배치가 나온다** 를 지킨다 — 이게 실제 경로(seed.ts·db/universe.ts)의 계약이다.
+   */
+  const RAW = raw as unknown as SeedData;
+  let rollOk = true;
+  const detail: string[] = [];
+  for (const day of ["2026-08-23", "2026-08-30", "2026-09-13", "2026-12-01", "2027-03-07"]) {
+    const at = new Date(`${day}T10:00:00+09:00`);
+    const rolled = rollDemoDates(RAW, at);
+    const w = rolled.emptyWagons.find((x) => x.id === "WGN-A17")!;
+    const h = (new Date(w.cutoffAt).getTime() - at.getTime()) / 3_600_000;
+    // 시나리오 화차는 언제 굴려도 조율 윈도우 안에 있어야 한다
+    if (!(h > 0 && h <= NEGOTIATION_WINDOW_HOURS)) {
+      rollOk = false;
+      detail.push(`${day}:${h.toFixed(0)}h`);
+    }
+    // 일요일 출발이 남아 있으면 안 되고, 마감→출발 간격은 원본과 같아야 한다
+    for (const rw of rolled.emptyWagons) {
+      const gap = (Date.parse(`${rw.departure.date}T00:00:00Z`) -
+        Date.parse(`${rw.cutoffAt.slice(0, 10)}T00:00:00Z`)) / 86_400_000;
+      const o = RAW.emptyWagons.find((x) => x.id === rw.id)!;
+      const oGap = (Date.parse(`${o.departure.date}T00:00:00Z`) -
+        Date.parse(`${o.cutoffAt.slice(0, 10)}T00:00:00Z`)) / 86_400_000;
+      if (gap !== oGap || new Date(`${rw.departure.date}T00:00:00Z`).getUTCDay() === 0) {
+        rollOk = false;
+        detail.push(`${day}:${rw.id}`);
+      }
+    }
+  }
+  ok("어느 날 굴려도 같은 상대 배치 (5개 날짜)", rollOk, detail.join(" "));
   const sundays = seed.emptyWagons.filter(
     (w) => new Date(`${w.departure.date}T00:00:00Z`).getUTCDay() === 0,
   );

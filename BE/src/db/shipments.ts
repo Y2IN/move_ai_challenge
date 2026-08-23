@@ -123,6 +123,38 @@ export async function updateShipmentRecord(
   });
 }
 
+/**
+ * 여러 화물의 상태를 한 번에 바꾼다 (확정된 편성에 실린 화물 → "confirmed").
+ *
+ * 이게 없으면 이미 실려 나간 화물이 다음 매칭·공차 적재율에 계속 다시 잡힌다.
+ * jsonb 안의 status 도 같이 바꿔야 한다 — 매칭이 읽는 건 payload 쪽이다.
+ */
+export async function markShipmentsStatus(
+  ids: string[],
+  status: Shipment["status"],
+): Promise<number | null> {
+  if (!ids.length) return 0;
+  return tryDb("markShipmentsStatus", async (db) => {
+    const rows = unwrap(
+      await db.from("registered_shipments").select(SHIPMENT_COLS).in("id", ids),
+    ) as ShipmentRow[];
+
+    let n = 0;
+    for (const row of rows) {
+      if (row.shipment.status === status) continue;
+      const next = { ...row.shipment, status };
+      unwrap(
+        await db
+          .from("registered_shipments")
+          .update({ shipment: next, updated_at: new Date().toISOString() })
+          .eq("id", row.id),
+      );
+      n += 1;
+    }
+    return n;
+  });
+}
+
 export async function deleteShipmentRecord(
   id: string,
 ): Promise<boolean | null> {

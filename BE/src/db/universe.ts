@@ -24,7 +24,7 @@
 
 import { tryDb, unwrap } from "./client";
 import { rollDemoDates } from "../roll";
-import { seed as bundledSeed } from "../seed";
+import { rawSeed, seed as bundledSeed } from "../seed";
 import type { EmptyWagon, Lane, SeedData, Shipment, Shipper, Station } from "../types";
 
 interface StationRow {
@@ -149,7 +149,7 @@ async function fetchFromDb(): Promise<SeedData | null> {
     const shipperList: Shipper[] = shipperRows.map((r) => {
       // contract 컬럼이 아직 없거나 비어 있으면 번들 값으로 메운다 —
       // 화주영업 화면(clients.ts)이 계약 물량을 분모로 쓰기 때문에 비면 0 나눗셈이 된다.
-      const fallback = bundledSeed.shippers.find((s) => s.id === r.id);
+      const fallback = rawSeed.shippers.find((s) => s.id === r.id);
       const contract =
         r.contract && Object.keys(r.contract).length > 0 ? r.contract : fallback?.contract;
       return {
@@ -164,7 +164,9 @@ async function fetchFromDb(): Promise<SeedData | null> {
     });
 
     return {
-      ...bundledSeed,
+      // ⚠️ rawSeed (롤링 전) 를 펼친다. bundledSeed 는 anchor 가 이미 "오늘"이라
+      //    이걸 펼치면 아래 rollDemoDates 의 delta 가 0 이 되어 DB 날짜가 안 밀린다.
+      ...rawSeed,
       stations: stationList,
       lanes: laneList,
       shippers: shipperList,
@@ -185,8 +187,10 @@ export async function loadUniverse(): Promise<SeedData> {
   const cached = globalCache.__railhubUniverseCache;
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) return cached.data;
 
+  // 폴백도 rawSeed 를 쓴다 — bundledSeed 는 모듈 로드 시점에 한 번 롤링된 값이라,
+  // 인스턴스가 며칠 살아 있으면 그 날짜에 얼어붙는다.
   const fromDb = await fetchFromDb();
-  const data = rollDemoDates(fromDb ?? bundledSeed);
+  const data = rollDemoDates(fromDb ?? rawSeed);
 
   globalCache.__railhubUniverseCache = {
     data,

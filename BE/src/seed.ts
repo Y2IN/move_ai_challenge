@@ -20,7 +20,16 @@ import type { SeedData } from "./types";
  * 시나리오 날짜는 로드 시점에 오늘 기준으로 롤링됩니다 (roll.ts).
  * JSON 의 절대 날짜는 dateAnchor 기준 상대 배치일 뿐입니다.
  */
-export const seed = rollDemoDates(raw as unknown as SeedData);
+/**
+ * **롤링 전 원본.** dateAnchor 프레임의 절대 날짜를 그대로 들고 있다.
+ *
+ * DB 로더(`db/universe.ts`)와 투입 스크립트(`db/push.ts`)는 반드시 이 값을 써야 한다.
+ * 이미 롤링된 `seed` 를 쓰면 anchor 가 "오늘"로 갱신돼 있어서, 그 위에서 다시
+ * 롤링해도 delta 가 0 이 되어 **DB 페이로드의 날짜가 한 칸도 안 밀린다.**
+ */
+export const rawSeed = raw as unknown as SeedData;
+
+export const seed = rollDemoDates(rawSeed);
 
 /** 시연 시작 상태에서 매칭 대기 중인 화물 */
 export const requestedShipments = seed.shipments.filter((s) => s.status === "requested");

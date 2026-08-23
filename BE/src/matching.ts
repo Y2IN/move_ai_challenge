@@ -53,6 +53,17 @@ export const NEGOTIATION_WINDOW_HOURS = 48;
  */
 export const DEFAULT_FLEX_DAYS = 2;
 
+/**
+ * 지금 폼에 입력된 화물(아직 저장 전)의 id.
+ *
+ * 예전 기본값은 `SHM-USER-001` 이었는데, 그건 **저장소가 첫 등록 화물에 발급하는
+ * 번호와 같다.** 두 번째 화물을 등록하는 순간 라이브 입력과 저장된 1번 화물이
+ * 같은 id 로 편성에 두 번 실렸고, 그 결과 톤수가 이중 계상되고 시나리오 화차의
+ * `fromRegistry` 가드도 뚫렸다(id 가 같아 mustInclude 로 취급됨).
+ * 저장소는 `SHM-USER-<n>` 만 발급하므로 이 값과는 절대 겹치지 않는다.
+ */
+export const LIVE_INPUT_ID = "SHM-INPUT";
+
 export interface MatchResult {
   /**
    * `phase` 에서 파생됩니다. 둘이 따로 놀면 "phase=confirmed 인데 status=shortfall,
@@ -123,7 +134,7 @@ export function normalizeInput(input: ShipmentInput, seed: SeedData, id?: string
   const roadKm = lane?.roadDistanceKm ?? 380;
 
   return {
-    id: id ?? "SHM-USER-001",
+    id: id ?? LIVE_INPUT_ID,
     shipperId: "SHP-USER",
     shipperName: input.shipperName ?? "내 화물",
     status: "requested",

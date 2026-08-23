@@ -45,6 +45,7 @@ import {
   insertNegotiation,
   insertShipment,
   listShipmentRecords,
+  markShipmentsStatus,
   updateShipmentRecord,
   type ConfirmationStatus,
 } from "./db/shipments";
@@ -144,6 +145,12 @@ interface IssuedSeq {
  * 그래서 이 경우엔 `localOnly` 를 세워 DB 쓰기를 아예 건너뛴다. 화면은 계속 동작하고
  * (그 인스턴스 메모리에는 남는다), 남의 데이터는 손대지 않는다.
  */
+const SEQ_FIELD = {
+  shipment: "seq",
+  confirm: "confirmSeq",
+  negotiation: "negSeq",
+} as const;
+
 async function issueSeq(
   kind: "shipment" | "confirm" | "negotiation",
   bump: () => number,
@@ -151,7 +158,13 @@ async function issueSeq(
   const fromDb = await nextSeq(kind);
   if (fromDb !== null) {
     // 폴백이 나중에 걸리더라도 이 인스턴스가 본 최댓값 위에서 시작하도록 맞춰 둔다.
-    if (fromDb > state.seq) state.seq = fromDb;
+    //
+    // ⚠️ **kind 별 카운터에 맞춰야 한다.** 예전에는 셋 다 화물 카운터(state.seq)에
+    //    넣어서, confirm·negotiation 은 DB 값과 한 번도 동기화되지 않았다. 그 상태로
+    //    RPC 만 실패하면 폴백이 GRP-001 을 다시 발급하고, 조회는 DB 를 먼저 보므로
+    //    **남의 편성**을 그려 준다.
+    const field = SEQ_FIELD[kind];
+    if (fromDb > state[field]) state[field] = fromDb;
     return { n: fromDb, localOnly: false };
   }
   return { n: bump(), localOnly: isDbEnabled() };
@@ -361,6 +374,16 @@ export async function confirmMatch(
 
   if (!localOnly) await insertConfirmation(confirmation, n);
   confirmations.push(confirmation);
+
+  // 편성에 실린 등록 화물은 매칭 풀에서 빼야 한다. 안 그러면 이미 실려 나간
+  // 화물이 다음 편성의 적재율에 계속 더해진다 (buildMatchData 의 status 필터는
+  // 상태를 바꾸는 코드가 없어 그동안 아무것도 거르지 못했다).
+  const memberIds = result.members.map((m) => m.shipmentId);
+  await markShipmentsStatus(memberIds, "confirmed");
+  for (const r of registered) {
+    if (memberIds.includes(r.shipment.id)) r.shipment.status = "confirmed";
+  }
+
   return { status: "confirmed", confirmation };
 }
 
