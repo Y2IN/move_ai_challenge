@@ -243,10 +243,10 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                   <>
                     <span className="text-[13px] text-[#4E5968]">
                       {bulk.mode === 'preview'
-                        ? `검증 ${bulk.total}건 중 ${bulk.skipped.length}건 오류`
+                        ? `검증 ${bulk.total}건 중 ${bulk.invalid}건 오류`
                         : `${bulk.registered.length}건 등록됨`}
                     </span>
-                    {bulk.mode === 'preview' && bulk.total > bulk.skipped.length && (
+                    {bulk.mode === 'preview' && bulk.valid > 0 && (
                       <button
                         type="button"
                         disabled={bulkBusy}
@@ -262,14 +262,19 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                         }}
                         className="rounded-lg bg-[#3182F6] px-3 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1B64DA] disabled:bg-[#B0B8C1]"
                       >
-                        {bulk.total - bulk.skipped.length}건 등록하기
+                        {bulk.valid}건 등록하기
                       </button>
                     )}
-                    {bulk.skipped.slice(0, 2).map((s) => (
-                      <span key={s.row} className="text-[13px] text-[#C77700]">
-                        {s.row}행: {Object.values(s.errors ?? {})[0] ?? '형식 오류'}
-                      </span>
-                    ))}
+                    {(bulk.mode === 'preview'
+                      ? bulk.rows.filter((r) => !r.ok)
+                      : bulk.skipped
+                    )
+                      .slice(0, 2)
+                      .map((s) => (
+                        <span key={s.row} className="text-[13px] text-[#C77700]">
+                          {s.row}행: {Object.values(s.errors ?? {})[0] ?? '형식 오류'}
+                        </span>
+                      ))}
                   </>
                 )}
               </div>
