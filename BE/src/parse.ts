@@ -202,7 +202,7 @@ const PARSE_SCHEMA: Record<string, unknown> = {
 };
 
 /** 문장에 그 숫자가 실제로 적혀 있는지. `8톤` · `8 톤` · `8t` 를 모두 본다. */
-function numberAppears(text: string, n: number): boolean {
+export function numberAppears(text: string, n: number): boolean {
   const plain = String(n);
   if (text.includes(plain)) return true;
   // "1,200" 처럼 천단위 콤마가 찍힌 경우

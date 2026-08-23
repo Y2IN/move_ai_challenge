@@ -11,6 +11,8 @@
  * 폴백이 검사기에 걸리는 규칙은 어떤 경로로도 통과할 수 없는 규칙이다.
  */
 
+import { evidenceGrounded } from "../classify";
+import { numberAppears } from "../parse";
 import { PARAGRAPHS, fallbackText } from "../esg/paragraphs";
 import { aggregate, parsePeriod } from "../esg/period";
 import { fixtureReportInput as fx } from "./fixture";
@@ -114,6 +116,30 @@ console.log("\n── 통합 게이트: 숫자 + 표현을 한 번에 잡는다 
   const hasBoth = r.retryNote.includes("182") && r.retryNote.includes("획기적");
   hasBoth ? pass++ : fail++;
   console.log(`${hasBoth ? "✅" : "❌"} 재작성 지시문이 두 사유를 모두 담는다`);
+}
+
+console.log("\n── 입력 경로 근거 검사 (#21 제약 분류 · #10 파싱) ──");
+
+{
+  const ok = (label: string, cond: boolean) => {
+    cond ? pass++ : fail++;
+    console.log(`${cond ? "✅" : "❌"} ${label}`);
+  };
+
+  const utter = "월말 정산 때문에 25일 전에는 도착해야 하고, 앞뒤로 하루 이틀은 조정 가능합니다";
+
+  // AI 가 "근거"라고 내놓은 조각이 실제 발화에 있어야 한다.
+  ok("원문 그대로 잘라낸 근거는 통과", evidenceGrounded(utter, "25일 전에는 도착해야"));
+  ok("띄어쓰기만 다른 근거는 통과", evidenceGrounded(utter, "앞뒤로하루 이틀은 조정가능"));
+  ok("의역한 근거는 걸린다", !evidenceGrounded(utter, "고객사가 월말에 마감이라 급하다고 함"));
+  ok("지어낸 근거는 걸린다", !evidenceGrounded(utter, "주말 출발은 불가하다고 하셨습니다"));
+  ok("빈 근거는 걸린다", !evidenceGrounded(utter, ""));
+
+  // 문장에 없는 중량을 채우면 폼은 정상으로 보이고 결과만 틀린다.
+  const order = "울산 공장에서 경기 물류센터까지 석유화학제품 8톤, 다음주 화요일 출발";
+  ok("문장에 있는 중량은 통과", numberAppears(order, 8));
+  ok("문장에 없는 중량은 걸린다", !numberAppears(order, 12));
+  ok("천단위 콤마 표기도 찾는다", numberAppears("총 1,200톤을 보냅니다", 1200));
 }
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);

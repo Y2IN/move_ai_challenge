@@ -237,7 +237,7 @@ const CLASSIFY_SCHEMA: Record<string, unknown> = {
  * 공백만 다른 경우(모델이 띄어쓰기를 정리하는 일이 잦다)는 통과시킨다.
  * 그 외의 재작성은 통과시키지 않는다 — 의역을 허용하면 검사가 의미를 잃는다.
  */
-function evidenceGrounded(utterance: string, evidence: string): boolean {
+export function evidenceGrounded(utterance: string, evidence: string): boolean {
   const strip = (t: string) => t.replace(/\s+/g, "");
   return evidence.length > 0 && strip(utterance).includes(strip(evidence));
 }
