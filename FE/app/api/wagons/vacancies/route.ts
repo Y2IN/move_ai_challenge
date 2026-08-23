@@ -1,4 +1,4 @@
-import { match, wagonPhase } from "@railhub/be/matching";
+import { normalizeInput, scheduleFits, seatOnWagon, wagonPhase } from "@railhub/be/matching";
 import { quote } from "@railhub/be/quote";
 import { seed } from "@railhub/be/seed";
 import type { MemberInput } from "@railhub/be/calc";
@@ -25,12 +25,20 @@ export async function POST(req: Request) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
-  const current = match(seed, body?.shipment ?? null, now);
   const shipment = body?.shipment;
+  const userShipment = shipment ? normalizeInput(shipment, seed) : null;
+  const pool = seed.shipments.filter((s) => s.status === "requested");
 
   const vacancies = seed.emptyWagons.map((wagon) => {
     const lane = seed.lanes.find((l) => l.id === wagon.laneId);
-    const phase = wagonPhase(wagon, current.totalTon, now);
+
+    // 화차마다 **그 화차에 실제로 앉는 조합**을 계산한다. 예전에는 best 화차
+    // 1량의 적재톤을 세 화차 전부에 적용해 phase 배지가 뒤섞였다 — A17 이
+    // 14톤을 실었으면 B04·C09 도 "14톤 실린 것"으로 판정됐다.
+    const eligible = pool.filter((s) => scheduleFits(s, wagon));
+    const seated = seatOnWagon(wagon, eligible, null);
+    const phase = wagonPhase(wagon, seated.totalTon, now);
+
     const base = {
       railDistanceKm: lane?.railDistanceKm ?? 0,
       roadDirectDistanceKm: lane?.roadDistanceKm ?? 0,
@@ -39,18 +47,13 @@ export async function POST(req: Request) {
     };
 
     // 이 화차에 이미 잡혀 있는 화주들
-    const others: MemberInput[] = current.members
-      .filter((m) => !m.isUserInput)
-      .map((m) => {
-        const s = seed.shipments.find((x) => x.id === m.shipmentId);
-        return {
-          shipmentId: m.shipmentId,
-          shipperName: m.shipperName,
-          weightTon: m.weightTon,
-          shuttleKm: s ? s.origin.shuttleKm + s.destination.shuttleKm : 0,
-          currentRoadFareKrw: s?.currentRoadFareKrw ?? 0,
-        };
-      });
+    const others: MemberInput[] = seated.members.map((s) => ({
+      shipmentId: s.id,
+      shipperName: s.shipperName ?? s.shipperId,
+      weightTon: s.cargo.weightTon,
+      shuttleKm: s.origin.shuttleKm + s.destination.shuttleKm,
+      currentRoadFareKrw: s.currentRoadFareKrw ?? 0,
+    }));
 
     const target: MemberInput | null = shipment
       ? {
@@ -81,6 +84,9 @@ export async function POST(req: Request) {
         ? `${seed.stations.find((s) => s.id === lane.originStationId)?.name} → ${seed.stations.find((s) => s.id === lane.destStationId)?.name}`
         : null,
       ...phase,
+      // 이 화차에 지금 모여 있는 물량 — 코레일 화면의 "얼마나 찼는지"는 이 값이다.
+      seatedTon: seated.totalTon,
+      seatedCount: seated.members.length,
       // 견적은 대상 화물이 있을 때만 의미가 있다
       quote: target ? quote(target, others, wagon, base, now) : null,
     };

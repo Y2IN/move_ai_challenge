@@ -7,6 +7,7 @@ import { ChoiceField, Field, SelectField, TextField } from '../components/Field'
 import { setShipment } from '../lib/demo-session';
 import {
   CORP_TYPES,
+  FLEX_CHOICES,
   FREIGHT_ITEMS,
   TRANSPORT_MODES,
   applyParsed,
@@ -19,6 +20,7 @@ import {
   toShipmentInput,
   validateForm,
   type CorpType,
+  type FlexChoice,
   type FreightField,
   type FreightForm,
   type StationOption,
@@ -234,6 +236,15 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
 
               <Field label="희망 출발일" ai={aiFields.has('departDate')} error={errors.departDate}>
                 <TextField type="date" value={form.departDate} onChange={(v) => setField('departDate', v)} />
+              </Field>
+
+              {/* 화차 시각표와 정확히 같은 날짜만 고집하면 매칭이 거의 안 잡힌다 */}
+              <Field label="출발일 유연폭">
+                <SelectField<FlexChoice>
+                  value={form.flexDays}
+                  options={FLEX_CHOICES}
+                  onChange={(v) => setField('flexDays', v)}
+                />
               </Field>
 
               <Field label="기업 구분">

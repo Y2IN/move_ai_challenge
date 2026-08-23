@@ -181,6 +181,12 @@ export interface EmptyWagon {
   minLoadRate: number;
   /** 현재까지 확보된 물량 (톤) */
   reservedTon: number;
+  /**
+   * 조율 데모 시나리오 화차 — 시작 상태가 반드시 정원 미달(14/18톤)이어야
+   * 조율 에이전트 시연이 성립한다. 저장소에 누적된 등록 화물은 이 화차에
+   * 앉히지 않는다 (방금 등록한 라이브 입력은 예외 — 성공 경로 시연용).
+   */
+  demoScenario?: boolean;
   laneId: string;
   departure: {
     stationId: string;
@@ -229,6 +235,12 @@ export interface ShipmentInput {
   requiresCover?: boolean;
   currentRoadFareKrw?: number;
   constraintText?: string;
+  /**
+   * 출발일 앞뒤 허용 폭(일). 비우면 ±2 로 간주합니다.
+   * 0 으로 강제하면 화차 시각표와 날짜가 정확히 일치할 때만 매칭돼
+   * 대부분의 등록이 noWagon 으로 끝납니다 — 폼에서 반드시 노출하세요.
+   */
+  departureFlexDays?: number;
 }
 
 // ── 계산 결과 ──────────────────────────────────────────────────

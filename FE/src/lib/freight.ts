@@ -29,6 +29,14 @@ export const FREIGHT_ITEMS: ItemCategory[] = ['석유화학제품', '화학원�
 export const CORP_TYPES: CorpType[] = ['중소기업', '우수물류기업', '일반'];
 export const TRANSPORT_MODES: TransportMode[] = ['자차', '위탁'];
 
+/**
+ * 출발일 유연폭 — 화차 시각표와 희망일이 정확히 일치하는 경우는 드물다.
+ * 이 값이 0이면 대부분의 등록이 "조건에 맞는 공차 없음"으로 끝난다 (서버 기본 ±2일).
+ */
+export type FlexChoice = '당일만' | '±1일' | '±2일' | '±3일';
+export const FLEX_CHOICES: FlexChoice[] = ['당일만', '±1일', '±2일', '±3일'];
+export const FLEX_TO_DAYS: Record<FlexChoice, number> = { 당일만: 0, '±1일': 1, '±2일': 2, '±3일': 3 };
+
 export const CORP_TYPE_TO_API: Record<CorpType, CompanyGrade> = {
   중소기업: 'sme',
   우수물류기업: 'excellentLogistics',
@@ -47,6 +55,8 @@ export interface FreightForm {
   item: ItemCategory;
   tons: string;
   departDate: string;
+  /** 출발일 앞뒤 허용 폭 — 매칭 일정 검사(scheduleFits)에 그대로 들어간다 */
+  flexDays: FlexChoice;
   corpType: CorpType;
   transportMode: TransportMode;
   /** 화주가 문장으로 적은 제약 — 조율 에이전트(#22)가 읽는 입력입니다 */
@@ -61,6 +71,7 @@ export const emptyForm: FreightForm = {
   item: '석유화학제품',
   tons: '',
   departDate: '',
+  flexDays: '±2일',
   corpType: '중소기업',
   transportMode: '위탁',
   constraintText: '',
@@ -165,6 +176,7 @@ export function toShipmentInput(form: FreightForm, shipperName?: string): Shipme
     category: form.item,
     weightTon: Number(form.tons),
     desiredDepartureDate: form.departDate,
+    departureFlexDays: FLEX_TO_DAYS[form.flexDays],
     companyGrade: CORP_TYPE_TO_API[form.corpType],
     transportArrangement: TRANSPORT_MODE_TO_API[form.transportMode],
     shipperName,

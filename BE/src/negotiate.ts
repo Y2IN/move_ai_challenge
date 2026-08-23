@@ -274,7 +274,21 @@ export async function negotiate(
     shortfallTon: current.shortfallTon,
   };
 
-  if (current.shortfallTon <= 0 || !current.wagon) {
+  // 배정 가능한 공차 자체가 없으면 조율로 살릴 수 없다. 예전에는 여기서
+  // feasible:true 를 돌려줘 화면의 "편성 확정하기" 버튼이 활성화됐고,
+  // 누르면 확정 API 가 409 를 돌려줘 에러 화면으로 떨어졌다.
+  if (!current.wagon) {
+    return {
+      before,
+      after: null,
+      rejected: [],
+      proposals: [],
+      feasible: false,
+      message: current.message || "조건에 맞는 공차가 없습니다. 다음 공차 일정을 확인하세요.",
+    };
+  }
+
+  if (current.shortfallTon <= 0) {
     return {
       before,
       after: null,
@@ -282,6 +296,18 @@ export async function negotiate(
       proposals: [],
       feasible: true,
       message: "정원이 이미 충족되어 조율이 필요하지 않습니다.",
+    };
+  }
+
+  // 마감 후 최소 적재율로 이미 성립한 편성 — 자리는 남았지만 더 모을 시간이 없다.
+  if (current.status === "matched") {
+    return {
+      before,
+      after: null,
+      rejected: [],
+      proposals: [],
+      feasible: true,
+      message: `편성이 이미 성립했습니다 (적재율 ${Math.round(current.loadFactor * 100)}%). 모집이 마감되어 추가 합적 없이 출발합니다.`,
     };
   }
 

@@ -2,7 +2,8 @@
   "meta": {
     "schemaVersion": "1.0.0",
     "generatedAt": "2026-08-13",
-    "scenario": "울산 → 수도권 소량화물 합적. 시작 시점은 정원 미달(14/18톤)이라 매칭이 반드시 실패하도록 세팅됨.",
+    "dateAnchor": "2026-08-24",
+    "scenario": "울산 → 수도권 소량화물 합적. 시작 시점은 정원 미달(14/18톤)이라 매칭이 반드시 실패하도록 세팅됨. 날짜는 dateAnchor 기준 상대 배치 — roll.ts 가 오늘로 민다.",
     "fictional": true,
     "notes": [
       "회사명·주소·연락처·운임은 전부 가상 데이터입니다.",
@@ -11,7 +12,8 @@
       "shipments[].parsedConstraints 는 /api/parse 가 채우는 자리입니다. 시드에서는 null 로 비워둡니다.",
       "shipments[].fallbackHints 는 생성 AI 호출이 실패했을 때 쓰는 규칙기반 폴백 전용 값입니다.",
       "lanes[].roadDistanceKm 는 도로 직행 baseline 거리입니다. 철도 거리와 다릅니다.",
-      "emptyWagons[].cutoffAt 은 모집 마감시한(출발 D-2)입니다. 이 시점에 정원 판정을 하고, minLoadRate 미만이면 편성을 취소합니다. minLoadRate 는 코레일 정책이 아니라 우리가 상한 보장 손실을 어디까지 감수할지의 선입니다."
+      "emptyWagons[].cutoffAt 은 모집 마감시한(출발 D-2)입니다. 이 시점에 정원 판정을 하고, minLoadRate 미만이면 편성을 취소합니다. minLoadRate 는 코레일 정책이 아니라 우리가 상한 보장 손실을 어디까지 감수할지의 선입니다.",
+      "시나리오 날짜(화차 cutoff/출발, 화물 희망일)는 dateAnchor(D0) 기준 상대 배치입니다. 런타임에 BE/src/roll.ts 의 rollDemoDates 가 오늘 기준으로 밀어줍니다 — 절대 날짜를 믿지 마세요."
     ]
   },
   "stations": [
@@ -138,8 +140,8 @@
         "shuttleKm": 15.2
       },
       "schedule": {
-        "requestedDepartureDate": "2026-08-20",
-        "requiredArrivalBy": "2026-08-25"
+        "requestedDepartureDate": "2026-08-26",
+        "requiredArrivalBy": "2026-08-31"
       },
       "currentMode": "road",
       "transportArrangement": "consignment",
@@ -149,7 +151,7 @@
       "parsedConstraints": null,
       "fallbackHints": {
         "departureFlexDays": 2,
-        "hardArrivalBy": "2026-08-25",
+        "hardArrivalBy": "2026-08-31",
         "mustBeCovered": true,
         "noWeekendDispatch": false,
         "requiresForklift": true
@@ -182,8 +184,8 @@
         "shuttleKm": 47.8
       },
       "schedule": {
-        "requestedDepartureDate": "2026-08-19",
-        "requiredArrivalBy": "2026-08-22"
+        "requestedDepartureDate": "2026-08-25",
+        "requiredArrivalBy": "2026-08-28"
       },
       "currentMode": "road",
       "transportArrangement": "consignment",
@@ -193,7 +195,7 @@
       "parsedConstraints": null,
       "fallbackHints": {
         "departureFlexDays": 2,
-        "hardArrivalBy": "2026-08-22",
+        "hardArrivalBy": "2026-08-28",
         "mustBeCovered": true,
         "noWeekendDispatch": false,
         "requiresForklift": false
@@ -226,8 +228,8 @@
         "shuttleKm": 39.5
       },
       "schedule": {
-        "requestedDepartureDate": "2026-08-20",
-        "requiredArrivalBy": "2026-08-26"
+        "requestedDepartureDate": "2026-08-26",
+        "requiredArrivalBy": "2026-09-01"
       },
       "currentMode": "road",
       "transportArrangement": "consignment",
@@ -237,9 +239,9 @@
       "parsedConstraints": null,
       "fallbackHints": {
         "departureFlexDays": 3,
-        "hardArrivalBy": "2026-08-26",
+        "hardArrivalBy": "2026-09-01",
         "mustBeCovered": false,
-        "noWeekendDispatch": true,
+        "noWeekendDispatch": false,
         "requiresForklift": false
       }
     },
@@ -271,20 +273,20 @@
         "shuttleKm": 39.5
       },
       "schedule": {
-        "requestedDepartureDate": "2026-08-24",
-        "requiredArrivalBy": "2026-08-31"
+        "requestedDepartureDate": "2026-08-30",
+        "requiredArrivalBy": "2026-09-04"
       },
       "currentMode": "road",
       "transportArrangement": "consignment",
       "roadDirectDistanceKm": 372.0,
       "currentRoadFareKrw": 420000,
-      "constraintText": "24일 출고 예정 물량입니다. 창고에 이미 다 나와 있어서 당겨서 보내는 건 문제 없습니다.",
+      "constraintText": "다음 주 출고 예정 물량입니다. 창고에 이미 다 나와 있어서 당겨서 보내는 건 문제 없습니다.",
       "parsedConstraints": null,
       "fallbackHints": {
-        "departureFlexDays": -4,
-        "hardArrivalBy": "2026-08-31",
+        "departureFlexDays": 4,
+        "hardArrivalBy": "2026-09-04",
         "mustBeCovered": false,
-        "noWeekendDispatch": true,
+        "noWeekendDispatch": false,
         "requiresForklift": false
       }
     }
@@ -297,20 +299,21 @@
       "capacityTon": 18.0,
       "capacityCbm": 58.0,
       "capacityBasis": "유개화차 1량 적재중량 기준",
-      "cutoffAt": "2026-08-18T18:00:00+09:00",
+      "cutoffAt": "2026-08-25T18:00:00+09:00",
       "minLoadRate": 0.6,
       "reservedTon": 0.0,
+      "demoScenario": true,
       "laneId": "LANE-ULS-OBONG",
       "departure": {
         "stationId": "ULS-FRT",
-        "date": "2026-08-20",
-        "dayOfWeek": "목",
+        "date": "2026-08-26",
+        "dayOfWeek": "수",
         "time": "22:40"
       },
       "arrival": {
         "stationId": "OBONG",
-        "date": "2026-08-21",
-        "dayOfWeek": "금",
+        "date": "2026-08-27",
+        "dayOfWeek": "목",
         "time": "06:10"
       },
       "emptyReason": "수도권→울산 수송 완료 후 울산에서 대기 중인 복귀 공차",
@@ -328,20 +331,20 @@
       "capacityTon": 22.0,
       "capacityCbm": 45.0,
       "capacityBasis": "무개화차 1량 적재중량 기준",
-      "cutoffAt": "2026-08-18T18:00:00+09:00",
+      "cutoffAt": "2026-08-25T18:00:00+09:00",
       "minLoadRate": 0.6,
       "reservedTon": 0.0,
       "laneId": "LANE-ULS-OBONG",
       "departure": {
         "stationId": "ULS-FRT",
-        "date": "2026-08-20",
-        "dayOfWeek": "목",
+        "date": "2026-08-26",
+        "dayOfWeek": "수",
         "time": "14:20"
       },
       "arrival": {
         "stationId": "OBONG",
-        "date": "2026-08-20",
-        "dayOfWeek": "목",
+        "date": "2026-08-26",
+        "dayOfWeek": "수",
         "time": "21:50"
       },
       "emptyReason": "수도권→울산 수송 완료 후 울산에서 대기 중인 복귀 공차",
@@ -358,19 +361,19 @@
       "capacityTon": 18.0,
       "capacityCbm": 58.0,
       "capacityBasis": "유개화차 1량 적재중량 기준",
-      "cutoffAt": "2026-08-21T18:00:00+09:00",
+      "cutoffAt": "2026-08-28T18:00:00+09:00",
       "minLoadRate": 0.6,
       "reservedTon": 0.0,
       "laneId": "LANE-ULS-OBONG",
       "departure": {
         "stationId": "ULS-FRT",
-        "date": "2026-08-23",
+        "date": "2026-08-30",
         "dayOfWeek": "일",
         "time": "22:40"
       },
       "arrival": {
         "stationId": "OBONG",
-        "date": "2026-08-24",
+        "date": "2026-08-31",
         "dayOfWeek": "월",
         "time": "06:10"
       },

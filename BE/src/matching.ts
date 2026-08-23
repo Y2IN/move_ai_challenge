@@ -110,14 +110,14 @@ export function wagonPhase(
 }
 
 /** 사용자 입력을 Shipment 형태로 정규화. 빠진 값은 시드 기준으로 추정합니다. */
-export function normalizeInput(input: ShipmentInput, seed: SeedData): Shipment {
+export function normalizeInput(input: ShipmentInput, seed: SeedData, id?: string): Shipment {
   const lane = findLane(seed, input.originStationId, input.destStationId);
   const shuttleIn = input.originShuttleKm ?? 10;
   const shuttleOut = input.destShuttleKm ?? 25;
   const roadKm = lane?.roadDistanceKm ?? 380;
 
   return {
-    id: "SHM-USER-001",
+    id: id ?? "SHM-USER-001",
     shipperId: "SHP-USER",
     shipperName: input.shipperName ?? "내 화물",
     status: "requested",
@@ -154,7 +154,9 @@ export function normalizeInput(input: ShipmentInput, seed: SeedData): Shipment {
     constraintText: input.constraintText ?? "",
     parsedConstraints: null,
     fallbackHints: {
-      departureFlexDays: 0,
+      // 유연폭 0 을 강제하면 화차 시각표와 정확히 같은 날짜만 통과해
+      // 대부분의 등록이 noWagon 이 된다. 폼 기본값과 같은 ±2 로 둔다.
+      departureFlexDays: Math.min(7, Math.max(0, Math.round(input.departureFlexDays ?? 2))),
       hardArrivalBy: input.requiredArrivalBy ?? null,
       mustBeCovered: input.requiresCover ?? false,
       noWeekendDispatch: false,
@@ -216,8 +218,73 @@ export function scheduleFits(s: Shipment, wagon: EmptyWagon): boolean {
 }
 
 /**
+ * 한 화차에 후보 화물을 최대한 싣는 조합을 찾습니다.
+ *
+ * 후보가 16건 이하면 **전수탐색**으로 정확한 최대 적재 조합을 고릅니다.
+ * 그리디(무거운 것부터)는 되돌아가지 않아 "4톤을 넣으면 만재인데 5톤을 넣으면
+ * 오히려 총량이 준다" 같은 비단조 구간을 만듭니다 — 사용자가 중량을 올렸는데
+ * 적재율이 떨어지는 화면은 버그로 보입니다. 후보가 그보다 많으면(수백 건 등록
+ * 누적) 무거운 것부터 그리디로 폴백합니다.
+ */
+export function seatOnWagon(
+  wagon: EmptyWagon,
+  eligible: Shipment[],
+  mustInclude: Shipment | null,
+): { members: Shipment[]; totalTon: number } {
+  // 이미 확보된 물량(reservedTon)만큼 실제로 쓸 수 있는 자리가 줄어듭니다.
+  const usableTon = Math.max(0, wagon.capacityTon - (wagon.reservedTon ?? 0));
+
+  const fits = (subset: Shipment[]) => {
+    const ton = subset.reduce((a, s) => a + s.cargo.weightTon, 0);
+    return ton <= usableTon && !wagonViolation(wagon, subset);
+  };
+
+  if (eligible.length <= 16) {
+    const mustIdx = mustInclude ? eligible.findIndex((s) => s.id === mustInclude.id) : -1;
+    if (mustInclude && mustIdx < 0) return { members: [], totalTon: 0 };
+
+    let best: Shipment[] = [];
+    let bestTon = -1;
+    for (let mask = 0; mask < 1 << eligible.length; mask++) {
+      if (mustIdx >= 0 && !(mask & (1 << mustIdx))) continue;
+      const subset = eligible.filter((_, i) => mask & (1 << i));
+      if (!fits(subset)) continue;
+      const ton = subset.reduce((a, s) => a + s.cargo.weightTon, 0);
+      // 같은 톤수면 화주가 많은 조합 — 합적이 이 서비스의 정의다
+      if (ton > bestTon || (ton === bestTon && subset.length > best.length)) {
+        best = subset;
+        bestTon = ton;
+      }
+    }
+    return { members: best, totalTon: Math.max(0, bestTon) };
+  }
+
+  // 그리디 폴백 — mustInclude 를 먼저 앉히고 무거운 것부터
+  const members: Shipment[] = [];
+  let load = 0;
+  const seat = (s: Shipment) => {
+    if (load + s.cargo.weightTon > usableTon) return;
+    if (wagonViolation(wagon, [...members, s])) return;
+    members.push(s);
+    load += s.cargo.weightTon;
+  };
+  const mine = mustInclude ? eligible.find((s) => s.id === mustInclude.id) : null;
+  if (mustInclude && !mine) return { members: [], totalTon: 0 };
+  if (mine) seat(mine);
+  for (const s of eligible
+    .filter((s) => s.id !== mine?.id)
+    .sort((a, b) => b.cargo.weightTon - a.cargo.weightTon)) {
+    seat(s);
+  }
+  if (mustInclude && !members.some((m) => m.id === mustInclude.id)) {
+    return { members: [], totalTon: 0 };
+  }
+  return { members, totalTon: load };
+}
+
+/**
  * 시드 풀 + 사용자 입력으로 최적 편성을 찾습니다.
- * 사용자 화물은 항상 편성에 포함되고, 나머지를 그리디로 채웁니다.
+ * 사용자 화물은 항상 편성에 포함되고, 나머지로 적재를 최대화합니다.
  */
 export function match(
   seed: SeedData,
@@ -232,41 +299,44 @@ export function match(
   const destId = userShipment?.destination.stationId ?? pool[0]?.destination.stationId;
   const lane = originId && destId ? findLane(seed, originId, destId) : null;
 
+  // 노선이 없으면 화차 후보도 없다. 예전처럼 `!lane || ...` 로 전 화차를 통과시키면
+  // 역방향 입력이 모든 화차에 올라타고 철도거리 0 으로 편익이 계산되는 오염이 생긴다.
+  if (!lane) {
+    const laneList = seed.lanes
+      .map((l) => {
+        const o = seed.stations.find((s) => s.id === l.originStationId)?.name ?? l.originStationId;
+        const d = seed.stations.find((s) => s.id === l.destStationId)?.name ?? l.destStationId;
+        return `${o} → ${d}`;
+      })
+      .join(", ");
+    return {
+      status: "noWagon",
+      phase: "open",
+      hoursToCutoff: Number.NaN,
+      wagon: null,
+      lane: null,
+      members: [],
+      totalTon: 0,
+      capacityTon: 0,
+      loadFactor: 0,
+      shortfallTon: 0,
+      negotiationCandidates: [],
+      calc: null,
+      message: `아직 개설되지 않은 노선입니다. 현재 운행 노선: ${laneList || "없음"}`,
+    };
+  }
+
   // 노선이 맞는 화차 후보를 훑어서 가장 많이 싣는 편성을 고릅니다.
-  const wagons = seed.emptyWagons.filter((w) => !lane || w.laneId === lane.id);
+  const wagons = seed.emptyWagons.filter((w) => w.laneId === lane.id);
   let best: { wagon: EmptyWagon; members: Shipment[] } | null = null;
 
   for (const wagon of wagons) {
     const eligible = all.filter((s) => scheduleFits(s, wagon));
+    const { members, totalTon } = seatOnWagon(wagon, eligible, userShipment);
 
-    const members: Shipment[] = [];
-    let load = 0;
-
-    // 이미 확보된 물량(reservedTon)만큼 실제로 쓸 수 있는 자리가 줄어듭니다.
-    const usableTon = Math.max(0, wagon.capacityTon - (wagon.reservedTon ?? 0));
-
-    const seat = (s: Shipment) => {
-      if (load + s.cargo.weightTon > usableTon) return;
-      if (wagonViolation(wagon, [...members, s])) return; // 물리 요건 위반이면 건너뜀
-      members.push(s);
-      load += s.cargo.weightTon;
-    };
-
-    // 사용자가 방금 등록한 화물을 먼저 앉힙니다.
-    // 무거운 것부터 그리디로 채우면 사용자 화물이 밀려나 편성에서 빠집니다.
-    const mine = eligible.find((s) => s.id === userShipment?.id);
-    if (mine) seat(mine);
-
-    // 남은 자리를 무거운 것부터 채웁니다.
-    for (const s of eligible
-      .filter((s) => s.id !== mine?.id)
-      .sort((a, b) => b.cargo.weightTon - a.cargo.weightTon)) {
-      seat(s);
-    }
-
-    // 사용자 화물이 안 들어간 편성은 의미 없음
-    if (userShipment && !members.some((m) => m.id === userShipment.id)) continue;
-    if (!best || load > best.members.reduce((a, m) => a + m.cargo.weightTon, 0)) {
+    // 사용자 화물이 안 들어간 편성은 의미 없음 (seatOnWagon 이 빈 배열을 돌려준다)
+    if (members.length === 0) continue;
+    if (!best || totalTon > best.members.reduce((a, m) => a + m.cargo.weightTon, 0)) {
       best = { wagon, members };
     }
   }
@@ -336,7 +406,9 @@ export function match(
     totalTon,
     capacityTon: wagon.capacityTon,
     loadFactor: totalTon / wagon.capacityTon,
-    shortfallTon: 0,
+    // 0 으로 덮어쓰지 않는다 — 마감 후 최소 적재율로 성립한 편성은 자리가 남아
+    // 있고, 조율 에이전트(negotiate.ts)가 이 값으로 "조율할 게 남았는지"를 판단한다.
+    shortfallTon,
     negotiationCandidates,
     calc: buildCalc(members, wagon, lane, seed),
     message: `동일 노선 ${members.length}건 · ${wagon.label} 배정 완료 · 적재율 ${Math.round((totalTon / wagon.capacityTon) * 100)}%`,

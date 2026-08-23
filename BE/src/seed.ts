@@ -9,14 +9,18 @@
  */
 
 import raw from "./seed.json";
+import { rollDemoDates } from "./roll";
 import type { SeedData } from "./types";
 
 /**
  * JSON import 는 문자열 필드를 전부 `string` 으로 넓혀서 읽습니다.
  * (`packaging: "pallet"` → `string`) 리터럴 유니온과 맞지 않으므로 한 번만 단언합니다.
  * seed.json 을 고칠 때 타입이 안 맞으면 여기서 잡히지 않으니 주의하세요.
+ *
+ * 시나리오 날짜는 로드 시점에 오늘 기준으로 롤링됩니다 (roll.ts).
+ * JSON 의 절대 날짜는 dateAnchor 기준 상대 배치일 뿐입니다.
  */
-export const seed = raw as unknown as SeedData;
+export const seed = rollDemoDates(raw as unknown as SeedData);
 
 /** 시연 시작 상태에서 매칭 대기 중인 화물 */
 export const requestedShipments = seed.shipments.filter((s) => s.status === "requested");

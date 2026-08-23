@@ -411,6 +411,13 @@ export function validateShipmentInput(
   if (requiredArrivalBy && !isIsoDate(requiredArrivalBy))
     errors.requiredArrivalBy = "도착 기한 형식이 올바르지 않습니다 (YYYY-MM-DD).";
 
+  const departureFlexDays = b.departureFlexDays == null ? undefined : Number(b.departureFlexDays);
+  if (
+    departureFlexDays !== undefined &&
+    (!Number.isInteger(departureFlexDays) || departureFlexDays < 0 || departureFlexDays > 7)
+  )
+    errors.departureFlexDays = "출발일 유연폭은 0~7일 사이 정수여야 합니다.";
+
   const ok = Object.keys(errors).length === 0;
   const value: ShipmentInput | null = ok
     ? {
@@ -428,6 +435,7 @@ export function validateShipmentInput(
         requiresCover: b.requiresCover == null ? undefined : Boolean(b.requiresCover),
         currentRoadFareKrw: num(b.currentRoadFareKrw),
         constraintText: str(b.constraintText) || undefined,
+        departureFlexDays,
       }
     : null;
 
