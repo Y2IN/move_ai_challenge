@@ -1,5 +1,5 @@
 import { commitBulk, previewBulk } from "@railhub/be/bulk";
-import { seed } from "@railhub/be/seed";
+import { loadUniverse } from "@railhub/be/db/universe";
 
 // 화물 다건 등록 (#12). CSV 를 미리보기(검증만) → 확정(등록) 2단계로.
 // 입력: multipart(file, commit) / application/json({csv, commit}) / text/csv(raw)
@@ -36,6 +36,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = commit ? await commitBulk(csv, seed) : previewBulk(csv, seed);
+  // 검증 기준은 매칭 유니버스와 같아야 한다 (역 코드가 늘면 대량 등록도 따라가야 함)
+  const universe = await loadUniverse();
+  const result = commit ? await commitBulk(csv, universe) : previewBulk(csv, universe);
   return Response.json(result, { status: commit ? 201 : 200 });
 }

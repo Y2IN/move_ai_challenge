@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
-import { ErrorNotice } from '../components/AsyncSection';
+import { DemoDataBadge, ErrorNotice } from '../components/AsyncSection';
 import { ChoiceField, Field, SelectField, TextField } from '../components/Field';
 import { setConfirmationId, setRegisteredId, setShipment } from '../lib/demo-session';
 import {
@@ -15,10 +15,12 @@ import {
   fetchParseCases,
   fetchStations,
   parseFreight,
+  bulkFreights,
   registerFreight,
   requestMatching,
   toShipmentInput,
   validateForm,
+  type BulkResult,
   type CorpType,
   type FlexChoice,
   type FreightField,
@@ -26,7 +28,7 @@ import {
   type StationOption,
   type TransportMode,
 } from '../lib/freight';
-import { confirmMatching } from '../lib/negotiation';
+import { classifyConstraints, confirmMatching, type ClassifiedConstraint } from '../lib/negotiation';
 import { useAsync } from '../lib/use-async';
 import type { ItemCategory } from '@railhub/be/types';
 
@@ -38,6 +40,8 @@ interface Masters {
   stations: StationOption[];
   cases: { id: string; label: string; text: string }[];
   notice: string;
+  /** 규칙기반 데모 경로인지 (#10 이 LLM 을 안 탔을 때) */
+  demo: boolean;
 }
 
 /**
@@ -59,6 +63,16 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  /** #21 — 조건 문장을 절대/조정가능으로 나눠 미리 보여준다 (조율이 뭘 건드릴지 예고) */
+  const [constraints, setConstraints] = useState<ClassifiedConstraint[] | null>(null);
+  const [classifying, setClassifying] = useState(false);
+
+  /** #12 — CSV 다건 등록. 미리보기(검증만) → 확정 2단계 */
+  const csvRef = useRef<HTMLInputElement>(null);
+  const [bulk, setBulk] = useState<BulkResult | null>(null);
+  const [bulkCsv, setBulkCsv] = useState<string>('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   /** 역 마스터와 예시 문장은 화면 진입 때 한 번만 받습니다. */
   const masters = useAsync<Masters>(
     useCallback(
@@ -67,9 +81,9 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
         // Promise.all 로 묶여 있어 한쪽만 실패해도 출발역·도착역이 통째로 잠겼습니다.
         const [s, p] = await Promise.all([
           fetchStations(),
-          fetchParseCases().catch(() => ({ cases: [], notice: '' })),
+          fetchParseCases().catch(() => ({ cases: [], notice: '', demo: false })),
         ]);
-        return { stations: s.items, cases: p.cases, notice: p.notice };
+        return { stations: s.items, cases: p.cases, notice: p.notice, demo: Boolean(p.demo) };
       },
       [],
     ),
@@ -193,9 +207,79 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 </div>
               )}
 
+              {/* #12 — 여러 건은 CSV 로. 검증만 먼저 돌려 몇 건이 걸리는지 보여준다 */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-[#F2F4F6] pt-3">
+                <input
+                  ref={csvRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setBulkBusy(true);
+                    setSubmitError(null);
+                    try {
+                      const csv = await file.text();
+                      setBulkCsv(csv);
+                      setBulk(await bulkFreights(csv, false));
+                    } catch (err) {
+                      setSubmitError(err instanceof Error ? err.message : 'CSV 를 읽지 못했습니다.');
+                    } finally {
+                      setBulkBusy(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => csvRef.current?.click()}
+                  className="rounded-lg border border-[#D1D6DB] bg-white px-3 py-2 text-[13px] font-bold text-[#333D4B] transition-colors hover:bg-[#F9FAFB] disabled:opacity-60"
+                >
+                  {bulkBusy ? '읽는 중…' : 'CSV 로 여러 건 등록'}
+                </button>
+                {bulk && (
+                  <>
+                    <span className="text-[13px] text-[#4E5968]">
+                      {bulk.mode === 'preview'
+                        ? `검증 ${bulk.total}건 중 ${bulk.skipped.length}건 오류`
+                        : `${bulk.registered.length}건 등록됨`}
+                    </span>
+                    {bulk.mode === 'preview' && bulk.total > bulk.skipped.length && (
+                      <button
+                        type="button"
+                        disabled={bulkBusy}
+                        onClick={async () => {
+                          setBulkBusy(true);
+                          try {
+                            setBulk(await bulkFreights(bulkCsv, true));
+                          } catch (err) {
+                            setSubmitError(err instanceof Error ? err.message : '등록에 실패했습니다.');
+                          } finally {
+                            setBulkBusy(false);
+                          }
+                        }}
+                        className="rounded-lg bg-[#3182F6] px-3 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1B64DA] disabled:bg-[#B0B8C1]"
+                      >
+                        {bulk.total - bulk.skipped.length}건 등록하기
+                      </button>
+                    )}
+                    {bulk.skipped.slice(0, 2).map((s) => (
+                      <span key={s.row} className="text-[13px] text-[#C77700]">
+                        {s.row}행: {Object.values(s.errors ?? {})[0] ?? '형식 오류'}
+                      </span>
+                    ))}
+                  </>
+                )}
+              </div>
+
               <div className="flex items-center justify-between gap-4">
-                <span className="text-[13px] leading-relaxed text-[#8B95A1]">
+                <span className="flex flex-wrap items-center gap-2 text-[13px] leading-relaxed text-[#8B95A1]">
                   {masters.state.status === 'ready' ? masters.state.data.notice : ' '}
+                  {masters.state.status === 'ready' && masters.state.data.demo && (
+                    <DemoDataBadge api="#10 LLM 파싱" />
+                  )}
                 </span>
                 <button
                   type="button"
@@ -296,6 +380,44 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 className="h-[84px] w-full resize-none rounded-xl border border-[#E5E8EB] bg-white p-4 text-base leading-relaxed text-[#191F28] outline-none transition-colors focus:border-[#3182F6]"
               />
             </Field>
+
+            {form.constraintText.trim() && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={classifying}
+                  onClick={() => {
+                    setClassifying(true);
+                    classifyConstraints(form.constraintText)
+                      .then((r) => setConstraints(r.constraints))
+                      .catch(() => setConstraints([]))
+                      .finally(() => setClassifying(false));
+                  }}
+                  className="self-start text-[13px] font-semibold text-[#3182F6] underline-offset-2 hover:underline disabled:text-[#B0B8C1]"
+                >
+                  {classifying ? '조건 분석 중…' : '이 조건이 어떻게 읽히는지 확인'}
+                </button>
+                {constraints !== null && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {constraints.length === 0 ? (
+                      <span className="text-[13px] text-[#8B95A1]">
+                        구조화할 수 있는 조건을 못 찾았습니다 — 문장은 그대로 조율에 전달됩니다.
+                      </span>
+                    ) : (
+                      constraints.map((c, i) => (
+                        <span
+                          key={`${c.field}-${i}`}
+                          className="rounded-lg bg-[#F2F4F6] px-2.5 py-1.5 text-[13px] text-[#4E5968]"
+                        >
+                          <b className="font-bold text-[#191F28]">{c.field}</b>
+                          {c.evidence ? ` · ${c.evidence}` : ''}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {submitError && <ErrorNotice message={submitError} />}
 

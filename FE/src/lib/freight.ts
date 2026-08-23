@@ -219,3 +219,27 @@ export function requestMatching(
     ...(registeredId ? { registeredId } : {}),
   });
 }
+
+// ── #12 CSV 다건 등록 ──────────────────────────────────────────
+
+export interface BulkRowResult {
+  row: number;
+  ok: boolean;
+  errors?: Record<string, string>;
+  raw?: unknown;
+}
+
+export interface BulkResult {
+  mode: 'preview' | 'commit';
+  total: number;
+  registered: Shipment[];
+  skipped: BulkRowResult[];
+}
+
+/**
+ * CSV 로 여러 건을 한 번에 등록합니다. **미리보기 → 확정** 2단계입니다 —
+ * 검증만 먼저 돌려 몇 건이 걸리는지 보여주고, 확인한 뒤에만 실제로 넣습니다.
+ */
+export function bulkFreights(csv: string, commit: boolean): Promise<BulkResult> {
+  return postJson<BulkResult>('/api/freights/bulk', { csv, commit });
+}

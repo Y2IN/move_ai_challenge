@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AsyncSection, CardSkeleton, SkeletonGrid } from '../components/AsyncSection';
 import { LoadBar, StatusBadge } from '../components/StatusBadge';
@@ -20,7 +20,7 @@ import { formatDateTime, formatNumber, formatPct } from '../lib/format';
 import { requestMatching, type MatchResult } from '../lib/freight';
 import { useAccount } from '../lib/account';
 import { useAsync } from '../lib/use-async';
-import { fetchVacancies, type Vacancy } from '../lib/wagons';
+import { fetchVacancies, syncWagonTypeLabels, type Vacancy } from '../lib/wagons';
 
 // 각 열을 내용이 안 접히는 폭으로 고정하고, 부족하면 카드 안에서 가로 스크롤
 // 구간만 남는 폭을 흡수(최소 260px), 나머지는 고정
@@ -115,6 +115,12 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
   );
 
   // 적재율 낮은 순 — 채울 여지가 큰 공차가 위로 온다.
+  // 화차 종류 라벨을 서버 마스터와 맞춘다 (종류가 늘어도 화면만 낡지 않게).
+  // 실패해도 기본 라벨이 있어 화면은 그대로 뜬다.
+  useEffect(() => {
+    void syncWagonTypeLabels();
+  }, []);
+
   const matches = useAsync<MatchRowData[]>(
     useCallback(
       () =>

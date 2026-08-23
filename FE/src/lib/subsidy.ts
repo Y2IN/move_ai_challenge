@@ -281,3 +281,35 @@ export type SubsidyExportFormat = 'html' | 'pdf';
 export function applicationExportUrl(id: string, format: SubsidyExportFormat): string {
   return `${BASE}/${encodeURIComponent(id)}/export?format=${format}`;
 }
+
+// ── #30 사전 점검 ──────────────────────────────────────────────
+
+export type PreflightState = 'ready' | 'pending' | 'blocked';
+
+export interface PreflightItem {
+  key: string;
+  title: string;
+  desc: string;
+  state: PreflightState;
+  /** 서버가 판정한 문구. 화면에서 다시 만들지 않습니다 */
+  status: string;
+  ai?: boolean;
+}
+
+export interface PreflightResponse {
+  period: { id: string; label: string; from: string; to: string };
+  applicant: string | null;
+  items: PreflightItem[];
+  /** 비어 있지 않으면 이대로 만들 때 서식이 빕니다 */
+  blockers: string[];
+  estimatedSeconds: number;
+}
+
+/**
+ * 생성 전 점검. 예전에는 이 목록이 화면 상수라 데이터가 없어도 늘 "준비 완료"였습니다.
+ * 판정 근거(집계·계수·산식)가 서버에 있으므로 판정도 서버가 합니다.
+ */
+export function fetchPreflight(period?: string | null): Promise<PreflightResponse> {
+  const q = period ? `?period=${encodeURIComponent(period)}` : '';
+  return json<PreflightResponse>(`/api/subsidy/preflight${q}`);
+}

@@ -4,6 +4,7 @@ import {
   parsePreviousSections,
 } from "@railhub/be/esg/narrative";
 import { isSectionKey, SECTION_KEYS } from "@railhub/be/esg/paragraphs";
+import { listEdits } from "@railhub/be/db/esg-edits";
 import { EsgQueryError, resolveAggregateDb } from "@railhub/be/esg/query";
 import type { EsgSectionKey } from "@railhub/be/esg/types";
 
@@ -91,7 +92,25 @@ export async function POST(request: Request) {
       previous,
       draftSeed: body.draftSeed as number | undefined,
     });
-    return Response.json(report);
+
+    // 사람이 고친 문단은 생성 결과 위에 덮어씌운다. 리포트 자체는 원장에서 매번
+    // 다시 만들어야 하므로(숫자가 따라가야 한다) 편집분만 따로 보관한다.
+    // 단, 이번 요청에서 **다시 생성하라고 지정한 문단**은 덮지 않는다 —
+    // 사용자가 그 문단을 새로 뽑겠다고 누른 것이다.
+    const edits = await listEdits(agg.period.id, agg.shipperId ?? null);
+    const regenerating = new Set(sections ?? []);
+    const merged = report.sections.map((s) => {
+      const e = edits.get(s.key);
+      if (!e || regenerating.has(s.key)) return s;
+      return {
+        ...s,
+        text: e.text,
+        source: "user" as const,
+        warnings: ["직접 편집한 문단입니다. 서버가 숫자를 보증하지 않습니다."],
+      };
+    });
+
+    return Response.json({ ...report, sections: merged });
   } catch (error) {
     if (error instanceof EsgQueryError) {
       return Response.json({ error: error.message }, { status: 400 });

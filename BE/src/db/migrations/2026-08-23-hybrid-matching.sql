@@ -56,3 +56,19 @@ comment on column settlement_documents.file is
 -- 5. RLS — 새 테이블도 서버(service_role)만 통과시킨다
 alter table settlement_documents enable row level security;
 revoke all on table settlement_documents from anon, authenticated;
+
+-- ── 6. K-ESG 리포트 문단의 사람 편집분 ──────────────────────────
+--    리포트 자체는 실적 집계에서 매번 다시 생성한다(원장이 바뀌면 숫자도 바뀌어야
+--    하므로). 그래서 결과를 통째로 저장하지 않고 **사람이 고친 문단만** 남겨
+--    생성할 때마다 덮어씌운다. 사업계획서(#35)가 사용자 편집을 보존하는 것과 같다.
+create table if not exists esg_section_edits (
+  period_id    text not null,
+  shipper_id   text,
+  section_key  text not null,
+  text         text not null,
+  edited_at    timestamptz not null default now(),
+  primary key (period_id, shipper_id, section_key)
+);
+
+alter table esg_section_edits enable row level security;
+revoke all on table esg_section_edits from anon, authenticated;

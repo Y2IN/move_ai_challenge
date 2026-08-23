@@ -218,3 +218,31 @@ export function calculateBenefits(
     ...(registeredId ? { registeredId } : {}),
   });
 }
+
+// ── #21 제약 분류 ──────────────────────────────────────────────
+
+export interface ClassifiedConstraint {
+  field: string;
+  kind?: string;
+  summary?: string;
+  evidence?: string;
+}
+
+export interface ClassifyResponse {
+  demo: boolean;
+  source: 'ai' | 'rule';
+  notice: string;
+  sensitivity: { price: string; leadTime: string };
+  constraints: ClassifiedConstraint[];
+  warnings: string[];
+}
+
+/**
+ * 화주가 문장으로 적은 조건을 **절대 조건 / 조정 가능**으로 나눕니다.
+ *
+ * 등록 화면에서 미리 보여주면, 조율 에이전트가 나중에 무엇을 건드릴지
+ * 사용자가 등록 시점에 확인할 수 있습니다.
+ */
+export function classifyConstraints(utterance: string): Promise<ClassifyResponse> {
+  return postJson<ClassifyResponse>('/api/negotiation/classify', { utterance });
+}

@@ -23,10 +23,19 @@ export const maxDuration = 60;
 const STEP_GAP_MS = 400;
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  /**
+   * 화면이 "생성 취소"를 누르면 EventSource 를 닫고, 그러면 이 요청이 abort 된다.
+   * 예전에는 그 신호를 안 봐서 **서버는 문단을 끝까지 다 생성했다** — 취소했는데
+   * 요금은 그대로 나가고 로그에는 완료로 남았다. 단계 사이마다 확인해 멈춘다.
+   *
+   * 이미 생성이 끝난 문단은 그대로 저장한다. 버리면 다음 진입에서 또 만들어야 한다.
+   */
+  const aborted = () => req.signal.aborted;
 
   // 진행률 스트림은 **이미 만들어진 초안**을 채운다. 여기서 새 초안을 만들면
   // 스트림을 열 때마다 유령 초안이 하나씩 쌓이고 findLatest() 가 그걸 가리킨다.
@@ -81,9 +90,11 @@ export async function GET(
         });
 
         for (const s of computedSteps) {
+          if (aborted()) return;
           await pause();
           send("step", { ...s, status: "done" });
         }
+        if (aborted()) return;
 
         // ── 5단계: AI 서술 문단 (여기서 실제 시간이 든다)
         await pause();
@@ -94,6 +105,7 @@ export async function GET(
           status: "running",
         });
 
+        if (aborted()) return;
         const result = isLlmConfigured()
           ? await generateParagraphs(input, (done, total, key) => {
               send("paragraph", {
@@ -108,6 +120,7 @@ export async function GET(
 
         send("step", { step: 5, label: "서술 문단 작성", status: "done" });
 
+        // 생성이 끝난 문단은 취소됐어도 저장한다 (이미 지불한 값이다).
         const at = new Date().toISOString();
         // ⚠️ 위에서 잡아 둔 `app` 은 DB 모드에서 교체 결과를 못 본다 (find 가 매번
         //    새 객체를 준다). 반환값을 이어받아야 done 이 방금 쓴 문단을 싣는다.
@@ -118,6 +131,7 @@ export async function GET(
         }
         await saveDiagnostics(id, result.diagnostics);
 
+        if (aborted()) return;
         send("done", {
           applicationId: latest.id,
           progress: 100,

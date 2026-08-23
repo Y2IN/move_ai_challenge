@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AgentFlowCard, EsgDocPreview, PlanDocPreview } from '../components/DocPreview';
 import { AiChip, LandingSection, SectionHeader } from '../components/LandingSection';
 import { formatNumber, formatWonSign } from '../lib/format';
+import { DemoDataBadge } from '../components/AsyncSection';
 import { usePublicStats } from '../lib/landing';
 import type { PublicStats } from '../lib/public';
 import {
@@ -234,12 +235,21 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             </button>
           </div>
 
-          <div className="mt-[18px] text-[15px] text-[#6B7684]">
-            {stats.status === 'ready'
-              ? `누적 합적 화주 ${formatNumber(stats.data.cumulative.shippers)}개사 · 채운 공차 ${formatNumber(
-                  stats.data.cumulative.filledWagons,
-                )}량 · 코레일 공차 노선 실시간 연동`
-              : '코레일 공차 노선 실시간 연동'}
+          {/* 히어로 금액은 원장 실집계지만, 누적 화주 수는 한 분기 원장으로 구할 수
+              없어 큐레이션 값입니다. 어느 쪽인지 화면에 표시합니다. */}
+          <div className="mt-[18px] flex flex-wrap items-center gap-2 text-[15px] text-[#6B7684]">
+            {stats.status === 'ready' ? (
+              <>
+                <span>
+                  {`누적 합적 화주 ${formatNumber(stats.data.cumulative.shippers)}개사 · 채운 공차 ${formatNumber(
+                    stats.data.cumulative.filledWagons,
+                  )}량 · 코레일 공차 노선 실시간 연동`}
+                </span>
+                <DemoDataBadge />
+              </>
+            ) : (
+              <span>코레일 공차 노선 실시간 연동</span>
+            )}
           </div>
         </div>
       </section>
