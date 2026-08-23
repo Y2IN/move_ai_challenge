@@ -15,17 +15,28 @@
  * 메모리로 되돌아간다 — 그 인스턴스가 처리한 만큼은 계속 보인다.
  * 환경변수가 아예 없으면 예전과 100% 같은 동작이다.
  *
- * ⚠️ 매칭 풀과의 관계: `match()` 는 여전히 "시드 풀 + 방금 등록한 1건" 으로
- *    편성을 계산한다. 시연 시나리오(14/18톤 → 반드시 미달)를 보존하기 위해
- *    이 스토어의 누적 화물은 매칭 풀에 섞지 않고, 목록(#13) 표시용으로만 쓴다.
- *    심사위원이 2주간 화물을 아무리 쌓아도 시나리오가 흔들리지 않는 이유다.
+ * ── 매칭 풀과의 관계 (하이브리드) ───────────────────────────────
+ *
+ * 예전에는 등록 화물을 매칭 풀에서 **통째로 배제**했다. 시연 시나리오(14/18톤 →
+ * 반드시 미달)를 지키려는 의도였지만, 부작용이 컸다: 화물을 아무리 등록해도
+ * 화차가 채워지지 않았고 "데이터가 부족하다"는 메시지만 반복됐다. 등록이
+ * 아무 영향도 주지 않는 제품은 시연으로도 설득이 안 된다.
+ *
+ * 이제 `buildMatchData()` 가 등록 화물을 매칭 풀에 넣는다. 대신 시나리오는
+ * **화차 한 량에 가둬서** 지킨다 — `demoScenario` 플래그가 붙은 화차에는
+ * 저장소 출신 화물(`fromRegistry`)이 앉지 않는다 (matching.ts 의 seatOnWagon).
+ * 그래서 조율 데모용 화차는 언제나 시드 14/18톤에서 시작하고, 나머지 화차는
+ * 등록이 쌓이는 만큼 실제로 차오른다.
  */
 
 import { isDbEnabled, nextSeq } from "./db/client";
+import { loadUniverse } from "./db/universe";
 import {
   cancelNegotiationRow,
   clearAll as clearDb,
   deleteShipmentRecord,
+  findConfirmation,
+  findConfirmationByClientKey,
   findLatestConfirmation,
   findNegotiation,
   findShipmentRecord,
@@ -35,7 +46,7 @@ import {
   listShipmentRecords,
   updateShipmentRecord,
 } from "./db/shipments";
-import { match, normalizeInput } from "./matching";
+import { DEFAULT_FLEX_DAYS, match, normalizeInput } from "./matching";
 import type { MatchCandidate, MatchResult } from "./matching";
 import { accept } from "./negotiate";
 import type { NegotiationResult } from "./negotiate";
@@ -157,6 +168,41 @@ function buildShipment(input: ShipmentInput, n: number, data: SeedData): Shipmen
 // ── 화물 CRUD ──────────────────────────────────────────────────
 
 /** 등록: 입력을 Shipment 로 정규화해 저장하고, 만들어진 레코드를 돌려준다. */
+/**
+ * 매칭에 쓸 데이터 — 유니버스(DB 우선) + 등록 화물.
+ *
+ * 등록 화물에는 `fromRegistry: true` 를 달아 보낸다. 이 표시가 있어야
+ * seatOnWagon 이 시나리오 화차에서 걸러낼 수 있다.
+ *
+ * @param excludeId 방금 등록해 따로 입력으로 넘기는 화물. 두 번 세면 톤수가 부풀어
+ *                  적재율이 실제와 달라진다.
+ */
+export async function buildMatchData(excludeId?: string | null): Promise<SeedData> {
+  const universe = await loadUniverse();
+  const rows = await listShipmentRecords();
+  const stored = rows ?? registered;
+
+  const extra: Shipment[] = stored
+    .filter((r) => r.shipment.id !== excludeId)
+    // 이미 확정 편성에 들어간 화물은 다시 매칭에 넣지 않는다.
+    .filter((r) => r.shipment.status === "requested" || r.shipment.status === "scheduled")
+    .map((r) => ({
+      ...r.shipment,
+      fromRegistry: true,
+      fallbackHints: {
+        ...r.shipment.fallbackHints,
+        // 유연폭 입력이 생기기 전에 등록된 화물은 0 이 박혀 있다. 그대로 쓰면
+        // 화차 출발일과 날짜가 정확히 같아야만 실려서 사실상 아무 데도 못 탄다.
+        // 입력에 값이 없던 건에 한해 현재 기본값(±2일)으로 본다.
+        departureFlexDays:
+          r.input.departureFlexDays ??
+          (r.shipment.fallbackHints.departureFlexDays || DEFAULT_FLEX_DAYS),
+      },
+    }));
+
+  return { ...universe, shipments: [...universe.shipments, ...extra] };
+}
+
 export async function registerShipment(
   input: ShipmentInput,
   data: SeedData = seed,
@@ -249,6 +295,8 @@ export async function clearShipments(): Promise<void> {
 export interface Confirmation {
   groupId: string;
   status: "confirmed";
+  /** 멱등 키 — 같은 키로 다시 확정 요청이 오면 새로 만들지 않고 이 편성을 돌려준다 */
+  clientKey?: string | null;
   wagon: EmptyWagon;
   members: MatchCandidate[];
   totalTon: number;
@@ -269,8 +317,19 @@ export type ConfirmResult =
 export async function confirmMatch(
   input: ShipmentInput | null,
   acceptedShipmentIds: string[] = [],
-  data: SeedData = seed,
+  opts: { registeredId?: string | null; clientKey?: string | null } = {},
 ): Promise<ConfirmResult> {
+  // 같은 클라이언트 키로 이미 확정한 편성이 있으면 그걸 돌려준다.
+  // 화면 새로고침·더블클릭·StrictMode 이중 실행으로 편성이 여러 개 생기던 문제를 막는다.
+  if (opts.clientKey) {
+    const existing = await findConfirmationByClientKey(opts.clientKey);
+    if (existing) return { status: "confirmed", confirmation: existing };
+    const mirrored = confirmations.find((c) => c.clientKey === opts.clientKey);
+    if (mirrored) return { status: "confirmed", confirmation: mirrored };
+  }
+
+  const data = await buildMatchData(opts.registeredId ?? null);
+
   // 조율 수락분이 있으면 negotiate.accept() 로 재매칭 (예정 물량 당김), 없으면 그대로 매칭.
   const result = acceptedShipmentIds.length
     ? accept(data, input, acceptedShipmentIds).result
@@ -284,6 +343,7 @@ export async function confirmMatch(
   const confirmation: Confirmation = {
     groupId: `GRP-${String(n).padStart(3, "0")}`,
     status: "confirmed",
+    clientKey: opts.clientKey ?? null,
     wagon: result.wagon,
     members: result.members,
     totalTon: result.totalTon,
@@ -309,6 +369,13 @@ export async function latestConfirmation(): Promise<Confirmation | null> {
   const fromDb = await findLatestConfirmation();
   if (fromDb) return fromDb;
   return confirmations.length ? confirmations[confirmations.length - 1] : null;
+}
+
+/** 편성 번호로 한 건. 확정 화면이 조회 전용으로 동작하기 위한 진입점. */
+export async function getConfirmation(groupId: string): Promise<Confirmation | null> {
+  const fromDb = await findConfirmation(groupId);
+  if (fromDb) return fromDb;
+  return confirmations.find((c) => c.groupId === groupId) ?? null;
 }
 
 // ── 조율 세션 (#25 조회 · #26 취소) ────────────────────────────

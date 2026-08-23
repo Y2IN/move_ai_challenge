@@ -47,6 +47,12 @@ export type WagonPhase = "open" | "negotiate" | "confirmed" | "cancelled";
 /** 마감 몇 시간 전부터 조율 에이전트를 돌릴지 */
 export const NEGOTIATION_WINDOW_HOURS = 48;
 
+/**
+ * 출발일 유연폭 기본값(일). 폼 기본 선택과 같은 값이어야 한다.
+ * 0 이면 화차 시각표와 날짜가 정확히 일치할 때만 매칭돼 대부분 noWagon 이 된다.
+ */
+export const DEFAULT_FLEX_DAYS = 2;
+
 export interface MatchResult {
   /**
    * `phase` 에서 파생됩니다. 둘이 따로 놀면 "phase=confirmed 인데 status=shortfall,
@@ -156,7 +162,7 @@ export function normalizeInput(input: ShipmentInput, seed: SeedData, id?: string
     fallbackHints: {
       // 유연폭 0 을 강제하면 화차 시각표와 정확히 같은 날짜만 통과해
       // 대부분의 등록이 noWagon 이 된다. 폼 기본값과 같은 ±2 로 둔다.
-      departureFlexDays: Math.min(7, Math.max(0, Math.round(input.departureFlexDays ?? 2))),
+      departureFlexDays: Math.min(7, Math.max(0, Math.round(input.departureFlexDays ?? DEFAULT_FLEX_DAYS))),
       hardArrivalBy: input.requiredArrivalBy ?? null,
       mustBeCovered: input.requiresCover ?? false,
       noWeekendDispatch: false,
@@ -199,6 +205,20 @@ export function wagonViolation(wagon: EmptyWagon, shipments: Shipment[]): string
   return null;
 }
 
+/**
+ * 이 화물이 그 노선 화차에 실릴 수 있는 구간인지.
+ *
+ * 예전에는 검사하지 않았다. 시드 화물이 전부 같은 노선이라 문제가 없었지만,
+ * 등록 화물이 매칭 풀에 들어오면서 **역방향 화물이 남의 편성에 올라탔다**
+ * (오봉→울산 12톤이 울산→오봉 화차에 실려 적재율을 부풀렸다).
+ */
+export function shipmentOnLane(s: Shipment, lane: Lane): boolean {
+  return (
+    s.origin.stationId === lane.originStationId &&
+    s.destination.stationId === lane.destStationId
+  );
+}
+
 /** 출발일이 화차 시각표와 맞는지 (fallbackHints 기준 — AI 파싱 실패 시 경로) */
 export function scheduleFits(s: Shipment, wagon: EmptyWagon): boolean {
   const want = new Date(s.schedule.requestedDepartureDate).getTime();
@@ -228,11 +248,18 @@ export function scheduleFits(s: Shipment, wagon: EmptyWagon): boolean {
  */
 export function seatOnWagon(
   wagon: EmptyWagon,
-  eligible: Shipment[],
+  candidates: Shipment[],
   mustInclude: Shipment | null,
 ): { members: Shipment[]; totalTon: number } {
   // 이미 확보된 물량(reservedTon)만큼 실제로 쓸 수 있는 자리가 줄어듭니다.
   const usableTon = Math.max(0, wagon.capacityTon - (wagon.reservedTon ?? 0));
+
+  // 조율 데모 시나리오 화차는 시드 화물 + 지금 입력만 태운다. 저장소에 쌓인
+  // 등록 화물이 여기까지 들어오면 시작 상태(14/18톤 미달)가 무너져 조율 시연이
+  // 성립하지 않는다. 나머지 화차는 등록 화물로 실제로 채워진다.
+  const eligible = wagon.demoScenario
+    ? candidates.filter((s) => !s.fromRegistry || s.id === mustInclude?.id)
+    : candidates;
 
   const fits = (subset: Shipment[]) => {
     const ton = subset.reduce((a, s) => a + s.cargo.weightTon, 0);
@@ -326,18 +353,24 @@ export function match(
     };
   }
 
-  // 노선이 맞는 화차 후보를 훑어서 가장 많이 싣는 편성을 고릅니다.
+  // 노선이 맞는 화차 후보를 훑어서 **가장 꽉 차는** 편성을 고릅니다.
+  //
+  // 절대 톤수가 아니라 적재율로 비교합니다. 톤수로 고르면 큰 화차의 헐거운 편성이
+  // 작은 화차의 빽빽한 편성을 이깁니다 (15/22=68% 가 14/18=78% 를 이기는 식) —
+  // 적재율이 낮을수록 톤당 단가가 비싸고 성립 가능성도 낮으므로 화주에게 손해입니다.
   const wagons = seed.emptyWagons.filter((w) => w.laneId === lane.id);
-  let best: { wagon: EmptyWagon; members: Shipment[] } | null = null;
+  let best: { wagon: EmptyWagon; members: Shipment[]; rate: number; ton: number } | null = null;
 
   for (const wagon of wagons) {
-    const eligible = all.filter((s) => scheduleFits(s, wagon));
+    const eligible = all.filter((s) => shipmentOnLane(s, lane) && scheduleFits(s, wagon));
     const { members, totalTon } = seatOnWagon(wagon, eligible, userShipment);
 
     // 사용자 화물이 안 들어간 편성은 의미 없음 (seatOnWagon 이 빈 배열을 돌려준다)
     if (members.length === 0) continue;
-    if (!best || totalTon > best.members.reduce((a, m) => a + m.cargo.weightTon, 0)) {
-      best = { wagon, members };
+    const rate = wagon.capacityTon > 0 ? totalTon / wagon.capacityTon : 0;
+    // 적재율이 같으면 더 많이 싣는 쪽 (같은 비율이면 큰 화차가 사회적 편익이 크다)
+    if (!best || rate > best.rate || (rate === best.rate && totalTon > best.ton)) {
+      best = { wagon, members, rate, ton: totalTon };
     }
   }
 

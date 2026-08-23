@@ -137,6 +137,12 @@ export interface Shipment {
   shipperName?: string;
   status: ShipmentStatus;
   pullForwardEligible?: boolean;
+  /**
+   * 저장소(등록 화물)에서 온 화물. 시드 풀 화물과 구분한다.
+   * 조율 데모 시나리오 화차(`EmptyWagon.demoScenario`)는 이 화물을 태우지 않는다 —
+   * 누적 등록이 시작 상태(14/18톤 미달)를 흔들면 조율 시연이 성립하지 않는다.
+   */
+  fromRegistry?: boolean;
   cargo: Cargo;
   origin: {
     name: string;

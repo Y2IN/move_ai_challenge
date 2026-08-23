@@ -8,10 +8,10 @@
  */
 
 import raw from "./seed.json";
-import { match, NEGOTIATION_WINDOW_HOURS, seatOnWagon, scheduleFits } from "./matching";
+import { match, NEGOTIATION_WINDOW_HOURS, scheduleFits, seatOnWagon, shipmentOnLane } from "./matching";
 import { accept } from "./negotiate";
 import { rollDemoDates, todayYmd } from "./roll";
-import type { SeedData, ShipmentInput } from "./types";
+import type { SeedData, Shipment, ShipmentInput } from "./types";
 
 let pass = 0;
 let fail = 0;
@@ -125,7 +125,77 @@ const input = (over: Partial<ShipmentInput> = {}): ShipmentInput => ({
   ok("유연폭 기본값은 ±2 (미지정도 탑승)", def.status !== "noWagon", def.status);
 }
 
-// ── 6. seatOnWagon 물리 요건 ───────────────────────────────────
+// ── 6. 하이브리드 매칭 — 등록 화물은 채우되 시나리오 화차는 지킨다 ──
+
+{
+  const dep = seed.emptyWagons.find((w) => w.id === "WGN-B04")!.departure.date;
+  /** 저장소에서 온 것처럼 표시한 등록 화물 */
+  const registryShipment = (id: string, ton: number): Shipment => ({
+    ...seed.shipments.find((s) => s.id === "SHM-C-001")!,
+    id,
+    shipperId: "SHP-USER",
+    shipperName: "등록 화주",
+    fromRegistry: true,
+    cargo: {
+      ...seed.shipments.find((s) => s.id === "SHM-C-001")!.cargo,
+      weightTon: ton,
+      requiresCover: false,
+    },
+    schedule: { requestedDepartureDate: dep, requiredArrivalBy: "" },
+    fallbackHints: {
+      departureFlexDays: 2,
+      hardArrivalBy: null,
+      mustBeCovered: false,
+      noWeekendDispatch: false,
+      requiresForklift: false,
+    },
+  });
+
+  const hybrid: SeedData = {
+    ...seed,
+    shipments: [...seed.shipments, registryShipment("SHM-USER-901", 12)],
+  };
+
+  const a17 = seed.emptyWagons.find((w) => w.id === "WGN-A17")!;
+  const b04 = seed.emptyWagons.find((w) => w.id === "WGN-B04")!;
+  const onLane = (s: Shipment) => shipmentOnLane(s, seed.lanes[0]);
+
+  const seatedA17 = seatOnWagon(
+    a17,
+    hybrid.shipments.filter((s) => s.status === "requested" && onLane(s) && scheduleFits(s, a17)),
+    null,
+  );
+  ok("시나리오 화차는 등록 화물을 안 태운다 (14t 유지)", seatedA17.totalTon === 14, `${seatedA17.totalTon}t`);
+
+  const seatedB04 = seatOnWagon(
+    b04,
+    hybrid.shipments.filter((s) => s.status === "requested" && onLane(s) && scheduleFits(s, b04)),
+    null,
+  );
+  ok(
+    "일반 화차는 등록 화물로 채워진다",
+    seatedB04.members.some((m) => m.id === "SHM-USER-901"),
+    `${seatedB04.totalTon}t · ${seatedB04.members.map((m) => m.id).join(",")}`,
+  );
+
+  // 역방향 등록 화물이 남의 편성에 올라타면 안 된다
+  const reverse: Shipment = {
+    ...registryShipment("SHM-USER-902", 10),
+    origin: { ...seed.shipments[0].origin, stationId: "OBONG" },
+    destination: { ...seed.shipments[0].destination, stationId: "ULS-FRT" },
+  };
+  ok("역방향 등록 화물은 노선 필터에 걸린다", !shipmentOnLane(reverse, seed.lanes[0]));
+
+  // 적재율로 화차를 고른다 (톤수로 고르면 헐거운 큰 화차가 이긴다)
+  const picked = match(hybrid, null, NOW);
+  ok(
+    "적재율이 높은 화차를 고른다 (시나리오 유지)",
+    picked.wagon?.id === "WGN-A17",
+    `${picked.wagon?.id} ${picked.totalTon}/${picked.capacityTon}t`,
+  );
+}
+
+// ── 7. seatOnWagon 물리 요건 ───────────────────────────────────
 
 {
   const b04 = seed.emptyWagons.find((w) => w.id === "WGN-B04")!;

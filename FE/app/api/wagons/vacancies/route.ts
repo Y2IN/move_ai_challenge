@@ -1,6 +1,6 @@
-import { normalizeInput, scheduleFits, seatOnWagon, wagonPhase } from "@railhub/be/matching";
+import { normalizeInput, scheduleFits, seatOnWagon, shipmentOnLane, wagonPhase } from "@railhub/be/matching";
 import { quote } from "@railhub/be/quote";
-import { seed } from "@railhub/be/seed";
+import { buildMatchData } from "@railhub/be/store";
 import type { MemberInput } from "@railhub/be/calc";
 import type { ShipmentInput } from "@railhub/be/types";
 
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
-    | { shipment?: ShipmentInput; now?: string }
+    | { shipment?: ShipmentInput; now?: string; registeredId?: string }
     | null;
 
   const now = body?.now ? new Date(body.now) : new Date();
@@ -26,6 +26,8 @@ export async function POST(req: Request) {
   }
 
   const shipment = body?.shipment;
+  // 유니버스(DB) + 등록 화물 — 화면의 "얼마나 찼는지"가 실제 등록을 반영해야 한다
+  const seed = await buildMatchData(body?.registeredId ?? null);
   const userShipment = shipment ? normalizeInput(shipment, seed) : null;
   const pool = seed.shipments.filter((s) => s.status === "requested");
 
@@ -35,7 +37,9 @@ export async function POST(req: Request) {
     // 화차마다 **그 화차에 실제로 앉는 조합**을 계산한다. 예전에는 best 화차
     // 1량의 적재톤을 세 화차 전부에 적용해 phase 배지가 뒤섞였다 — A17 이
     // 14톤을 실었으면 B04·C09 도 "14톤 실린 것"으로 판정됐다.
-    const eligible = pool.filter((s) => scheduleFits(s, wagon));
+    const eligible = pool.filter(
+      (s) => (lane ? shipmentOnLane(s, lane) : false) && scheduleFits(s, wagon),
+    );
     const seated = seatOnWagon(wagon, eligible, null);
     const phase = wagonPhase(wagon, seated.totalTon, now);
 

@@ -1,7 +1,7 @@
 import { badJson, readBody, validationError } from "@railhub/be/http";
+import { loadUniverse } from "@railhub/be/db/universe";
 import { match } from "@railhub/be/matching";
-import { seed } from "@railhub/be/seed";
-import { listShipments, registerShipment, validateShipmentInput } from "@railhub/be/store";
+import { buildMatchData, listShipments, registerShipment, validateShipmentInput } from "@railhub/be/store";
 
 // 화물 등록 · 목록 (디자인 04a). 등록할 때마다 합적 매칭이 다시 돌아가므로,
 // POST 응답에 편성 미리보기(matchPreview)를 함께 실어 04a → 04b 전환을 매끄럽게 한다.
@@ -19,13 +19,15 @@ export async function POST(req: Request) {
   if (body.kind === "invalid") return badJson();
   const raw = body.kind === "json" ? body.value : {};
 
-  const { ok, errors, value } = validateShipmentInput(raw, seed);
+  const universe = await loadUniverse();
+  const { ok, errors, value } = validateShipmentInput(raw, universe);
   if (!ok || !value) return validationError(errors);
 
-  const shipment = await registerShipment(value, seed);
+  const shipment = await registerShipment(value, universe);
 
   // 편성 전체가 아니라 요약만 — 상세 편성/조율은 별도 매칭 API(#16)의 몫이다.
-  const m = match(seed, value);
+  // 방금 등록한 건은 입력으로 넘기므로 풀에서 제외한다 (두 번 세면 톤수가 부푼다).
+  const m = match(await buildMatchData(shipment.id), value);
   const matchPreview = {
     status: m.status,
     wagonLabel: m.wagon?.label ?? null,

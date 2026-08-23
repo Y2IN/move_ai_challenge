@@ -1,7 +1,6 @@
 import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/http";
 import { match } from "@railhub/be/matching";
-import { seed } from "@railhub/be/seed";
-import { validateShipmentInput } from "@railhub/be/store";
+import { buildMatchData, validateShipmentInput } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 /**
@@ -24,20 +23,23 @@ export async function POST(req: Request) {
     parsed.kind === "json" && parsed.value && typeof parsed.value === "object" && !Array.isArray(parsed.value)
       ? parsed.value
       : {}
-  ) as { shipment?: unknown; now?: string };
+  ) as { shipment?: unknown; now?: string; registeredId?: string };
 
   const now = body.now ? new Date(body.now) : new Date();
   if (Number.isNaN(now.getTime())) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
+  // 유니버스(DB) + 등록 화물. 방금 등록한 건은 입력으로 따로 넘어오므로 제외한다.
+  const data = await buildMatchData(body.registeredId ?? null);
+
   // 화물 입력이 있으면 검증, 없으면 시드 단독
   let shipment: ShipmentInput | null = null;
   if (!isEmptyObject(body.shipment)) {
-    const v = validateShipmentInput(body.shipment, seed);
+    const v = validateShipmentInput(body.shipment, data);
     if (!v.ok || !v.value) return validationError(v.errors);
     shipment = v.value;
   }
 
-  return Response.json(match(seed, shipment, now));
+  return Response.json(match(data, shipment, now));
 }

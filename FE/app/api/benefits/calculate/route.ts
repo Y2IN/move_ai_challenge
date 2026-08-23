@@ -1,8 +1,7 @@
 import { badJson, isEmptyObject, readBody, validationError } from "@railhub/be/http";
 import { match } from "@railhub/be/matching";
 import { accept } from "@railhub/be/negotiate";
-import { seed } from "@railhub/be/seed";
-import { validateShipmentInput } from "@railhub/be/store";
+import { buildMatchData, validateShipmentInput } from "@railhub/be/store";
 import type { ShipmentInput } from "@railhub/be/types";
 
 // 도로 단독 vs 철도 합적 → 4대 편익 (#27). calc 엔진(calc.ts)을 라우트로 노출.
@@ -22,16 +21,18 @@ export async function POST(req: Request) {
     parsed.kind === "json" && parsed.value && typeof parsed.value === "object" && !Array.isArray(parsed.value)
       ? parsed.value
       : {}
-  ) as { shipment?: unknown; acceptedShipmentIds?: unknown; now?: string };
+  ) as { shipment?: unknown; acceptedShipmentIds?: unknown; now?: string; registeredId?: string };
 
   const now = raw.now ? new Date(raw.now) : new Date();
   if (Number.isNaN(now.getTime())) {
     return Response.json({ error: "now 형식이 올바르지 않습니다" }, { status: 400 });
   }
 
+  const data = await buildMatchData(raw.registeredId ?? null);
+
   let shipment: ShipmentInput | null = null;
   if (!isEmptyObject(raw.shipment)) {
-    const v = validateShipmentInput(raw.shipment, seed);
+    const v = validateShipmentInput(raw.shipment, data);
     if (!v.ok || !v.value) return validationError(v.errors);
     shipment = v.value;
   }
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     ? raw.acceptedShipmentIds.filter((x): x is string => typeof x === "string")
     : [];
 
-  const result = ids.length ? accept(seed, shipment, ids, now).result : match(seed, shipment, now);
+  const result = ids.length ? accept(data, shipment, ids, now).result : match(data, shipment, now);
 
   return Response.json({
     status: result.status,
