@@ -10,6 +10,11 @@
  *
  * 키는 (기간, 화주, 문단) 이다. 다른 분기를 보면 그 분기의 편집만 적용된다.
  *
+ * ⚠️ **"전체 화주" 를 NULL 로 저장하지 않는다.** `shipper_id` 는 기본키 구성
+ *    컬럼이라 Postgres 가 암묵적으로 NOT NULL 을 건다 — NULL 을 넣으면 23502 로
+ *    거부되고, tryDb 가 그걸 삼켜 "저장했다"고 응답하게 된다(실제로 그렇게 샜다).
+ *    센티널 `'*'` 로 적고 읽을 때 null 로 되돌린다.
+ *
  * 테이블이 없으면 인메모리 미러로 돈다 (settlement-docs.ts 와 같은 계약).
  */
 
@@ -40,11 +45,16 @@ const mirror = (globalRef.__railhubEsgEdits ??= new Map());
 
 /** 같은 (기간·화주·문단) 은 한 벌만 남는다 */
 const cacheKey = (periodId: string, shipperId: string | null, key: string) =>
-  `${periodId}|${shipperId ?? "*"}|${key}`;
+  `${periodId}|${shipperId ?? ALL_SHIPPERS}|${key}`;
+
+/** "전체 화주" 를 나타내는 컬럼 값. PK 컬럼이라 NULL 을 쓸 수 없다. */
+const ALL_SHIPPERS = "*";
+const toColumn = (shipperId: string | null) => shipperId ?? ALL_SHIPPERS;
+const fromColumn = (v: string | null) => (v === ALL_SHIPPERS || v === null ? null : v);
 
 const toEdit = (r: EditRow): EsgEdit => ({
   periodId: r.period_id,
-  shipperId: r.shipper_id,
+  shipperId: fromColumn(r.shipper_id),
   key: r.section_key,
   text: r.text,
   editedAt: r.edited_at,
@@ -56,9 +66,11 @@ export async function listEdits(
   shipperId: string | null,
 ): Promise<Map<EsgSectionKey, EsgEdit>> {
   const rows = await tryDb("listEsgEdits", async (db) => {
-    let q = db.from("esg_section_edits").select("*").eq("period_id", periodId);
-    q = shipperId ? q.eq("shipper_id", shipperId) : q.is("shipper_id", null);
-    const res = await q;
+    const res = await db
+      .from("esg_section_edits")
+      .select("*")
+      .eq("period_id", periodId)
+      .eq("shipper_id", toColumn(shipperId));
     if (res.error) {
       if (/does not exist|schema cache/i.test(res.error.message)) return null;
       throw new Error(res.error.message);
@@ -85,7 +97,7 @@ export async function saveEdit(edit: EsgEdit): Promise<{ persisted: boolean }> {
       .upsert(
         {
           period_id: edit.periodId,
-          shipper_id: edit.shipperId,
+          shipper_id: toColumn(edit.shipperId),
           section_key: edit.key,
           text: edit.text,
           edited_at: edit.editedAt,
@@ -111,13 +123,12 @@ export async function clearEdit(
 ): Promise<void> {
   mirror.delete(cacheKey(periodId, shipperId, key));
   await tryDb("clearEsgEdit", async (db) => {
-    let q = db
+    const res = await db
       .from("esg_section_edits")
       .delete()
       .eq("period_id", periodId)
-      .eq("section_key", key);
-    q = shipperId ? q.eq("shipper_id", shipperId) : q.is("shipper_id", null);
-    const res = await q;
+      .eq("section_key", key)
+      .eq("shipper_id", toColumn(shipperId));
     if (res.error && !/does not exist|schema cache/i.test(res.error.message)) {
       throw new Error(res.error.message);
     }
