@@ -34,6 +34,12 @@ alter table confirmations add column if not exists client_key text;
 create unique index if not exists confirmations_client_key_idx
   on confirmations (client_key) where client_key is not null;
 
+-- 3-1. 코레일 배차 승인 (#43)
+--     화주의 '확정'과 코레일의 '승인'은 다른 사건이다. status 는 기존 컬럼을
+--     쓰고(confirmed → approved), 누가 언제 승인했는지만 따로 남긴다.
+alter table confirmations add column if not exists approved_at timestamptz;
+alter table confirmations add column if not exists approved_by text;
+
 -- 4. 정산 제출 서류
 --    파일 본문은 보관하지 않는다 — "무엇이 언제 올라왔는지"만 기록한다.
 create table if not exists settlement_documents (

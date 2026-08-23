@@ -171,6 +171,30 @@ async function tryPush(
   return true;
 }
 
+/**
+ * 이미 있는 행의 일부 컬럼만 갱신. 컬럼이 없으면 건너뛴다.
+ * (upsert 는 INSERT 경로 때문에 NOT NULL 컬럼을 전부 요구한다)
+ */
+async function tryUpdate(
+  table: string,
+  keyCol: string,
+  rows: { id: string; patch: Record<string, unknown> }[],
+): Promise<boolean> {
+  for (const { id, patch } of rows) {
+    const { error } = await db.from(table).update(patch).eq(keyCol, id);
+    if (!error) continue;
+    if (/does not exist|schema cache|column/i.test(error.message)) {
+      console.log(`  · ${table.padEnd(22)} 일부 컬럼 건너뜀 — ${error.message}`);
+      console.log("     (schema.sql 을 다시 적용하면 들어갑니다)");
+      return false;
+    }
+    console.error(`\n✖ ${table} 갱신 실패: ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`  ✓ ${table.padEnd(22)} ${rows.length}건 갱신`);
+  return true;
+}
+
 // ── 투입 ───────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -244,10 +268,12 @@ async function main(): Promise<void> {
     })),
     "id",
   );
-  await tryPush(
+  // demo_scenario 만 따로 채운다. upsert 로 보내면 INSERT 경로가 먼저 평가돼
+  // label 같은 NOT NULL 컬럼이 비어 제약에 걸린다 — 이미 있는 행이므로 update 다.
+  await tryUpdate(
     "empty_wagons",
-    seed.emptyWagons.map((w) => ({ id: w.id, demo_scenario: w.demoScenario ?? false })),
     "id",
+    seed.emptyWagons.map((w) => ({ id: w.id, patch: { demo_scenario: w.demoScenario ?? false } })),
   );
 
   await push(
