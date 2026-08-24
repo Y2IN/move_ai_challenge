@@ -62,7 +62,7 @@ export function DemoDataBadge({ api }: { api?: string }) {
 
 export function SkeletonGrid({ count = 4, height = 118 }: { count?: number; height?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
         <CardSkeleton key={i} height={height} />
       ))}

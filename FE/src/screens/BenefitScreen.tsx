@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, type CSSProperties } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { AnalogyCard } from '../components/StatCard';
 import { fetchCoefficients, type Coefficients } from '../lib/esg';
@@ -112,7 +112,7 @@ function CoefficientNote() {
           {verified ? '' : ' · 제3자 검증 전'}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
         {rows.map(([key, src]) => (
           <div key={key} className="flex justify-between gap-3 border-t border-[#F2F4F6] pt-2">
             <span className="flex-none text-[13px] font-bold text-[#4E5968]">{key}</span>
@@ -132,14 +132,15 @@ export function BenefitScreen({ data, onNavigate }: BenefitScreenProps) {
         <p className="text-base text-[#6B7684]">{data.periodLine}</p>
       </header>
 
-      <section className="grid grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ModeCard variant="road" rows={data.modeRows} />
         <ModeCard variant="rail" rows={data.modeRows} />
       </section>
 
+      {/* 데스크톱은 기존처럼 항목 수만큼 가로 나열, 모바일은 2열 */}
       <section
-        className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(data.benefitItems.length, 1)}, minmax(0, 1fr))` }}
+        className="grid grid-cols-2 gap-4 lg:grid-cols-[repeat(var(--benefit-cols),minmax(0,1fr))]"
+        style={{ '--benefit-cols': Math.max(data.benefitItems.length, 1) } as CSSProperties}
       >
         {data.benefitItems.map((b) => (
           <div key={b.name} className="flex flex-col gap-2.5 rounded-[18px] bg-white p-6">
@@ -155,7 +156,7 @@ export function BenefitScreen({ data, onNavigate }: BenefitScreenProps) {
 
       <CoefficientNote />
 
-      <section className="grid grid-cols-[1fr_300px] items-center gap-6 rounded-[20px] bg-white p-7">
+      <section className="grid grid-cols-1 items-center gap-6 rounded-[20px] bg-white p-7 lg:grid-cols-[1fr_300px]">
         <div>
           <div className="flex items-baseline justify-between border-b-2 border-[#191F28] pb-3.5">
             <span className="text-[17px] font-bold text-[#191F28]">{data.subsidy.totalLabel}</span>
@@ -184,7 +185,7 @@ export function BenefitScreen({ data, onNavigate }: BenefitScreenProps) {
       </section>
 
       <section className="flex flex-col gap-2.5">
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row">
           <AnalogyCard tone="green" value={data.analogies.pine.value} label={data.analogies.pine.label} />
           <AnalogyCard value={data.analogies.truck.value} label={data.analogies.truck.label} />
         </div>

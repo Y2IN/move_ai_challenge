@@ -19,7 +19,7 @@ import { useAsync } from '../lib/use-async';
 /** 화물 여러 건이 화차 1편성으로 모이는 연결선 */
 function MergeLines() {
   return (
-    <svg viewBox="0 0 132 220" className="h-[220px] w-[132px]" aria-hidden="true">
+    <svg viewBox="0 0 132 220" className="hidden h-[220px] w-[132px] lg:block" aria-hidden="true">
       <path d="M0 36 C 66 36, 66 110, 132 110" fill="none" stroke="#B0B8C1" strokeWidth="2" />
       <path d="M0 110 L 132 110" fill="none" stroke="#B0B8C1" strokeWidth="2" />
       <path d="M0 184 C 66 184, 66 110, 132 110" fill="none" stroke="#B0B8C1" strokeWidth="2" />
@@ -101,7 +101,7 @@ function EmptyConfirmation({ onNavigate }: { onNavigate?: (to: string) => void }
         편성은 조율 화면에서 <b>편성 확정하기</b>를 눌러야 발급됩니다. 아직 확정한 편성이 없거나,
         브라우저 세션이 초기화된 상태입니다.
       </p>
-      <div className="mt-5 flex gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onNavigate?.('/matching/negotiation')}
@@ -140,12 +140,12 @@ function ConfirmedBody({
         {calc ? ` · 합적 단가 ${formatPct(calc.cost.poolingSavingRate)} 인하` : ''}
       </Banner>
 
-      <section className="grid grid-cols-[1fr_380px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-4">
           <Card>
             <CardTitle>확정 편성</CardTitle>
 
-            <div className="mt-[18px] grid grid-cols-[1fr_132px_220px] items-center gap-2">
+            <div className="mt-[18px] grid grid-cols-1 items-center gap-2 lg:grid-cols-[1fr_132px_220px]">
               <div className="flex flex-col gap-2.5">
                 {c.members.map((m) => {
                   const share = shares.find((s) => s.shipmentId === m.shipmentId);
@@ -271,7 +271,7 @@ function ConfirmedBody({
 
             {calc ? (
               <>
-                <div className="mt-[18px] grid grid-cols-2 gap-2.5">
+                <div className="mt-[18px] grid grid-cols-1 gap-2.5 md:grid-cols-2">
                   <div className="rounded-[14px] bg-[#F9FAFB] p-4">
                     <div className="text-[13px] font-bold text-[#8B95A1]">도로 단독</div>
                     <div className="mt-3 text-xs text-[#B0B8C1]">운송비</div>

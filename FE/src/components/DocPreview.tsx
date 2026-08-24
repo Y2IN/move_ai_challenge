@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AiChip, MiniAiParagraph, MiniFormula, MiniSheet, MiniSheetHeader } from './LandingSection';
 import { formatKrwExact, formatNumber } from '../lib/format';
 import type { PublicStats } from '../lib/public';
@@ -66,6 +67,15 @@ function Row({
   );
 }
 
+/** 좁은 화면에서 칸을 줄이는 대신 표만 가로 스크롤시킨다 — 서식 유지 */
+function MiniTableScroll({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`overflow-x-auto ${className}`}>
+      <div className="min-w-[420px] border border-[#B0B8C1] text-[11px]">{children}</div>
+    </div>
+  );
+}
+
 function PreviewHead({ title, formats }: { title: string; formats: string }) {
   return (
     <div className="flex items-center gap-2.5">
@@ -95,7 +105,7 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
 
         <div>
           <div className="text-[13px] font-extrabold text-[#191F28]">4. 사회환경적 편익</div>
-          <div className="mt-2 border border-[#B0B8C1] text-[11px]">
+          <MiniTableScroll className="mt-2">
             <Row cols={BENEFIT_COLS} head>
               <Cell head>편익 항목</Cell>
               <Cell head>계수 출처</Cell>
@@ -121,12 +131,12 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
                 {stats ? formatKrwExact(total) : '—'}
               </Cell>
             </Row>
-          </div>
+          </MiniTableScroll>
         </div>
 
         <div>
           <div className="text-[13px] font-extrabold text-[#191F28]">5. 보조금 산정 결과</div>
-          <div className="mt-2 border border-[#B0B8C1] text-[11px]">
+          <MiniTableScroll className="mt-2">
             <Row cols={SUBSIDY_COLS}>
               <Cell head>추가비용 (A)</Cell>
               <Cell>
@@ -169,7 +179,7 @@ export function PlanDocPreview({ stats }: { stats: PublicStats | null }) {
                 <span className="text-xs text-[#B0B8C1]">신청서에서 산출</span>
               </Cell>
             </Row>
-          </div>
+          </MiniTableScroll>
         </div>
 
         <MiniAiParagraph body={d.aiParagraph} caption="AI 서술 · 편집 가능" />
@@ -193,7 +203,7 @@ export function EsgDocPreview({ stats }: { stats: PublicStats | null }) {
       <MiniSheet>
         <MiniSheetHeader formNo={d.formNo} title={d.docTitle} />
 
-        <div className="border border-[#B0B8C1] text-[11px]">
+        <MiniTableScroll>
           <Row cols={ESG_COLS} head>
             <Cell head>항목번호</Cell>
             <Cell head>항목명</Cell>
@@ -217,7 +227,7 @@ export function EsgDocPreview({ stats }: { stats: PublicStats | null }) {
               </Cell>
             </Row>
           ))}
-        </div>
+        </MiniTableScroll>
 
         <MiniAiParagraph body={d.aiParagraph} caption="AI 서술 · 편집 가능" />
 
@@ -263,7 +273,7 @@ export function AgentFlowCard({
         </div>
         <div className="mt-2 text-sm leading-[1.7] text-[#333D4B]">{output.message}</div>
 
-        <div className="mt-[11px] flex items-center gap-2.5 border-t border-[#F2F4F6] pt-[11px] text-[13px]">
+        <div className="mt-[11px] flex flex-wrap items-center gap-2.5 border-t border-[#F2F4F6] pt-[11px] text-[13px]">
           <span className="rounded-md bg-[#EAF8F1] px-2 py-[3px] font-bold text-[#12A87A]">{output.status}</span>
           <span className="tabular-nums text-[#6B7684]">{output.basis}</span>
           <span className="ml-auto font-bold tabular-nums text-[#191F28]">{output.loadChange}</span>

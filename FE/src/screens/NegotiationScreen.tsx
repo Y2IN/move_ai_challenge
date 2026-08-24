@@ -138,9 +138,9 @@ function ConfirmAction({
 
   if (!negotiation.feasible) {
     return (
-      <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-col gap-2 sm:items-end">
         {nextWagon && <span className="text-[13px] font-semibold text-[#3182F6]">{nextWagon}</span>}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             disabled={busy}
@@ -179,7 +179,7 @@ function ConfirmAction({
   }
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex flex-col gap-2 sm:items-end">
       <button
         type="button"
         disabled={disabled || busy}
@@ -235,7 +235,7 @@ function NegotiationBody({
   return (
     <>
       <section className="rounded-[20px] bg-white px-[26px] py-[22px]">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">
             {stream.done ? '조율 완료' : '조율 진행 중'} · {route}
           </span>
@@ -263,7 +263,7 @@ function NegotiationBody({
           )}
         </span>
 
-        <div className="mt-2 flex gap-5 text-[13px] text-[#8B95A1]">
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-[#8B95A1]">
           <span>
             <b className="text-[#191F28]">{startPct}%</b> 조율 전
           </span>
@@ -278,7 +278,7 @@ function NegotiationBody({
       </section>
 
       {/* items-start 없이 stretch — 두 패널이 내용 많은 쪽 높이에 맞춰 함께 늘어난다 */}
-      <section className="grid grid-cols-[480px_1fr] gap-4">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[480px_1fr]">
         <div className="flex flex-col gap-3 rounded-[20px] bg-white px-6 py-[22px]">
           <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">화주 제약 분류</span>
           <p className="text-[13px] leading-relaxed text-[#8B95A1]">
@@ -324,7 +324,7 @@ function NegotiationBody({
               ))}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#F2F4F6] pt-3">
+          <div className="flex flex-col gap-3 border-t border-[#F2F4F6] pt-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-1">
               <span className="text-sm text-[#8B95A1]">{n.message}</span>
               <button
@@ -352,7 +352,7 @@ function ShipperCard({ option, excluded }: { option: ConcessionOption; excluded?
         excluded ? 'border-[#E5E8EB] bg-white opacity-[0.72]' : 'border-[#F2F4F6] bg-[#F9FAFB]',
       ].join(' ')}
     >
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">
           {option.shipperName}{' '}
           <span className="text-sm font-semibold tabular-nums text-[#8B95A1]">
@@ -396,7 +396,7 @@ function ProposalStep({ proposal, accepted }: { proposal: Proposal; accepted: bo
       </span>
 
       <div>
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-[15px] font-bold text-[#191F28]">
             {proposal.shipperName} · {proposal.ask}
           </span>
@@ -435,7 +435,7 @@ function RejectedStep({ option }: { option: ConcessionOption }) {
         ✕
       </span>
       <div>
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-[15px] font-bold text-[#6B7684]">
             {option.shipperName} · {option.ask}
           </span>

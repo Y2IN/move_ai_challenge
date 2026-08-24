@@ -92,9 +92,9 @@ function SettlementBody({
 
   return (
     <>
-      <header className="flex items-end justify-between gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <PeriodSelect current={contract.no} history={history} onSelect={onSelectContract} />
             <span className="text-sm text-[#6B7684]">협약 전체 대비 현재까지 실적</span>
           </div>
@@ -108,7 +108,7 @@ function SettlementBody({
         </span>
       </header>
 
-      <section className="grid grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: '협약물량', value: ton(contract.contractTon), big: true },
           { label: '협약 보조금', value: formatKrw(contract.subsidyKrw), big: true },
@@ -138,7 +138,7 @@ function SettlementBody({
       <Recalc recalc={recalc} contractTon={contract.contractTon} actualTon={achievement.actualTon} asOf={data.asOf} />
       <History history={history} />
 
-      <section className="grid grid-cols-[1fr_380px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_380px]">
         <Trips trips={trips} summary={data.tripSummary} />
         <div className="flex flex-col gap-4">
           <DocChecklist documents={documents} onUploaded={onUploaded} />
@@ -163,20 +163,20 @@ function PeriodSelect({
   const now = history.find((h) => h.no === current);
 
   return (
-    <div className="relative">
+    <div className="relative max-w-full">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[34px] items-center gap-2 rounded-[10px] border border-[#E5E8EB] bg-white px-3 text-sm font-bold tracking-[-0.02em] text-[#191F28]"
+        className="flex h-[34px] max-w-full items-center gap-2 rounded-[10px] border border-[#E5E8EB] bg-white px-3 text-sm font-bold tracking-[-0.02em] text-[#191F28]"
       >
-        <span>
+        <span className="truncate">
           {now?.name ?? current} ({now ? span(now.periodFrom, now.periodTo) : ''})
         </span>
         <span className="text-[11px] text-[#8B95A1]">▾</span>
       </button>
 
       {open && (
-        <div className="absolute left-0 top-10 z-20 w-[360px] rounded-[14px] border border-[#E5E8EB] bg-white p-1.5 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+        <div className="absolute left-0 top-10 z-20 w-[360px] max-w-[calc(100vw-48px)] rounded-[14px] border border-[#E5E8EB] bg-white p-1.5 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
           {[...history].reverse().map((h) => (
             <button
               key={h.no}
@@ -221,8 +221,8 @@ function AchievementCard({ a, asOf }: { a: AchievementView; asOf: string }) {
   ];
 
   return (
-    <section className="rounded-[20px] bg-white px-8 pb-[26px] pt-[30px]">
-      <div className="flex items-end justify-between">
+    <section className="rounded-[20px] bg-white px-5 pb-[26px] pt-[30px] sm:px-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-2.5">
           <span className="text-[15px] font-semibold text-[#6B7684]">협약물량 달성률</span>
           <span className="text-xl font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
@@ -231,7 +231,7 @@ function AchievementCard({ a, asOf }: { a: AchievementView; asOf: string }) {
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-start gap-2 sm:items-end">
           <div className="flex items-baseline gap-3">
             <span
               className={`rounded-full px-3 py-1.5 text-sm font-bold ${
@@ -253,7 +253,7 @@ function AchievementCard({ a, asOf }: { a: AchievementView; asOf: string }) {
         </div>
       </div>
 
-      <div className="relative mt-[26px] pb-[34px]">
+      <div className="relative mt-[26px] pb-2.5 sm:pb-[34px]">
         <span className="block h-[18px] overflow-hidden rounded-full bg-[#F2F4F6]">
           <span
             className={`block h-[18px] rounded-full ${behind ? 'bg-[#F59E0B]' : 'bg-[#15C47E]'}`}
@@ -264,17 +264,18 @@ function AchievementCard({ a, asOf }: { a: AchievementView; asOf: string }) {
           className="absolute top-0 h-[18px] w-0.5 -translate-x-1/2 bg-[#191F28]"
           style={{ left: `${Math.min(targetPct, 100)}%` }}
         />
+        {/* 좁은 화면에서는 흐름 배치(정적)로 내려 라벨이 카드 밖으로 나가지 않게 한다 */}
         <span
-          className="absolute top-[23px] -translate-x-1/2 whitespace-nowrap rounded-[7px] bg-[#191F28] px-[9px] py-1 text-xs font-bold text-white"
+          className="mt-2.5 inline-block whitespace-nowrap rounded-[7px] bg-[#191F28] px-[9px] py-1 text-xs font-bold text-white sm:absolute sm:top-[23px] sm:mt-0 sm:-translate-x-1/2"
           style={{ left: `${Math.min(targetPct, 100)}%` }}
         >
           지금 도달해야 할 지점 {targetPct}%
         </span>
       </div>
 
-      <div className="mt-1 grid grid-cols-3 border-t border-[#F2F4F6] pt-5">
+      <div className="mt-1 grid grid-cols-1 gap-4 border-t border-[#F2F4F6] pt-5 sm:grid-cols-3 sm:gap-0">
         {stats.map((s, i) => (
-          <div key={s.label} className={`flex flex-col gap-2 ${i ? 'border-l border-[#F2F4F6] pl-7' : ''}`}>
+          <div key={s.label} className={`flex flex-col gap-2 ${i ? 'sm:border-l sm:border-[#F2F4F6] sm:pl-7' : ''}`}>
             <span className="text-sm text-[#8B95A1]">{s.label}</span>
             <span
               className={`text-2xl font-extrabold tabular-nums tracking-[-0.03em] ${
@@ -292,7 +293,7 @@ function AchievementCard({ a, asOf }: { a: AchievementView; asOf: string }) {
 
 function ShortfallAlert({ a, onFill }: { a: AchievementView; onFill?: () => void }) {
   return (
-    <section className="flex items-center gap-6 rounded-[20px] bg-[#FFF4E0] px-7 py-6">
+    <section className="flex flex-wrap items-center gap-6 rounded-[20px] bg-[#FFF4E0] px-5 py-6 sm:px-7">
       <span className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#F59E0B] text-[15px] font-extrabold text-white">
         !
       </span>
@@ -361,14 +362,14 @@ function Recalc({
   ];
 
   return (
-    <section className="grid grid-cols-[1fr_380px] items-stretch gap-4">
-      <div className="rounded-[20px] bg-white px-7 py-[26px]">
-        <div className="flex items-baseline justify-between gap-4">
+    <section className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[1fr_380px]">
+      <div className="rounded-[20px] bg-white px-5 py-[26px] sm:px-7">
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
           <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">확정 보조금 재계산</span>
           <span className="text-right text-sm leading-relaxed text-[#8B95A1]">{recalc.formulaNote}</span>
         </div>
 
-        <div className="mt-6 grid grid-cols-[200px_1fr]">
+        <div className="mt-6 grid grid-cols-[140px_1fr] sm:grid-cols-[200px_1fr]">
           <span className="py-3.5 text-[13px] font-bold text-[#B0B8C1]">구분</span>
           <span className="py-3.5 text-right text-[13px] font-bold text-[#B0B8C1]">협약 기준</span>
 
@@ -396,7 +397,7 @@ function Recalc({
         </p>
       </div>
 
-      <div className="flex flex-col rounded-[20px] border-t-[3px] border-[#191F28] bg-white px-7 pb-[26px]">
+      <div className="flex flex-col rounded-[20px] border-t-[3px] border-[#191F28] bg-white px-5 pb-[26px] sm:px-7">
         <div className="flex items-center justify-between gap-2.5 pt-6">
           <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">현재 실적 기준</span>
           <span className="text-[13px] tabular-nums text-[#8B95A1]">{asOf} 기준</span>
@@ -449,8 +450,8 @@ function Recalc({
 
 function History({ history }: { history: ContractPerformance[] }) {
   return (
-    <section className="rounded-[20px] bg-white px-7 pb-5 pt-[26px]">
-      <div className="flex items-baseline justify-between">
+    <section className="rounded-[20px] bg-white px-5 pb-5 pt-[26px] sm:px-7">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">정산 히스토리</span>
           <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
@@ -460,55 +461,60 @@ function History({ history }: { history: ContractPerformance[] }) {
         <span className="text-sm text-[#8B95A1]">기간별 확정 보조금 · 감액 이력</span>
       </div>
 
-      <div className={`mt-[22px] grid ${HISTORY_COLS} gap-3 px-1 pb-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
-        <span>정산 기간</span>
-        <span className="text-right">협약물량</span>
-        <span className="text-right">실적물량</span>
-        <span className="text-right">확정 보조금</span>
-        <span className="text-right">감액</span>
-        <span className="text-right">상태</span>
-      </div>
+      {/* 6칸 표 — 좁은 화면은 가로 스크롤. -ml-2/pl-2 는 현재 행 하이라이트(-ml-2)가 잘리지 않게 하는 보정 */}
+      <div className="-ml-2 overflow-x-auto pl-2">
+        <div className="min-w-[800px]">
+          <div className={`mt-[22px] grid ${HISTORY_COLS} gap-3 px-1 pb-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
+            <span>정산 기간</span>
+            <span className="text-right">협약물량</span>
+            <span className="text-right">실적물량</span>
+            <span className="text-right">확정 보조금</span>
+            <span className="text-right">감액</span>
+            <span className="text-right">상태</span>
+          </div>
 
-      {history.map((h) => (
-        <div
-          key={h.no}
-          className={[
-            `grid ${HISTORY_COLS} items-center gap-3 border-t border-[#F2F4F6]`,
-            h.current ? '-ml-2 rounded-r-xl border-l-[3px] border-l-[#3182F6] bg-[#F9FAFB] py-4 pl-3 pr-1' : 'px-1 py-4',
-          ].join(' ')}
-        >
-          <span className="flex flex-col gap-[3px]">
-            <span className="flex items-center gap-2">
-              <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">{h.name}</span>
-              {h.current && (
-                <span className="rounded-md bg-[#E8F3FF] px-2 py-[3px] text-xs font-bold text-[#1B64DA]">현재</span>
-              )}
-            </span>
-            <span className="text-[13px] tabular-nums text-[#8B95A1]">
-              {h.no} · {span(h.periodFrom, h.periodTo)}
-            </span>
-          </span>
+          {history.map((h) => (
+            <div
+              key={h.no}
+              className={[
+                `grid ${HISTORY_COLS} items-center gap-3 border-t border-[#F2F4F6]`,
+                h.current ? '-ml-2 rounded-r-xl border-l-[3px] border-l-[#3182F6] bg-[#F9FAFB] py-4 pl-3 pr-1' : 'px-1 py-4',
+              ].join(' ')}
+            >
+              <span className="flex flex-col gap-[3px]">
+                <span className="flex items-center gap-2">
+                  <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">{h.name}</span>
+                  {h.current && (
+                    <span className="rounded-md bg-[#E8F3FF] px-2 py-[3px] text-xs font-bold text-[#1B64DA]">현재</span>
+                  )}
+                </span>
+                <span className="text-[13px] tabular-nums text-[#8B95A1]">
+                  {h.no} · {span(h.periodFrom, h.periodTo)}
+                </span>
+              </span>
 
-          <span className="text-right text-[15px] tabular-nums text-[#6B7684]">{ton(h.contractTon)}</span>
-          <span className="text-right text-[15px] font-bold tabular-nums text-[#191F28]">{ton(h.actualTon)}</span>
-          <span className="text-right text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
-            {formatKrw(h.actualSubsidyKrw)}
-            {h.current && <span className="ml-1 text-[13px] font-semibold text-[#8B95A1]">예상</span>}
-          </span>
+              <span className="text-right text-[15px] tabular-nums text-[#6B7684]">{ton(h.contractTon)}</span>
+              <span className="text-right text-[15px] font-bold tabular-nums text-[#191F28]">{ton(h.actualTon)}</span>
+              <span className="text-right text-base font-bold tabular-nums tracking-[-0.02em] text-[#191F28]">
+                {formatKrw(h.actualSubsidyKrw)}
+                {h.current && <span className="ml-1 text-[13px] font-semibold text-[#8B95A1]">예상</span>}
+              </span>
 
-          <span className="justify-self-end">
-            {h.diffKrw >= 0 ? (
-              <span className="text-[15px] text-[#B0B8C1]">없음</span>
-            ) : (
-              <Badge tone="warnDeep">△{formatKrw(Math.abs(h.diffKrw)).replace('−', '')}</Badge>
-            )}
-          </span>
+              <span className="justify-self-end">
+                {h.diffKrw >= 0 ? (
+                  <span className="text-[15px] text-[#B0B8C1]">없음</span>
+                ) : (
+                  <Badge tone="warnDeep">△{formatKrw(Math.abs(h.diffKrw)).replace('−', '')}</Badge>
+                )}
+              </span>
 
-          <span className="justify-self-end">
-            <Badge tone={h.status === '전액지급' ? 'ok' : 'warn'}>{h.status}</Badge>
-          </span>
+              <span className="justify-self-end">
+                <Badge tone={h.status === '전액지급' ? 'ok' : 'warn'}>{h.status}</Badge>
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </section>
   );
 }
@@ -533,8 +539,8 @@ function Trips({
 
   return (
     <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
-      <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
-        <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-3.5 pt-5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">실적 운송 내역</span>
           <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold tabular-nums text-[#6B7684]">
             {summary.tripCount}편성 · {summary.legCount}건 · {ton(summary.totalTon)}
@@ -543,42 +549,47 @@ function Trips({
         <span className="text-sm text-[#8B95A1]">운송장은 화주별로 발행됩니다</span>
       </div>
 
-      <div className={`grid ${TRIP_COLS} gap-2.5 px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
-        <span>회차</span>
-        <span>운송일</span>
-        <span>구간</span>
-        <span>품목</span>
-        <span className="text-right">물량</span>
-        <span>운송장번호</span>
-        <span className="text-right">증빙 상태</span>
+      {/* 7칸 표 — 좁은 화면은 가로 스크롤로 봅니다 */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[780px]">
+          <div className={`grid ${TRIP_COLS} gap-2.5 px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
+            <span>회차</span>
+            <span>운송일</span>
+            <span>구간</span>
+            <span>품목</span>
+            <span className="text-right">물량</span>
+            <span>운송장번호</span>
+            <span className="text-right">증빙 상태</span>
+          </div>
+
+          {shown.map((t) => (
+            <div
+              key={t.waybill}
+              className={`grid ${TRIP_COLS} items-center gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]`}
+            >
+              <span className="text-[15px] font-bold tabular-nums text-[#191F28]">{t.no}회차</span>
+              <span className="text-[15px] tabular-nums text-[#4E5968]">{t.date}</span>
+              <span className="text-[15px] font-semibold tracking-[-0.02em] text-[#191F28]">{t.route}</span>
+              <span className="text-[15px] text-[#6B7684]">{t.category}</span>
+              <span className="text-right text-[15px] font-semibold tabular-nums text-[#191F28]">
+                {formatNumber(t.weightTon, 1)}t
+              </span>
+              <span className="truncate text-sm tabular-nums text-[#8B95A1]">{t.waybill}</span>
+              <span className="justify-self-end">
+                {/* 원장에 올라온 건 = 수송이 끝나고 확정된 실적입니다 */}
+                <Badge tone="ok">원장 확정</Badge>
+              </span>
+            </div>
+          ))}
+
+          {restCount > 0 && (
+            <div className="flex items-center justify-between gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]">
+              <span className="text-[15px] text-[#6B7684]">외 {formatNumber(restCount)}건</span>
+              <span className="text-[15px] font-semibold tabular-nums text-[#191F28]">{ton(restTon)}</span>
+            </div>
+          )}
+        </div>
       </div>
-
-      {shown.map((t) => (
-        <div
-          key={t.waybill}
-          className={`grid ${TRIP_COLS} items-center gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]`}
-        >
-          <span className="text-[15px] font-bold tabular-nums text-[#191F28]">{t.no}회차</span>
-          <span className="text-[15px] tabular-nums text-[#4E5968]">{t.date}</span>
-          <span className="text-[15px] font-semibold tracking-[-0.02em] text-[#191F28]">{t.route}</span>
-          <span className="text-[15px] text-[#6B7684]">{t.category}</span>
-          <span className="text-right text-[15px] font-semibold tabular-nums text-[#191F28]">
-            {formatNumber(t.weightTon, 1)}t
-          </span>
-          <span className="truncate text-sm tabular-nums text-[#8B95A1]">{t.waybill}</span>
-          <span className="justify-self-end">
-            {/* 원장에 올라온 건 = 수송이 끝나고 확정된 실적입니다 */}
-            <Badge tone="ok">원장 확정</Badge>
-          </span>
-        </div>
-      ))}
-
-      {restCount > 0 && (
-        <div className="flex items-center justify-between gap-2.5 border-t border-[#F2F4F6] px-5 py-[15px]">
-          <span className="text-[15px] text-[#6B7684]">외 {formatNumber(restCount)}건</span>
-          <span className="text-[15px] font-semibold tabular-nums text-[#191F28]">{ton(restTon)}</span>
-        </div>
-      )}
     </div>
   );
 }

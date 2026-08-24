@@ -192,7 +192,7 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
           skeleton={<SkeletonGrid count={4} height={118} />}
         >
           {(cards) => (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {cards.map((c) => (
                 <StatCard key={c.label} stat={c} />
               ))}
@@ -201,7 +201,7 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
         </AsyncSection>
       </section>
 
-      <section className="grid grid-cols-[1fr_360px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_360px]">
         {/* min-w-0 없으면 그리드 아이템이 내용 폭만큼 부풀어 페이지가 가로로 늘어남 */}
         <AsyncSection state={matches.state} onRetry={matches.reload} skeleton={<CardSkeleton height={520} />}>
           {(rows) => {
@@ -209,8 +209,8 @@ export function WagonScreen({ onNavigate }: WagonScreenProps) {
 
             return (
               <div className="min-w-0 rounded-[20px] bg-white px-2 pb-3 pt-2">
-                <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3.5 pt-5">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">공차 목록</span>
                     <span className="rounded-lg bg-[#F2F4F6] px-2.5 py-[5px] text-[13px] font-bold text-[#6B7684]">
                       {rows.length}편성

@@ -9,9 +9,9 @@ interface DemoEntryScreenProps {
 /** 02a-1 — 해커톤 시연용. 역할만 고르면 바로 입장한다 */
 export function DemoEntryScreen({ onEnter, onLogin }: DemoEntryScreenProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
+    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-4 sm:p-8 lg:p-12">
       <AuthCard>
-        <div className="flex flex-col justify-center gap-6 px-16 py-14">
+        <div className="flex flex-col justify-center gap-6 px-6 py-10 sm:px-10 md:px-16 md:py-14">
           <div className="flex flex-col gap-2">
             <span className="self-start rounded-lg bg-[#E8F3FF] px-[11px] py-1.5 text-[13px] font-bold text-[#1B64DA]">
               데모 모드

@@ -16,13 +16,13 @@ export function TrendChart({ title, note, data, suffix }: TrendChartProps) {
   const heightOf = (rate: number) => (max > 0 ? `${(rate / max) * 100}%` : '0%');
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-[20px] bg-white p-[26px]">
+    <div className="flex h-full flex-col justify-between rounded-[20px] bg-white p-5 sm:p-[26px]">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">{title}</span>
         <span className="text-[13px] text-[#8B95A1]">{note}</span>
       </div>
 
-      <div className="mt-6 flex items-end gap-4">
+      <div className="mt-6 flex items-end gap-2 sm:gap-4">
         {data.map((d) => (
           <div key={d.label} className="flex flex-1 flex-col items-center gap-2.5">
             <span
