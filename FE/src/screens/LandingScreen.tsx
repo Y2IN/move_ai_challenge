@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AgentFlowCard, EsgDocPreview, PlanDocPreview } from '../components/DocPreview';
+import { GlobeBackdrop } from '../components/GlobeBackdrop';
 import { AiChip, LandingSection, SectionHeader } from '../components/LandingSection';
 import { formatNumber, formatWonSign } from '../lib/format';
-import { DemoDataBadge } from '../components/AsyncSection';
 import { usePublicStats } from '../lib/landing';
 import type { PublicStats } from '../lib/public';
 import {
@@ -189,8 +189,9 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
         </button>
       </nav>
 
-      <section className="bg-[#0B1220] pb-[88px]">
-        <div className="flex flex-col items-center gap-[22px] px-10 pt-[76px] text-center">
+      <section className="relative overflow-hidden bg-[#0B1220] pb-[88px]">
+        <GlobeBackdrop />
+        <div className="relative flex flex-col items-center gap-[22px] px-10 pt-[76px] text-center">
           <span className="rounded-full bg-[#3182F6]/[0.18] px-[15px] py-2 text-sm font-bold text-[#6FB0FF]">
             {brand.tagline}
           </span>
@@ -237,7 +238,7 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
 
           {/* 히어로 금액은 원장 실집계지만, 누적 화주 수는 한 분기 원장으로 구할 수
               없어 큐레이션 값입니다. 어느 쪽인지 화면에 표시합니다. */}
-          <div className="mt-[18px] flex flex-wrap items-center gap-2 text-[15px] text-[#6B7684]">
+          <div className="mt-[18px] flex flex-col items-center gap-2.5 text-[15px] text-[#6B7684]">
             {stats.status === 'ready' ? (
               <>
                 <span>
@@ -245,7 +246,11 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
                     stats.data.cumulative.filledWagons,
                   )}량 · 코레일 공차 노선 실시간 연동`}
                 </span>
-                <DemoDataBadge />
+                {/* 공유 DemoDataBadge 는 흰 배경용 노란 배지라 다크 히어로에서 시선을
+                    훔칩니다. 고지는 남기고 톤만 죽입니다. 무엇이 데모값인지도 명시. */}
+                <span className="whitespace-nowrap rounded-lg bg-white/[0.07] px-2.5 py-[5px] text-[13px] font-semibold text-[#D9A84B]">
+                  누적 수치는 데모 데이터
+                </span>
               </>
             ) : (
               <span>코레일 공차 노선 실시간 연동</span>
