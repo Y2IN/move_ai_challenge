@@ -96,7 +96,7 @@ function RevisionPanel({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
       <aside
-        className="flex h-full w-[520px] max-w-full flex-col gap-4 overflow-y-auto bg-white p-7"
+        className="flex h-full w-[520px] max-w-full flex-col gap-4 overflow-y-auto bg-white p-5 sm:p-7"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -355,7 +355,7 @@ export function ApplyDoneScreen({
       {revisions !== null && onCloseRevisions && (
         <RevisionPanel revisions={revisions} error={revisionsError} onClose={onCloseRevisions} />
       )}
-      <header className="flex items-end justify-between">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2.5">
             <span className="rounded-lg bg-[#EAF8F1] px-[11px] py-1.5 text-[13px] font-bold text-[#12A87A]">
@@ -392,9 +392,9 @@ export function ApplyDoneScreen({
         </div>
       </header>
 
-      <section className="grid grid-cols-[1fr_380px] items-start gap-5">
+      <section className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-3.5">
-          <div className="flex gap-1 self-start rounded-xl bg-[#EDEEF0] p-1">
+          <div className="flex max-w-full gap-1 self-start overflow-x-auto rounded-xl bg-[#EDEEF0] p-1">
             {TABS.map((t) => {
               const on = t.key === tab;
               return (
@@ -403,7 +403,7 @@ export function ApplyDoneScreen({
                   type="button"
                   onClick={() => setTab(t.key)}
                   className={[
-                    "h-[42px] rounded-[9px] px-[18px] text-[15px] font-bold transition-colors",
+                    "h-[42px] whitespace-nowrap rounded-[9px] px-[18px] text-[15px] font-bold transition-colors",
                     on ? "bg-white text-[#191F28]" : "text-[#8B95A1]",
                   ].join(" ")}>
                   {t.label}
@@ -436,7 +436,7 @@ export function ApplyDoneScreen({
               보조금 산정
             </span>
 
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <PanelCard card={panel?.a} />
               <PanelCard card={panel?.b} />
             </div>

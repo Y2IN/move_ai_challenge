@@ -129,7 +129,7 @@ export default function Benefit() {
           )}
         </header>
         {state.status === "loading" && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="h-[220px] animate-pulse rounded-[20px] bg-white" />
             <div className="h-[220px] animate-pulse rounded-[20px] bg-white" />
           </div>

@@ -65,7 +65,7 @@ export function WagonRouteCard({
           공차 회송 구간
         </span>
       </div>
-      <div className="mt-[18px] grid grid-cols-4 gap-4">
+      <div className="mt-[18px] grid grid-cols-2 gap-4 lg:grid-cols-4">
         <InfoCell label="구간" value={route} />
         <InfoCell label={departLabel} value={departAt} />
         <InfoCell label={third.label} value={third.value} />

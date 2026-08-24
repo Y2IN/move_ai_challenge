@@ -14,7 +14,7 @@ export function LoginScreen({ onLogin, onDemo, onSignup }: LoginScreenProps) {
   const [helpOpen, setHelpOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
+    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-4 sm:p-8 lg:p-12">
       {/* 인증이 데모 범위 밖이라 재설정 메일을 보낼 곳이 없습니다. 그 사실을 그대로 알립니다. */}
       {helpOpen && (
         <div
@@ -55,7 +55,7 @@ export function LoginScreen({ onLogin, onDemo, onSignup }: LoginScreenProps) {
         </div>
       )}
       <AuthCard>
-        <div className="flex flex-col justify-center gap-[22px] px-16 py-14">
+        <div className="flex flex-col justify-center gap-[22px] px-6 py-10 sm:px-10 md:px-16 md:py-14">
           <div className="rounded-xl bg-[#F5F9FF] px-4 py-3.5 text-[15px] leading-[1.55] text-[#1B64DA]">
             계정 없이 <b className="font-bold">데모 계정으로 둘러보기</b>로 바로 확인하실 수 있습니다.
           </div>

@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-/** 관공서 서식 표. 실선 테두리 + 회색 헤더 */
+/** 관공서 서식 표. 실선 테두리 + 회색 헤더. 좁은 화면에서는 칸을 줄이지 않고 가로 스크롤 */
 export function DocTable({ children }: { children: ReactNode }) {
-  return <div className="border border-[#B0B8C1] text-sm">{children}</div>;
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[560px] border border-[#B0B8C1] text-sm">{children}</div>
+    </div>
+  );
 }
 
 export function DocRow({
@@ -88,7 +92,7 @@ export function DocSectionTitle({ children }: { children: ReactNode }) {
 /** 문서 상단 안내 + 범례 */
 export function DocLegend({ note }: { note: string }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-[10px] bg-[#F9FAFB] px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3.5 rounded-[10px] bg-[#F9FAFB] px-4 py-3">
       <span className="flex-1 text-[13px] font-bold text-[#4E5968]">{note}</span>
       <span className="inline-flex items-center gap-1.5 text-xs text-[#6B7684]">
         <span className="h-2.5 w-2.5 rounded-[3px] bg-[#E5E8EB]" />
@@ -303,7 +307,7 @@ export function AiParagraphBlock({
 export function DocSheet({ children, minHeight = 1120 }: { children: ReactNode; minHeight?: number }) {
   return (
     <div
-      className="flex w-full flex-col gap-[26px] rounded-md border border-[#E5E8EB] bg-white px-[60px] pb-16 pt-14 shadow-[0_8px_28px_rgba(25,31,40,0.07)]"
+      className="flex w-full flex-col gap-[26px] rounded-md border border-[#E5E8EB] bg-white px-5 pb-16 pt-14 shadow-[0_8px_28px_rgba(25,31,40,0.07)] sm:px-[60px]"
       style={{ minHeight }}
     >
       {children}

@@ -116,7 +116,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   return (
     <AppLayout active="home" role={persona} account={account}>
-      <header className="flex items-end justify-between">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[28px] font-extrabold tracking-[-0.035em] text-[#191F28]">
             {account ? `${account.name}님, ` : ''}이번 분기 성과입니다
@@ -124,7 +124,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <p className="mt-2 text-base text-[#6B7684]">{periodLine}</p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* 코레일은 leftbar에 공차 관리가 있어 헤더 버튼 중복 → 기업(화물 등록)만 노출 */}
           {persona === 'corp' && (
             <button
@@ -161,7 +161,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
       </header>
 
-      <section className="grid grid-cols-[460px_1fr] gap-4">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[460px_1fr]">
         <div className="flex flex-col gap-4">
           <AsyncSection
             state={dashboard.state}
@@ -173,7 +173,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
           <AsyncSection state={dashboard.state} onRetry={dashboard.reload} skeleton={<CardSkeleton height={86} />}>
             {(data) => (
-              <div className="flex items-center justify-between rounded-[20px] bg-white px-7 py-[22px]">
+              <div className="flex items-center justify-between gap-3 rounded-[20px] bg-white px-5 py-[22px] sm:px-7">
                 <div className="flex flex-col gap-1">
                   <span className="text-[15px] font-semibold text-[#6B7684]">{copy.savingLabel}</span>
                   <span className="text-[13px] text-[#B0B8C1]">{copy.savingNote}</span>
@@ -191,7 +191,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         <div className="flex flex-col gap-4">
           <AsyncSection state={dashboard.state} onRetry={dashboard.reload} skeleton={<SkeletonGrid />}>
             {(data) => (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {toStatCards(data.kpis).map((s) => (
                   <StatCard key={s.label} stat={s} />
                 ))}
@@ -201,7 +201,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
           <AsyncSection state={dashboard.state} skeleton={<CardSkeleton height={76} />}>
             {(data) => (
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-4 md:flex-row">
                 <AnalogyCard
                   tone="green"
                   value={`${formatCompact(data.equivalents.pineTrees)} 그루`}
@@ -217,9 +217,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
       </section>
 
-      <section className="grid grid-cols-[1fr_360px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_360px]">
         <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
-          <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-2.5">
               <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">{copy.matchTitle}</span>
               {matches.state.status === 'ready' && (
@@ -279,13 +279,13 @@ const kpi = (data: DashboardResponse, key: string) => data.kpis.find((k) => k.ke
 /** 기업 — 보조금 예상액이 주인공. 편익 내역과 30% 상한을 함께 편다. */
 function CorpHero({ data }: { data: DashboardResponse }) {
   return (
-    <div className="rounded-[20px] bg-white p-7">
+    <div className="rounded-[20px] bg-white p-5 sm:p-7">
       <div className="flex items-center justify-between">
         <span className="text-[15px] font-semibold text-[#6B7684]">{homeCopy.corp.heroLabel}</span>
         <span className="rounded-lg bg-[#E8F3FF] px-2.5 py-[5px] text-[13px] font-bold text-[#1B64DA]">산정 완료</span>
       </div>
 
-      <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">
+      <div className="mt-3.5 text-[34px] font-extrabold tracking-[-0.045em] text-[#191F28] sm:text-[42px]">
         {data.subsidyEstimate.label}
       </div>
       <div className="mt-1.5 text-[15px] text-[#8B95A1]">
@@ -327,7 +327,7 @@ function KorailHero({ data }: { data: DashboardResponse }) {
   const drivers = [kpi(data, 'filledWagons'), kpi(data, 'newShippers')].filter(Boolean);
 
   return (
-    <div className="rounded-[20px] bg-white p-7">
+    <div className="rounded-[20px] bg-white p-5 sm:p-7">
       <div className="flex items-center justify-between">
         <span className="text-[15px] font-semibold text-[#6B7684]">{homeCopy.korail.heroLabel}</span>
         {rate?.deltaPct != null && rate.deltaPct < 0 && (
@@ -337,7 +337,7 @@ function KorailHero({ data }: { data: DashboardResponse }) {
         )}
       </div>
 
-      <div className="mt-3.5 text-[42px] font-extrabold tracking-[-0.045em] text-[#191F28]">{rate?.value ?? '—'}</div>
+      <div className="mt-3.5 text-[34px] font-extrabold tracking-[-0.045em] text-[#191F28] sm:text-[42px]">{rate?.value ?? '—'}</div>
       <div className="mt-1.5 text-[15px] text-[#8B95A1]">{formatPeriodLabel(data.period)} 기준</div>
 
       <div className="mt-[22px] flex flex-col gap-0.5">

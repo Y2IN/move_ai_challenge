@@ -108,14 +108,14 @@ export function ApplyIntroScreen({
     <AppLayout active="subsidy">
       {preview && (
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-8"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4 sm:p-8"
           onClick={() => setPreview(null)}
         >
           <div
-            className="mx-auto flex w-[880px] max-w-full flex-col gap-4 rounded-2xl bg-white p-7"
+            className="mx-auto flex w-[880px] max-w-full flex-col gap-4 rounded-2xl bg-white p-4 sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <h2 className="text-xl font-extrabold tracking-[-0.03em] text-[#191F28]">
                   빈 서식 미리보기
@@ -161,8 +161,8 @@ export function ApplyIntroScreen({
         <p className="text-base text-[#6B7684]">{applyMeta.legalBasis}</p>
       </header>
 
-      <section className="grid grid-cols-[1fr_380px] items-start gap-4">
-        <div className="rounded-[20px] bg-white px-7 pb-6 pt-7">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_380px]">
+        <div className="rounded-[20px] bg-white px-5 pb-6 pt-7 sm:px-7">
           <div className="flex items-center justify-between">
             <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">무엇이 만들어지나요</span>
             <span className="rounded-lg bg-[#F2F4F6] px-[11px] py-1.5 text-[13px] font-bold text-[#6B7684]">

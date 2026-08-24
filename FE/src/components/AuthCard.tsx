@@ -4,12 +4,12 @@ import type { ReactNode } from 'react';
 import { cumulativeLines, usePublicStats } from '../lib/landing';
 import { brand } from '../mocks/marketing';
 
-/** 02 로그인 · 회원가입 좌측 브랜드 패널 */
+/** 02 로그인 · 회원가입 좌측 브랜드 패널. 폼이 우선인 좁은 화면에서는 숨긴다 */
 export function AuthBrandPanel() {
   const { state: stats } = usePublicStats();
   return (
     // 랜딩('/') 다크 히어로와 같은 팔레트
-    <div className="flex flex-col justify-between bg-[#0B1220] px-10 py-11">
+    <div className="hidden flex-col justify-between bg-[#0B1220] px-10 py-11 md:flex">
       <div className="flex items-center gap-2">
         <img src="/train.png" alt="" width={28} height={28} className="rounded-lg" />
         <span className="text-[17px] font-extrabold tracking-[-0.03em] text-white">{brand.name}</span>
@@ -40,10 +40,10 @@ export function AuthBrandPanel() {
   );
 }
 
-/** 인증 화면 카드 셸. 1040 × 720 */
+/** 인증 화면 카드 셸. md 이상 1040 × 720 2열, 그 미만은 폼 단독 1열 */
 export function AuthCard({ children }: { children: ReactNode }) {
   return (
-    <div className="grid h-[720px] w-[1040px] grid-cols-[420px_1fr] overflow-hidden rounded-[20px] bg-white shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+    <div className="grid w-full max-w-[1040px] grid-cols-1 overflow-hidden rounded-[20px] bg-white shadow-[0_12px_40px_rgba(25,31,40,0.10)] md:h-[720px] md:grid-cols-[420px_1fr]">
       <AuthBrandPanel />
       {children}
     </div>

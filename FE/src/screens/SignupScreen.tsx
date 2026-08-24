@@ -14,9 +14,9 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
   const org = orgField[role];
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-12">
+    <div className="flex min-h-screen items-center justify-center bg-[#EDEEF0] p-4 sm:p-8 lg:p-12">
       {/* 높이 고정 없이 내용만큼 — 카드 안에서 스크롤되지 않게 */}
-      <div className="flex w-[620px] flex-col gap-[22px] rounded-[20px] bg-white px-12 pb-10 pt-12 shadow-[0_12px_40px_rgba(25,31,40,0.10)]">
+      <div className="flex w-full max-w-[620px] flex-col gap-[22px] rounded-[20px] bg-white px-6 py-8 shadow-[0_12px_40px_rgba(25,31,40,0.10)] sm:px-12 sm:pb-10 sm:pt-12">
         {/* 실제로 계정이 만들어지지 않는다는 사실과 버튼 동작을 일치시킵니다.
             예전 문구("가입 불가")는 버튼이 정상 진입시켜 서로 모순이었습니다. */}
         <div className="rounded-xl bg-[#FFFBF2] px-4 py-3.5 text-[15px] font-semibold text-[#B45309]">
@@ -52,7 +52,7 @@ export function SignupScreen({ onSubmit }: SignupScreenProps) {
           })}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AuthInput label="이름" placeholder="최현지" />
           <AuthInput label={org.label} placeholder={org.placeholder} />
         </div>

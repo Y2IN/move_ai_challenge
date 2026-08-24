@@ -56,7 +56,7 @@ export function ApplyGeneratingScreen({
         </p>
       </header>
 
-      <section className="rounded-[20px] bg-white p-7">
+      <section className="rounded-[20px] bg-white p-5 sm:p-7">
         <div className="flex items-center justify-between">
           <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">
             진행 단계 {progress.current} / {progress.total}
@@ -121,7 +121,7 @@ export function ApplyGeneratingScreen({
         </div>
       </section>
 
-      <section className="flex items-center justify-between rounded-2xl bg-white px-6 py-[18px]">
+      <section className="flex flex-col gap-3 rounded-2xl bg-white px-6 py-[18px] sm:flex-row sm:items-center sm:justify-between">
         <span className="text-[15px] text-[#6B7684]">{applyMeta.disclaimer}</span>
         <span className="flex gap-4">
           <button

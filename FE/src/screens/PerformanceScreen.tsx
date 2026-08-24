@@ -58,7 +58,7 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
       <section>
         <AsyncSection state={stats.state} onRetry={stats.reload} skeleton={<SkeletonGrid count={4} height={118} />}>
           {(cards) => (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {cards.map((c) => (
                 <StatCard key={c.label} stat={c} />
               ))}
@@ -74,7 +74,7 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
 
           return (
             <>
-              <section className="grid grid-cols-2 gap-4">
+              <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {charts.map((s) => (
                   <TrendChart
                     key={s.key}
@@ -86,10 +86,11 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
                 ))}
               </section>
 
-              <section className="grid grid-cols-[1fr_360px] items-start gap-4">
-                <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
-                  <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
-                    <div className="flex items-center gap-2.5">
+              <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_360px]">
+                {/* min-w-0 없으면 그리드 아이템이 표 내용 폭만큼 부풀어 페이지가 가로로 늘어남 */}
+                <div className="min-w-0 rounded-[20px] bg-white px-2 pb-3 pt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3.5 pt-5">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">
                         분기별 실적
                       </span>
@@ -100,45 +101,49 @@ export function PerformanceScreen({ onPublish, onOpenLast }: PerformanceScreenPr
                     <span className="text-sm text-[#8B95A1]">공차 회송 노선 기준</span>
                   </div>
 
-                  <div className={`${COLS} px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
-                    <span>분기</span>
-                    {data.series.map((s) => (
-                      <span key={s.key} className="text-right">
-                        {s.label}
-                      </span>
-                    ))}
-                  </div>
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[640px]">
+                      <div className={`${COLS} px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
+                        <span>분기</span>
+                        {data.series.map((s) => (
+                          <span key={s.key} className="text-right">
+                            {s.label}
+                          </span>
+                        ))}
+                      </div>
 
-                  {data.items.map((row) => (
-                    <div
-                      key={row.period}
-                      className={[
-                        COLS,
-                        'items-center border-t border-[#F2F4F6] px-5 py-4',
-                        row.current ? 'ml-2 rounded-r-xl border-l-[3px] border-l-[#3182F6] bg-[#F5F9FF]' : '',
-                      ].join(' ')}
-                    >
-                      <span
-                        className={`text-[15px] font-bold tabular-nums ${
-                          row.current ? 'text-[#1B64DA]' : 'text-[#191F28]'
-                        }`}
-                      >
-                        {row.label}
-                      </span>
-
-                      {data.series.map((s) => (
-                        <span
-                          key={s.key}
-                          className={`text-right text-[15px] font-semibold tabular-nums ${
-                            !row.hasData ? 'text-[#D1D6DB]' : row.current ? 'text-[#191F28]' : 'text-[#8B95A1]'
-                          }`}
+                      {data.items.map((row) => (
+                        <div
+                          key={row.period}
+                          className={[
+                            COLS,
+                            'items-center border-t border-[#F2F4F6] px-5 py-4',
+                            row.current ? 'ml-2 rounded-r-xl border-l-[3px] border-l-[#3182F6] bg-[#F5F9FF]' : '',
+                          ].join(' ')}
                         >
-                          {/* 실적이 없는 분기는 0 을 찍지 않는다 — 0톤 실적과 구분돼야 한다 */}
-                          {row.hasData ? formatMetric(row.metrics[s.key], s.unit) : '실적 없음'}
-                        </span>
+                          <span
+                            className={`text-[15px] font-bold tabular-nums ${
+                              row.current ? 'text-[#1B64DA]' : 'text-[#191F28]'
+                            }`}
+                          >
+                            {row.label}
+                          </span>
+
+                          {data.series.map((s) => (
+                            <span
+                              key={s.key}
+                              className={`text-right text-[15px] font-semibold tabular-nums ${
+                                !row.hasData ? 'text-[#D1D6DB]' : row.current ? 'text-[#191F28]' : 'text-[#8B95A1]'
+                              }`}
+                            >
+                              {/* 실적이 없는 분기는 0 을 찍지 않는다 — 0톤 실적과 구분돼야 한다 */}
+                              {row.hasData ? formatMetric(row.metrics[s.key], s.unit) : '실적 없음'}
+                            </span>
+                          ))}
+                        </div>
                       ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
 
                 <ReportPanel data={data} onPublish={onPublish} onOpenLast={onOpenLast} />

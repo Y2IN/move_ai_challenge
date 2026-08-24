@@ -113,7 +113,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
       {/* 배너 문구는 서버 판정 그대로. 화면이 다시 쓰면 판정과 어긋납니다 */}
       <Banner tone="warn">{m.message}</Banner>
 
-      <section className="grid grid-cols-[1fr_380px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_380px]">
         <div className="flex flex-col gap-4">
           <Card>
             <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
               </span>
             </div>
 
-            <div className="mt-[18px] grid grid-cols-4 gap-4">
+            <div className="mt-[18px] grid grid-cols-2 gap-4 lg:grid-cols-4">
               <InfoCell label="구간" value={m.wagon ? m.wagon.label : '배정 가능한 공차 없음'} />
               <InfoCell
                 label="출발 예정"
@@ -145,7 +145,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
                 style={{ width: `${Math.min(loadRate, 100)}%` }}
               />
             </span>
-            <div className="mt-2 flex justify-between text-[13px] text-[#B0B8C1]">
+            <div className="mt-2 flex flex-col gap-1 text-[13px] text-[#B0B8C1] sm:flex-row sm:justify-between">
               <span>{solo || '등록된 화물 없음'}</span>
               <span>
                 최소 기준 {minRate}% · {formatNumber(minTon, 1)}t · 부족 {formatNumber(m.shortfallTon, 1)}t
@@ -163,7 +163,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
 
             {m.negotiationCandidates.length > 0 && (
               <div className="mt-[18px] flex flex-col">
-                <div className="grid grid-cols-[150px_90px_1fr_120px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5 text-[13px] font-bold text-[#B0B8C1]">
+                <div className="hidden grid-cols-[150px_90px_1fr_120px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5 text-[13px] font-bold text-[#B0B8C1] md:grid">
                   <span>화주</span>
                   <span>물량</span>
                   <span>어긋난 조건</span>
@@ -173,7 +173,7 @@ function UnmatchedBody({ match: m, onNavigate }: { match: MatchResult; onNavigat
                 {m.negotiationCandidates.map((c) => (
                   <div
                     key={c.shipmentId}
-                    className="grid grid-cols-[150px_90px_1fr_120px] items-center gap-3.5 border-t border-[#F2F4F6] py-3.5"
+                    className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 border-t border-[#F2F4F6] py-3.5 md:grid md:grid-cols-[150px_90px_1fr_120px]"
                   >
                     <span className="text-base font-bold tracking-[-0.02em] text-[#191F28]">{c.shipperName}</span>
                     <span className="text-[15px] tabular-nums text-[#4E5968]">

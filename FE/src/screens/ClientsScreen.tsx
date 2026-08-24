@@ -40,7 +40,7 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
 
       <AsyncSection state={clients.state} onRetry={clients.reload} skeleton={<SkeletonGrid count={4} />}>
         {(data) => (
-          <section className="grid grid-cols-4 gap-4">
+          <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {data.stats.map((s) => (
               <StatCard
                 key={s.key}
@@ -61,10 +61,11 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
           const riskCount = data.items.filter((r) => r.status === '미달 위험').length;
 
           return (
-            <section className="grid grid-cols-[1fr_360px] items-start gap-4">
-              <div className="rounded-[20px] bg-white px-2 pb-3 pt-2">
-                <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
-                  <div className="flex items-center gap-2.5">
+            <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_360px]">
+              {/* min-w-0 없으면 그리드 아이템이 표 내용 폭만큼 부풀어 페이지가 가로로 늘어남 */}
+              <div className="min-w-0 rounded-[20px] bg-white px-2 pb-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3.5 pt-5">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <span className="text-[19px] font-extrabold tracking-[-0.02em] text-[#191F28]">
                       화주별 협약 이행
                     </span>
@@ -82,23 +83,27 @@ export function ClientsScreen({ onExport }: { onExport?: () => void }) {
                   </span>
                 </div>
 
-                <div className={`${COLS} px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
-                  <span>화주</span>
-                  <span>주 노선</span>
-                  <span className="text-right">협약물량</span>
-                  <span className="text-right">실적물량</span>
-                  <span>이행률</span>
-                  <span className="text-right">공차 기여</span>
-                  <span className="text-right">상태</span>
-                </div>
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1000px]">
+                    <div className={`${COLS} px-5 py-2.5 text-[13px] font-bold text-[#B0B8C1]`}>
+                      <span>화주</span>
+                      <span>주 노선</span>
+                      <span className="text-right">협약물량</span>
+                      <span className="text-right">실적물량</span>
+                      <span>이행률</span>
+                      <span className="text-right">공차 기여</span>
+                      <span className="text-right">상태</span>
+                    </div>
 
-                {data.items.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-[15px] text-[#8B95A1]">
-                    이 기간에 협약 실적이 있는 화주가 없습니다.
+                    {data.items.length === 0 ? (
+                      <div className="px-4 py-10 text-center text-[15px] text-[#8B95A1]">
+                        이 기간에 협약 실적이 있는 화주가 없습니다.
+                      </div>
+                    ) : (
+                      data.items.map((r) => <ClientLine key={r.id} row={r} riskRate={data.riskRate} />)
+                    )}
                   </div>
-                ) : (
-                  data.items.map((r) => <ClientLine key={r.id} row={r} riskRate={data.riskRate} />)
-                )}
+                </div>
               </div>
 
               <SalesPanel data={data} onExport={onExport} />

@@ -93,13 +93,13 @@ function HeroFigures({ stats }: { stats: PublicStats }) {
 
   return (
     <>
-      <div className="mt-0.5 flex flex-col items-center">
+      <div className="mt-0.5 flex w-full flex-col items-center">
         {/* 숫자는 흰→블루 그라디언트를 글자에 클립, '원'만 단색 블루로 남김 */}
-        <div className="bg-[linear-gradient(180deg,#FFFFFF_38%,#8FC2FF_100%)] bg-clip-text text-[116px] font-extrabold leading-[1.04] tracking-[-0.055em] text-transparent">
+        <div className="bg-[linear-gradient(180deg,#FFFFFF_38%,#8FC2FF_100%)] bg-clip-text text-[48px] font-extrabold leading-[1.04] tracking-[-0.055em] text-transparent sm:text-[84px] md:text-[116px]">
           {stats.quarterBenefit.label}
-          <span className="ml-3 text-[58px] font-bold tracking-[-0.03em] text-[#8FC2FF]">원</span>
+          <span className="ml-3 text-[26px] font-bold tracking-[-0.03em] text-[#8FC2FF] sm:text-[42px] md:text-[58px]">원</span>
         </div>
-        <div className="h-[3px] w-[640px] rounded-full bg-[linear-gradient(90deg,transparent,#3182F6,transparent)]" />
+        <div className="h-[3px] w-full max-w-[640px] rounded-full bg-[linear-gradient(90deg,transparent,#3182F6,transparent)]" />
         <div className="mt-3.5 flex items-center gap-2.5">
           <span className="text-base font-semibold tabular-nums text-[#8B95A1]">
             {formatWonSign(stats.quarterBenefit.amount)}
@@ -137,10 +137,10 @@ function HeroFigures({ stats }: { stats: PublicStats }) {
  */
 function HeroPlaceholder() {
   return (
-    <div className="mt-0.5 flex flex-col items-center">
-      <div className="h-[122px] w-[520px] animate-pulse rounded-3xl bg-white/[0.06]" />
+    <div className="mt-0.5 flex w-full flex-col items-center">
+      <div className="h-[122px] w-full max-w-[520px] animate-pulse rounded-3xl bg-white/[0.06]" />
       <div className="mt-3.5 h-[30px] w-[280px] animate-pulse rounded-full bg-white/[0.06]" />
-      <div className="mt-[22px] h-[42px] w-[640px] animate-pulse rounded-full bg-white/[0.04]" />
+      <div className="mt-[22px] h-[42px] w-full max-w-[640px] animate-pulse rounded-full bg-white/[0.04]" />
     </div>
   );
 }
@@ -155,14 +155,15 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
   return (
     <div className="min-h-screen bg-white">
       {/* 흰 섹션 위로도 지나가므로 반투명 다크 + blur 고정 */}
-      <nav className="sticky top-0 z-50 flex h-[72px] items-center justify-between bg-[#0B1220]/85 px-10 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 flex h-[72px] items-center justify-between bg-[#0B1220]/85 px-5 backdrop-blur-md sm:px-10">
         <div className="flex items-center gap-9">
           <div className="flex items-center gap-2">
             {/* ponytail: 26px 정적 아이콘이라 next/image 대신 <img> — 최적화가 벌어줄 게 없음 */}
             <img src="/train.png" alt="" width={28} height={28} className="rounded-lg" />
             <span className="text-[17px] font-extrabold tracking-[-0.03em] text-white">{brand.name}</span>
           </div>
-          <div className="flex gap-6 text-[15px] font-semibold">
+          {/* 모바일에선 앵커 링크를 숨기고 로그인 버튼만 남긴다 */}
+          <div className="hidden gap-6 text-[15px] font-semibold md:flex">
             {marketingNav.map((n) => (
               <a
                 key={n.label}
@@ -191,12 +192,12 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
 
       <section className="relative overflow-hidden bg-[#0B1220] pb-[88px]">
         <GlobeBackdrop />
-        <div className="relative flex flex-col items-center gap-[22px] px-10 pt-[76px] text-center">
+        <div className="relative flex flex-col items-center gap-[22px] px-5 pt-[76px] text-center sm:px-10">
           <span className="rounded-full bg-[#3182F6]/[0.18] px-[15px] py-2 text-sm font-bold text-[#6FB0FF]">
             {brand.tagline}
           </span>
 
-          <h1 className="text-[42px] font-bold leading-[1.32] tracking-[-0.035em] text-white">
+          <h1 className="text-[28px] font-bold leading-[1.32] tracking-[-0.035em] text-white md:text-[42px]">
             {brand.headline[0]}
             <br />
             {brand.headline[1]}
@@ -259,14 +260,14 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
         </div>
       </section>
 
-      <section className="flex flex-col gap-9 px-10 py-20">
+      <section className="flex flex-col gap-9 px-5 py-20 sm:px-10">
         {/* 헤더만이 아니라 카드까지 묶어야 스크롤 스파이가 이 구간 내내 붙어 있음 */}
         <div id="how" className="flex scroll-mt-[92px] flex-col gap-9">
           <div className="mx-auto w-full max-w-[1200px]">
             <SectionHeader badge={howSection.badge} title={howSection.title} lead={howSection.lead} />
           </div>
 
-          <div className="mx-auto grid w-full max-w-[1200px] grid-cols-3 gap-4">
+          <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-4 md:grid-cols-3">
             {howItWorks.map((s) => (
               <div key={s.step} className="rounded-[20px] bg-[#F9FAFB] p-8">
                 <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-[#3182F6] text-base font-extrabold text-white">
@@ -278,8 +279,8 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
             ))}
           </div>
 
-          <div className="mx-auto flex w-full max-w-[1200px] gap-4">
-            <div className="flex flex-1 items-center gap-[22px] rounded-[18px] bg-[#EAF8F1] px-[26px] py-[22px]">
+          <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 lg:flex-row">
+            <div className="flex flex-1 flex-col items-start gap-[22px] rounded-[18px] bg-[#EAF8F1] px-[26px] py-[22px] sm:flex-row sm:items-center">
               <img
                 src="/tree.png"
                 alt=""
@@ -300,7 +301,7 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
               </div>
             </div>
 
-            <div className="flex flex-1 items-center gap-[22px] rounded-[18px] bg-[#EAF2FE] px-[26px] py-[22px]">
+            <div className="flex flex-1 flex-col items-start gap-[22px] rounded-[18px] bg-[#EAF2FE] px-[26px] py-[22px] sm:flex-row sm:items-center">
               <img
                 src="/truck.png"
                 alt=""
@@ -322,7 +323,7 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
           <LandingSection id="how-agent">
             <SectionHeader badge={agentSection.badge} title={agentSection.title} lead={agentSection.lead} />
 
-            <div className="grid grid-cols-[1fr_1.15fr] items-center gap-8 rounded-[20px] bg-[#F5F9FF] px-9 py-[34px]">
+            <div className="grid grid-cols-1 items-center gap-8 rounded-[20px] bg-[#F5F9FF] px-5 py-[34px] sm:px-9 lg:grid-cols-[1fr_1.15fr]">
               <div className="flex flex-col gap-3">
                 <span className="inline-flex self-start items-center gap-[7px] rounded-full bg-white px-3 py-1.5 text-[13px] font-bold text-[#1B64DA]">
                   <AiChip />
@@ -344,12 +345,12 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
           <LandingSection id="esg-report">
             <SectionHeader badge={esgSection.badge} title={esgSection.title} lead={esgSection.lead} />
 
-            <div className="grid grid-cols-2 items-start gap-5">
+            <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
               <PlanDocPreview stats={statsData} />
               <EsgDocPreview stats={statsData} />
             </div>
 
-            <div className="flex items-center justify-center gap-7 rounded-2xl bg-[#F9FAFB] px-6 py-5">
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#F9FAFB] px-6 py-5 sm:flex-row sm:gap-7">
               {esgSection.legend.map((l) => (
                 <span key={l.label} className="flex items-center gap-2 text-[15px] text-[#4E5968]">
                   <span
@@ -362,7 +363,7 @@ export function LandingScreen({ onLogin, onStart }: LandingScreenProps) {
           </LandingSection>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between rounded-[20px] bg-[#0B1220] px-9 py-[34px]">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 rounded-[20px] bg-[#0B1220] px-6 py-7 sm:px-9 sm:py-[34px] md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2">
             <span className="text-2xl font-extrabold tracking-[-0.03em] text-white">{landingCta.title}</span>
             <span className="text-base text-[#B0B8C1]">{landingCta.body}</span>
