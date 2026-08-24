@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { AppLayout } from '../components/AppLayout';
 import { DemoDataBadge, ErrorNotice } from '../components/AsyncSection';
 import { ChoiceField, Field, SelectField, TextField } from '../components/Field';
+import { ParseResultPanel } from '../components/ParseResultPanel';
 import { setConfirmationId, setRegisteredId, setShipment } from '../lib/demo-session';
 import {
   CORP_TYPES,
@@ -25,6 +26,7 @@ import {
   type FlexChoice,
   type FreightField,
   type FreightForm,
+  type ParseResponse,
   type StationOption,
   type TransportMode,
 } from '../lib/freight';
@@ -59,7 +61,10 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [parsing, setParsing] = useState(false);
-  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  /** 마지막 "AI로 채우기" 결과. 패널이 이걸 그립니다. 닫으면 null */
+  const [parseResult, setParseResult] = useState<{ res: ParseResponse; filled: FreightField[] } | null>(null);
+  /** 패널에서 "출발역 ↓" 를 눌렀을 때 잠깐 테두리를 켤 칸 */
+  const [highlight, setHighlight] = useState<FreightField | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -110,6 +115,16 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
     });
   };
 
+  /** 패널의 "출발역 ↓" — 그 칸으로 스크롤하고 포커스를 주고, 잠깐 테두리를 켭니다 */
+  const jumpToField = (key: FreightField) => {
+    const el = document.getElementById(`field-${key}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.querySelector<HTMLElement>('input, select')?.focus({ preventScroll: true });
+    setHighlight(key);
+    window.setTimeout(() => setHighlight((cur) => (cur === key ? null : cur)), 1600);
+  };
+
   /** #10 — 문장을 서버로 보내 폼을 채웁니다. 못 맞춘 필드는 비워 두고 배지도 안 붙입니다. */
   const runAiFill = () => {
     if (!natural.trim() || parsing) return;
@@ -122,15 +137,8 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
         setForm(next);
         setAiFields(new Set(filled));
         setErrors({});
-
-        // 서버가 못 채운 필드가 있으면 그 사실을 그대로 알립니다.
-        const missing = (['originStationId', 'destStationId', 'tons', 'departDate'] as const).filter(
-          (k) => !filled.includes(k),
-        );
-        setParseWarnings([
-          ...res.warnings,
-          ...(missing.length ? ['직접 채워야 하는 항목이 있습니다 — 아래 폼을 확인하세요.'] : []),
-        ]);
+        // 뭘 채웠고 뭘 더 골라야 하는지는 패널이 그립니다 (경고 문장 나열 대신).
+        setParseResult({ res, filled });
       })
       .catch((error: Error) => setSubmitError(`파싱 실패 — ${error.message}`))
       .finally(() => setParsing(false));
@@ -180,7 +188,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
         <p className="text-base text-[#6B7684]">운송 요청을 문장으로 적어주세요. AI가 항목을 채워 드립니다.</p>
       </header>
 
-      <section className="grid grid-cols-[1fr_320px] items-start gap-4">
+      <section className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
           <div className="rounded-[20px] bg-white p-6">
             <div className="flex flex-col gap-3">
@@ -279,7 +287,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 )}
               </div>
 
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex flex-wrap items-center gap-2 text-[13px] leading-relaxed text-[#8B95A1]">
                   {masters.state.status === 'ready' ? masters.state.data.notice : ' '}
                   {masters.state.status === 'ready' && masters.state.data.demo && (
@@ -296,19 +304,28 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 </button>
               </div>
 
-              {parseWarnings.map((w) => (
-                <span key={w} className="text-[13px] font-semibold text-[#C77700]">
-                  {w}
-                </span>
-              ))}
+              {parseResult && (
+                <ParseResultPanel
+                  result={parseResult.res}
+                  filled={parseResult.filled}
+                  onJump={jumpToField}
+                  onDismiss={() => setParseResult(null)}
+                />
+              )}
             </div>
           </div>
 
           <div className="flex flex-col gap-4 rounded-[20px] bg-white p-6">
             <span className="text-[17px] font-extrabold tracking-[-0.02em] text-[#191F28]">운송 정보</span>
 
-            <div className="grid grid-cols-2 gap-3.5">
-              <Field label="출발역" ai={aiFields.has('originStationId')} error={errors.originStationId}>
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <Field
+                label="출발역"
+                id="field-originStationId"
+                highlight={highlight === 'originStationId'}
+                ai={aiFields.has('originStationId')}
+                error={errors.originStationId}
+              >
                 <ChoiceField
                   value={form.originStationId}
                   options={stationOptions}
@@ -318,7 +335,13 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 />
               </Field>
 
-              <Field label="도착역" ai={aiFields.has('destStationId')} error={errors.destStationId}>
+              <Field
+                label="도착역"
+                id="field-destStationId"
+                highlight={highlight === 'destStationId'}
+                ai={aiFields.has('destStationId')}
+                error={errors.destStationId}
+              >
                 <ChoiceField
                   value={form.destStationId}
                   options={stationOptions}
@@ -336,7 +359,13 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 />
               </Field>
 
-              <Field label="중량 (톤)" ai={aiFields.has('tons')} error={errors.tons}>
+              <Field
+                label="중량 (톤)"
+                id="field-tons"
+                highlight={highlight === 'tons'}
+                ai={aiFields.has('tons')}
+                error={errors.tons}
+              >
                 <TextField
                   type="number"
                   numeric
@@ -346,7 +375,13 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
                 />
               </Field>
 
-              <Field label="희망 출발일" ai={aiFields.has('departDate')} error={errors.departDate}>
+              <Field
+                label="희망 출발일"
+                id="field-departDate"
+                highlight={highlight === 'departDate'}
+                ai={aiFields.has('departDate')}
+                error={errors.departDate}
+              >
                 <TextField type="date" value={form.departDate} onChange={(v) => setField('departDate', v)} />
               </Field>
 
@@ -426,7 +461,7 @@ export function FreightNewScreen({ onNavigate }: FreightNewScreenProps) {
 
             {submitError && <ErrorNotice message={submitError} />}
 
-            <div className="mt-1 flex items-center justify-between">
+            <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-[13px] text-[#8B95A1]">
                 등록하면 시드 화물 풀과 함께 편성을 계산합니다.
               </span>

@@ -57,6 +57,19 @@ export interface ParseCase {
   warnings: string[];
 }
 
+/**
+ * 상대 날짜를 어떻게 환산했는지. 화면이 "'내일' → 8월 25일 (화)" 처럼 그린다.
+ * `kind === "arrival"` 이면 출발일이 아니라 도착 기한이라 폼에는 안 넣었다는 뜻이다.
+ */
+export interface DateResolution {
+  /** 원문에서 잡은 표현 — "내일", "다음주 토요일", "금주까지" */
+  expression: string;
+  date: string;
+  /** 환산 기준일 (YYYY-MM-DD) */
+  today: string;
+  kind: "depart" | "arrival";
+}
+
 export interface ParseResponse {
   /** 규칙(케이스) 경로로 나온 결과인지. `source === "rule"` 과 같다 */
   demo: boolean;
@@ -67,6 +80,17 @@ export interface ParseResponse {
   caseId: string;
   fields: ParsedFreight;
   warnings: string[];
+  /** 문장에 상대 날짜 표현이 있었으면 어떻게 환산했는지. 없으면 null */
+  dateResolution: DateResolution | null;
+}
+
+/** 생성 AI 가 붙어 있을 때 GET 이 주는 안내 */
+export const AI_READY_NOTICE = "문장을 적고 'AI로 채우기'를 누르면 항목을 읽어 채웁니다.";
+
+/** GET /api/freights/parse 가 쓰는 상태 — AI 가 붙어 있는지에 따라 배지·안내가 갈린다 */
+export function parseStatus(): { demo: boolean; notice: string } {
+  const demo = !isLlmConfigured();
+  return { demo, notice: demo ? DEMO_NOTICE : AI_READY_NOTICE };
 }
 
 const ai = <T>(value: T, confidence: number, enumCode?: string): ParseField<T> => ({
@@ -287,6 +311,8 @@ function nearestWeekday(today: Date, dayIdx: number): string {
 interface DateMatch {
   /** 문장 안 위치 — 어느 절(출발/도착)에 속하는지 볼 때 쓴다 */
   index: number;
+  /** 원문에서 잡힌 표현 그대로 — 화면이 "'내일' → …" 로 보여준다 */
+  expression: string;
   date: string;
 }
 
@@ -303,22 +329,26 @@ function findDateMatches(text: string, today: Date): DateMatch[] {
     const date = m[1]
       ? dayOfWeek(today, NEXT_WEEK_PREFIX.test(m[1]) ? 1 : 0, dayIdx)
       : nearestWeekday(today, dayIdx);
-    out.push({ index: m.index ?? 0, date });
+    out.push({ index: m.index ?? 0, expression: m[0].trim(), date });
   }
 
   // "금주까지" / "차주 안에" — 요일 없이 주 단위 마감이면 그 주 일요일
   for (const m of text.matchAll(/(이번\s*주|금주|다음\s*주|차주|담주)\s*(?:까지|안에)/g)) {
-    out.push({ index: m.index ?? 0, date: dayOfWeek(today, NEXT_WEEK_PREFIX.test(m[1]) ? 1 : 0, 6) });
+    out.push({
+      index: m.index ?? 0,
+      expression: m[0].trim(),
+      date: dayOfWeek(today, NEXT_WEEK_PREFIX.test(m[1]) ? 1 : 0, 6),
+    });
   }
 
   // "5일 뒤" / "3일 후"
   for (const m of text.matchAll(/(\d+)\s*일\s*(?:뒤|후)/g)) {
-    out.push({ index: m.index ?? 0, date: offsetDate(Number(m[1]), today) });
+    out.push({ index: m.index ?? 0, expression: m[0].trim(), date: offsetDate(Number(m[1]), today) });
   }
 
   for (const { pattern, offset } of RELATIVE_DATE_KEYWORDS) {
     for (const m of text.matchAll(pattern)) {
-      out.push({ index: m.index ?? 0, date: offsetDate(offset, today) });
+      out.push({ index: m.index ?? 0, expression: m[0].trim(), date: offsetDate(offset, today) });
     }
   }
 
@@ -347,8 +377,11 @@ function clauseKind(text: string, index: number): "depart" | "arrival" | "unknow
 export interface ResolvedDates {
   /** 희망 출발일. 출발 절이 없고 도착 절만 있으면 null */
   depart: string | null;
-  /** 도착 기한. 폼에는 안 들어가지만 warnings 문구에 쓴다 */
+  /** `depart` 를 만든 원문 표현 */
+  departExpr: string | null;
+  /** 도착 기한. 폼에는 안 들어가지만 안내 문구에 쓴다 */
   arrival: string | null;
+  arrivalExpr: string | null;
 }
 
 /**
@@ -360,16 +393,30 @@ export interface ResolvedDates {
  */
 export function resolveDates(text: string, today: Date = new Date()): ResolvedDates {
   const matches = findDateMatches(text, today);
-  let depart: string | null = null;
-  let unknown: string | null = null;
-  let arrival: string | null = null;
+  let depart: DateMatch | null = null;
+  let unknown: DateMatch | null = null;
+  let arrival: DateMatch | null = null;
   for (const m of matches) {
     const kind = clauseKind(text, m.index);
-    if (kind === "depart" && depart === null) depart = m.date;
-    else if (kind === "arrival" && arrival === null) arrival = m.date;
-    else if (kind === "unknown" && unknown === null) unknown = m.date;
+    if (kind === "depart" && depart === null) depart = m;
+    else if (kind === "arrival" && arrival === null) arrival = m;
+    else if (kind === "unknown" && unknown === null) unknown = m;
   }
-  return { depart: depart ?? unknown, arrival };
+  const d = depart ?? unknown;
+  return {
+    depart: d?.date ?? null,
+    departExpr: d?.expression ?? null,
+    arrival: arrival?.date ?? null,
+    arrivalExpr: arrival?.expression ?? null,
+  };
+}
+
+/** `resolveDates` 결과를 응답용으로. 출발이 있으면 출발, 아니면 도착, 둘 다 없으면 null */
+function toDateResolution(r: ResolvedDates, today: Date): DateResolution | null {
+  const todayIso = toIsoDate(today);
+  if (r.depart && r.departExpr) return { expression: r.departExpr, date: r.depart, today: todayIso, kind: "depart" };
+  if (r.arrival && r.arrivalExpr) return { expression: r.arrivalExpr, date: r.arrival, today: todayIso, kind: "arrival" };
+  return null;
 }
 
 /** `resolveDates(...).depart` 단축. 표현이 없거나 도착 기한만 있으면 `null`. */
@@ -400,12 +447,15 @@ export function parseFreightText(input: { text?: string; caseId?: string }): Par
   // caseId 로 고른 경우는 예시 문장을 그대로 쓰는 것이므로 케이스 값을 신뢰한다.
   let fields = withToday(picked);
   const warnings = [...picked.warnings];
+  let dateResolution: DateResolution | null = null;
   if (!input.caseId && input.text) {
-    const { depart, arrival } = resolveDates(input.text);
-    if (depart) fields = { ...fields, departDate: ai(depart, 0.95) };
-    else if (arrival) {
+    const today = new Date();
+    const resolved = resolveDates(input.text, today);
+    dateResolution = toDateResolution(resolved, today);
+    if (resolved.depart) fields = { ...fields, departDate: ai(resolved.depart, 0.95) };
+    else if (resolved.arrival) {
       fields = { ...fields, departDate: none() };
-      warnings.push(`도착 기한(${arrival})만 언급되어 출발일은 추정하지 못했습니다.`);
+      warnings.push(`도착 기한(${resolved.arrival})만 언급되어 출발일은 추정하지 못했습니다.`);
     }
   }
 
@@ -416,6 +466,7 @@ export function parseFreightText(input: { text?: string; caseId?: string }): Par
     caseId: picked.id,
     fields,
     warnings,
+    dateResolution,
   };
 }
 
@@ -532,17 +583,19 @@ export async function parseFreightWithLlm(
   // 도착 기한만 있는 문장이면 LLM 이 출발일을 채웠더라도 비운다 — 지어낸 값이다.
   let departDateValue = typeof r.departDate === "string" ? r.departDate : null;
   let departDateConfidence: unknown = r.departDateConfidence;
-  const { depart, arrival } = resolveDates(text, today);
-  if (depart) {
-    if (departDateValue !== depart) {
-      warnings.push(`상대 날짜 표현을 오늘(${toIsoDate(today)}) 기준 ${depart} 로 환산했습니다.`);
-    }
-    departDateValue = depart;
+  const resolved = resolveDates(text, today);
+  const dateResolution = toDateResolution(resolved, today);
+  let finalWarnings = warnings;
+  if (dateResolution) {
+    // 코드가 날짜를 확정했으면 LLM 이 남긴 날짜 관련 경고는 뺀다 — 같은 얘기를 두 번 하거나
+    // ("'내일'을 08-25 로 환산함") 코드 결과와 어긋나는 문장이 남는다. 화면은 dateResolution 을 그린다.
+    finalWarnings = warnings.filter((w) => !/departDate|출발일|날짜/.test(w));
+  }
+  if (resolved.depart) {
+    departDateValue = resolved.depart;
     departDateConfidence = 0.95;
-  } else if (arrival) {
-    if (departDateValue !== null) {
-      warnings.push(`도착 기한(${arrival})만 언급되어 출발일은 비워 뒀습니다 — 직접 입력해 주세요.`);
-    }
+  } else if (resolved.arrival) {
+    // 도착 기한만 있는데 LLM 이 출발일을 채웠다면 지어낸 값이다. 비운다.
     departDateValue = null;
   }
 
@@ -559,7 +612,8 @@ export async function parseFreightWithLlm(
       departDate: field(departDateValue, departDateConfidence),
       corpType: field(corpType, r.corpTypeConfidence),
     },
-    warnings,
+    warnings: finalWarnings,
+    dateResolution,
   };
 }
 
