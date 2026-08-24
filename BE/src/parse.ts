@@ -219,11 +219,15 @@ export const PARSE_CASES: ParseCase[] = [
   },
 ];
 
-/** 오늘 + n일 (로컬 달력 기준 — UTC 로 계산하면 KST 자정 직후 하루가 밀린다) */
-function offsetDate(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
+function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** 오늘 + n일 (로컬 달력 기준 — UTC 로 계산하면 KST 자정 직후 하루가 밀린다) */
+function offsetDate(days: number, base: Date = new Date()): string {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return toIsoDate(d);
 }
 
 /** 상대 오프셋을 오늘 기준 날짜로 채운 사본. 케이스 원본은 건드리지 않는다. */
@@ -233,6 +237,144 @@ function withToday(c: ParseCase): ParsedFreight {
     ...c.fields,
     departDate: { ...c.fields.departDate, value: offsetDate(c.departOffsetDays) },
   };
+}
+
+/**
+ * 상대 날짜 표현 → 오늘 기준 오프셋(일).
+ *
+ * AI 든 규칙 경로든 이 표가 **유일한 기준**이다. LLM 은 날짜 계산을 가끔 틀리므로
+ * (예: "모레"를 +1 로 셈) 문장에 이 표현이 있으면 LLM 결과를 이 값으로 덮어쓴다.
+ * 숫자(N일 뒤/후)와 요일·주 표현은 아래 `DATE_MATCHERS` 에서 정규식으로 따로 다룬다.
+ */
+const RELATIVE_DATE_KEYWORDS: Array<{ pattern: RegExp; offset: number }> = [
+  { pattern: /오늘/g, offset: 0 },
+  { pattern: /내일|명일/g, offset: 1 },
+  { pattern: /모레/g, offset: 2 },
+  { pattern: /글피/g, offset: 3 },
+  { pattern: /사흘\s*(?:뒤|후)/g, offset: 3 },
+  { pattern: /나흘\s*(?:뒤|후)/g, offset: 4 },
+  { pattern: /닷새\s*(?:뒤|후)/g, offset: 5 },
+  { pattern: /엿새\s*(?:뒤|후)/g, offset: 6 },
+  { pattern: /이레\s*(?:뒤|후)/g, offset: 7 },
+];
+
+const WEEKDAY_INDEX: Record<string, number> = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4, 토: 5, 일: 6 };
+/** "다음주"/"차주"/"담주" 계열 — "이번주"/"금주" 와 구분하는 데 쓴다 */
+const NEXT_WEEK_PREFIX = /다음\s*주|차주|담주/;
+
+/** 그 날이 속한 주의 월요일 (로컬 달력 기준, 월요일 시작) */
+function mondayOf(base: Date): Date {
+  const d = new Date(base);
+  const mondayBasedIdx = (d.getDay() + 6) % 7; // 월=0 ... 일=6
+  d.setDate(d.getDate() - mondayBasedIdx);
+  return d;
+}
+
+/** 이번주(0)·다음주(1) 의 `dayIdx`(월=0…일=6) 번째 날 */
+function dayOfWeek(today: Date, weekOffset: number, dayIdx: number): string {
+  const d = mondayOf(today);
+  d.setDate(d.getDate() + weekOffset * 7 + dayIdx);
+  return toIsoDate(d);
+}
+
+/** 오늘 이후 가장 가까운 그 요일 (오늘이 해당 요일이면 오늘) */
+function nearestWeekday(today: Date, dayIdx: number): string {
+  const todayIdx = (today.getDay() + 6) % 7;
+  const delta = (dayIdx - todayIdx + 7) % 7;
+  return offsetDate(delta, today);
+}
+
+interface DateMatch {
+  /** 문장 안 위치 — 어느 절(출발/도착)에 속하는지 볼 때 쓴다 */
+  index: number;
+  date: string;
+}
+
+/**
+ * 문장에서 날짜 표현을 **전부** 찾는다. 한 문장에 "모레 출발, 금요일까지 도착"처럼
+ * 둘 이상 올 수 있어서 하나만 뽑으면 안 된다.
+ */
+function findDateMatches(text: string, today: Date): DateMatch[] {
+  const out: DateMatch[] = [];
+
+  // "다음주 토요일" / "금주 목요일" / "토요일"
+  for (const m of text.matchAll(/(이번\s*주|금주|다음\s*주|차주|담주)?\s*(월|화|수|목|금|토|일)요일/g)) {
+    const dayIdx = WEEKDAY_INDEX[m[2]];
+    const date = m[1]
+      ? dayOfWeek(today, NEXT_WEEK_PREFIX.test(m[1]) ? 1 : 0, dayIdx)
+      : nearestWeekday(today, dayIdx);
+    out.push({ index: m.index ?? 0, date });
+  }
+
+  // "금주까지" / "차주 안에" — 요일 없이 주 단위 마감이면 그 주 일요일
+  for (const m of text.matchAll(/(이번\s*주|금주|다음\s*주|차주|담주)\s*(?:까지|안에)/g)) {
+    out.push({ index: m.index ?? 0, date: dayOfWeek(today, NEXT_WEEK_PREFIX.test(m[1]) ? 1 : 0, 6) });
+  }
+
+  // "5일 뒤" / "3일 후"
+  for (const m of text.matchAll(/(\d+)\s*일\s*(?:뒤|후)/g)) {
+    out.push({ index: m.index ?? 0, date: offsetDate(Number(m[1]), today) });
+  }
+
+  for (const { pattern, offset } of RELATIVE_DATE_KEYWORDS) {
+    for (const m of text.matchAll(pattern)) {
+      out.push({ index: m.index ?? 0, date: offsetDate(offset, today) });
+    }
+  }
+
+  return out.sort((a, b) => a.index - b.index);
+}
+
+const DEPART_WORDS = /출발|출고|발송|보내|싣|상차/;
+const ARRIVAL_WORDS = /도착|입고|납품|하차|받/;
+
+/**
+ * 날짜 표현이 속한 절이 출발인지 도착인지. 절은 쉼표·마침표·줄바꿈으로 자른다.
+ * 절 안에 출발·도착 단서가 둘 다 없으면 `"unknown"`.
+ */
+function clauseKind(text: string, index: number): "depart" | "arrival" | "unknown" {
+  const boundary = /[,.\n。、]/;
+  let start = index;
+  while (start > 0 && !boundary.test(text[start - 1])) start--;
+  let end = index;
+  while (end < text.length && !boundary.test(text[end])) end++;
+  const clause = text.slice(start, end);
+  if (DEPART_WORDS.test(clause)) return "depart";
+  if (ARRIVAL_WORDS.test(clause)) return "arrival";
+  return "unknown";
+}
+
+export interface ResolvedDates {
+  /** 희망 출발일. 출발 절이 없고 도착 절만 있으면 null */
+  depart: string | null;
+  /** 도착 기한. 폼에는 안 들어가지만 warnings 문구에 쓴다 */
+  arrival: string | null;
+}
+
+/**
+ * 문장의 상대 날짜 표현을 오늘(`today`) 기준 절대 날짜로 환산해 **출발/도착으로 나눠** 돌려준다.
+ *
+ * - 출발 절("모레 출발")이 있으면 그 날짜가 `depart`
+ * - 출발·도착 단서가 없는 절("모레 보내주세요" 가 아닌 그냥 "모레")은 출발로 본다
+ * - 도착 절("금요일까지 도착")만 있으면 `depart` 는 null — 출발일을 지어내지 않는다
+ */
+export function resolveDates(text: string, today: Date = new Date()): ResolvedDates {
+  const matches = findDateMatches(text, today);
+  let depart: string | null = null;
+  let unknown: string | null = null;
+  let arrival: string | null = null;
+  for (const m of matches) {
+    const kind = clauseKind(text, m.index);
+    if (kind === "depart" && depart === null) depart = m.date;
+    else if (kind === "arrival" && arrival === null) arrival = m.date;
+    else if (kind === "unknown" && unknown === null) unknown = m.date;
+  }
+  return { depart: depart ?? unknown, arrival };
+}
+
+/** `resolveDates(...).depart` 단축. 표현이 없거나 도착 기한만 있으면 `null`. */
+export function resolveRelativeDate(text: string, today: Date = new Date()): string | null {
+  return resolveDates(text, today).depart;
 }
 
 /** 데모 케이스 목록 (화면 picker 용) */
@@ -253,13 +395,27 @@ export function parseFreightText(input: { text?: string; caseId?: string }): Par
   }
   if (!picked) picked = PARSE_CASES[0];
 
+  // 케이스의 departOffsetDays 는 예시 문장용 고정값이다. 실제 입력 문장에
+  // "내일"·"모레" 같은 표현이 있으면 그 문장 기준으로 다시 계산해 덮어쓴다.
+  // caseId 로 고른 경우는 예시 문장을 그대로 쓰는 것이므로 케이스 값을 신뢰한다.
+  let fields = withToday(picked);
+  const warnings = [...picked.warnings];
+  if (!input.caseId && input.text) {
+    const { depart, arrival } = resolveDates(input.text);
+    if (depart) fields = { ...fields, departDate: ai(depart, 0.95) };
+    else if (arrival) {
+      fields = { ...fields, departDate: none() };
+      warnings.push(`도착 기한(${arrival})만 언급되어 출발일은 추정하지 못했습니다.`);
+    }
+  }
+
   return {
     demo: true,
     source: "rule",
     notice: DEMO_NOTICE,
     caseId: picked.id,
-    fields: withToday(picked),
-    warnings: picked.warnings,
+    fields,
+    warnings,
   };
 }
 
@@ -282,6 +438,7 @@ const SYSTEM_PROMPT = `너는 화물 운송 주문 문장에서 등록 폼 필�
 3. 품목은 [석유화학제품, 화학원료, 철강재, 기타] 중 하나다. 애매하면 "기타".
 4. 기업 구분은 [중소기업, 우수물류기업, 일반] 중 하나이며, **문장에 언급이 없으면 null** 이다.
 5. 상대 날짜("다음주 화요일")는 주어진 오늘 날짜 기준으로 환산하고, 확신이 낮으면 confidence 를 낮춰라.
+   (오늘/내일/모레/요일/금주·차주 같은 흔한 표현은 코드가 다시 계산해 덮어쓰므로 정확도에 집착하지 않아도 된다.)
 6. confidence 는 0~1 이다. 문장에 명시된 값은 높게, 환산·추론한 값은 낮게 준다.
 7. 출발지·도착지는 **문장에 나온 표현 그대로** 옮긴다. 역 이름으로 바꾸지 마라 (역 매칭은 화면이 따로 한다).
 
@@ -370,6 +527,25 @@ export async function parseFreightWithLlm(
   const itemName = typeof r.item === "string" && r.item in ITEM_ENUM ? r.item : null;
   const corpType = typeof r.corpType === "string" && CORP_TYPES.includes(r.corpType) ? r.corpType : null;
 
+  // "오늘/내일/모레/다음주 토요일" 같은 표현은 LLM 계산에 맡기지 않고 코드 기준으로 덮어쓴다.
+  // LLM 이 날짜 산수를 가끔 틀리기 때문에(예: "모레"를 +1일로 셈) 결정론적 값이 우선한다.
+  // 도착 기한만 있는 문장이면 LLM 이 출발일을 채웠더라도 비운다 — 지어낸 값이다.
+  let departDateValue = typeof r.departDate === "string" ? r.departDate : null;
+  let departDateConfidence: unknown = r.departDateConfidence;
+  const { depart, arrival } = resolveDates(text, today);
+  if (depart) {
+    if (departDateValue !== depart) {
+      warnings.push(`상대 날짜 표현을 오늘(${toIsoDate(today)}) 기준 ${depart} 로 환산했습니다.`);
+    }
+    departDateValue = depart;
+    departDateConfidence = 0.95;
+  } else if (arrival) {
+    if (departDateValue !== null) {
+      warnings.push(`도착 기한(${arrival})만 언급되어 출발일은 비워 뒀습니다 — 직접 입력해 주세요.`);
+    }
+    departDateValue = null;
+  }
+
   return {
     demo: false,
     source: "ai",
@@ -380,7 +556,7 @@ export async function parseFreightWithLlm(
       destination: field(typeof r.destination === "string" ? r.destination : null, r.destinationConfidence),
       item: field(itemName, r.itemConfidence, itemName ? ITEM_ENUM[itemName] : undefined),
       tons: field(tons, r.tonsConfidence),
-      departDate: field(typeof r.departDate === "string" ? r.departDate : null, r.departDateConfidence),
+      departDate: field(departDateValue, departDateConfidence),
       corpType: field(corpType, r.corpTypeConfidence),
     },
     warnings,

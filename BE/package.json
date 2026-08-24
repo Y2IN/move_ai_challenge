@@ -12,7 +12,8 @@
     "test:matching": "tsx src/matching.test.ts",
     "test:verify": "tsx src/report/verify.test.ts",
     "test:esg": "tsx src/esg/verify.test.ts && tsx src/esg/export.test.ts && tsx src/esg/guard.test.ts",
-    "test:guard": "tsx src/report/guard.test.ts"
+    "test:guard": "tsx src/report/guard.test.ts",
+    "test:parse": "tsx src/parse.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.17.0",
