@@ -98,6 +98,15 @@ assert("출발 단서 다양 — 상차", resolveRelativeDate("내일 상차", M
 assert("도착 단서 다양 — 입고", resolveDates("내일 입고", MON).depart, null);
 assert("도착 단서 다양 — 납품", resolveDates("차주 금요일 납품", MON).depart, null);
 
+// ── 4b. 원문 표현 캡처 — 화면이 "'내일' → 8월 25일" 로 그린다 ──
+console.log("── 표현 캡처 ──");
+assert("departExpr — 내일", resolveDates("철강재 3톤 내일 출발", MON).departExpr, "내일");
+assert("departExpr — 다음주 토요일", resolveDates("다음주 토요일 출발", MON).departExpr, "다음주 토요일");
+assert("departExpr — 띄어쓰기 보존", resolveDates("다음 주 토요일 출발", MON).departExpr, "다음 주 토요일");
+assert("departExpr — 5일 후", resolveDates("5일 후 출발", MON).departExpr, "5일 후");
+assert("arrivalExpr — 금주까지", resolveDates("금주까지 도착", MON).arrivalExpr, "금주까지");
+assert("표현 없음 → departExpr null", resolveDates("철강재 3톤", MON).departExpr, null);
+
 // ── 5. 없는 표현 ─────────────────────────────────────────────
 console.log("── 해당 없음 ──");
 assert("표현 없음 → null", resolveRelativeDate("울산에서 오봉까지 철강재 3톤", MON), null);
@@ -118,6 +127,19 @@ console.log("── parseFreightText 통합 ──");
   const r = parseFreightText({ text: "울산화물역에서 경기 의왕까지 화학원료 12톤, 이번 주 안에 도착만 하면 됩니다" });
   assert("도착 기한만 → 출발일 비움", r.fields.departDate.value, null);
   assert("도착 기한만 → warning 에 사유", r.warnings.some((w) => w.includes("도착 기한")), true);
+  assert("도착 기한만 → dateResolution.kind = arrival", r.dateResolution?.kind, "arrival");
+  assert("도착 기한만 → dateResolution.expression", r.dateResolution?.expression, "이번 주 안에");
+}
+{
+  const r = parseFreightText({ text: "울산 공장에서 경기 의왕까지 석유화학제품 8톤, 다음주 토요일 출발" });
+  assert("dateResolution.kind = depart", r.dateResolution?.kind, "depart");
+  assert("dateResolution.expression", r.dateResolution?.expression, "다음주 토요일");
+  assert("dateResolution.date 가 폼 값과 같다", r.dateResolution?.date, r.fields.departDate.value);
+  assert("dateResolution.today 는 YYYY-MM-DD", /^\d{4}-\d{2}-\d{2}$/.test(r.dateResolution?.today ?? ""), true);
+}
+{
+  const r = parseFreightText({ text: "울산 공장에서 경기 의왕까지 석유화학제품 8톤" });
+  assert("표현 없으면 dateResolution null", r.dateResolution, null);
 }
 {
   // caseId 로 직접 고른 경우는 예시 문장을 그대로 쓰는 것이니 케이스 값을 신뢰한다

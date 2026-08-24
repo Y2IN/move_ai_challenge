@@ -15,16 +15,27 @@ export function Field({
   label,
   ai,
   error,
+  id,
+  highlight,
   children,
 }: {
   label: string;
   ai?: boolean;
   /** 서버(#11)와 같은 규칙으로 화면이 먼저 거른 메시지 */
   error?: string;
+  /** 다른 곳(파싱 결과 패널)에서 이 칸으로 스크롤·포커스할 때 쓰는 앵커 */
+  id?: string;
+  /** 잠깐 테두리를 켜서 "여기" 라고 알려줍니다 */
+  highlight?: boolean;
   children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-2">
+    <label
+      id={id}
+      className={`flex flex-col gap-2 rounded-xl transition-shadow duration-500 ${
+        highlight ? 'shadow-[0_0_0_3px_rgba(49,130,246,0.35)]' : ''
+      }`}
+    >
       <span className="flex items-center gap-2 text-sm font-semibold text-[#6B7684]">
         {label}
         {ai && <AiBadge />}

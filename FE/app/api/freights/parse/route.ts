@@ -1,5 +1,5 @@
 import { badJson, readBody } from "@railhub/be/http";
-import { DEMO_NOTICE, listParseCases, parseFreight } from "@railhub/be/parse";
+import { listParseCases, parseFreight, parseStatus } from "@railhub/be/parse";
 
 // 자연어 → 구조화 폼 (#10) — 생성 AI 우선, 규칙(케이스) 폴백.
 // GET  : 고를 수 있는 데모 케이스 목록
@@ -8,9 +8,14 @@ import { DEMO_NOTICE, listParseCases, parseFreight } from "@railhub/be/parse";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/** GET /api/freights/parse — 데모 케이스 목록 */
+/**
+ * GET /api/freights/parse — 예시 문장 목록 + AI 가 붙어 있는지.
+ *
+ * `demo` 는 **LLM 설정 여부**다. 예전엔 `true` 로 박혀 있어서 AI 가 실제로 돌아도
+ * 화면에 "LLM 파싱 미구현" 배지가 떴다.
+ */
 export function GET() {
-  return Response.json({ demo: true, notice: DEMO_NOTICE, cases: listParseCases() });
+  return Response.json({ ...parseStatus(), cases: listParseCases() });
 }
 
 /** POST /api/freights/parse — { text?, caseId? } */
