@@ -28,6 +28,8 @@ import {
 import { saveEsgSection } from "@/src/lib/esg";
 import { toApplyDocView } from "@/src/lib/subsidy-view";
 import { ApplyDoneScreen } from "@/src/screens/ApplyDoneScreen";
+import { AppLayout } from "@/src/components/AppLayout";
+import { CardSkeleton } from "@/src/components/AsyncSection";
 
 /**
  * 06c 컨테이너.
@@ -394,10 +396,22 @@ function SubsidyDoneInner() {
   );
 }
 
+/**
+ * 청크 로딩 중 잠깐 걸리는 fallback. `null` 로 두면 라우트 이동 직후 화면이
+ * 통째로 비어 보인다 (다시 들어가면 청크가 캐시돼 있어 안 보일 뿐 근본 원인은 그대로다).
+ */
+function DoneFallback() {
+  return (
+    <AppLayout active="subsidy">
+      <CardSkeleton height={420} />
+    </AppLayout>
+  );
+}
+
 export default function SubsidyDone() {
   // useSearchParams 는 Suspense 경계가 필요하다 (없으면 빌드가 정적 생성에서 막힌다).
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DoneFallback />}>
       <SubsidyDoneInner />
     </Suspense>
   );
